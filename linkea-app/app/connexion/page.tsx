@@ -34,8 +34,7 @@ export default function Connexion() {
     const role = roleData?.role;
 
     if (role === "admin") router.push("/admin");
-    else if (role === "founder") router.push("/dashboard/founder");
-    else if (role === "developer") router.push("/dashboard/developer");
+    else if (role === "founder" || role === "developer") router.push("/projets");
     else router.push("/onboarding");
   }
 

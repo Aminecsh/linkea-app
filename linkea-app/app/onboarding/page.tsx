@@ -70,7 +70,7 @@ export default function Onboarding() {
         linkedin: form.linkedin,
       });
       if (dbError) { setError(dbError.message); setSaving(false); return; }
-      router.push("/dashboard/founder");
+      router.push("/projets");
     } else if (role === "developer") {
       const competencesArray = form.competences.split(",").map((c) => c.trim()).filter(Boolean);
       const { error: dbError } = await supabase.from("profiles_developer").insert({
@@ -84,7 +84,7 @@ export default function Onboarding() {
         linkedin: form.linkedin,
       });
       if (dbError) { setError(dbError.message); setSaving(false); return; }
-      router.push("/dashboard/developer");
+      router.push("/projets");
     }
   }
 
