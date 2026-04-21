@@ -27,7 +27,13 @@ export default function Inscription() {
       return;
     }
 
-    await supabase.from("user_roles").insert({ user_id: data.user.id, role });
+    const { error: roleError } = await supabase.from("user_roles").insert({ user_id: data.user.id, role });
+
+    if (roleError) {
+      setError("Erreur lors de l'enregistrement du rôle : " + roleError.message);
+      setLoading(false);
+      return;
+    }
 
     router.push("/onboarding");
   }

@@ -32,9 +32,15 @@ export default function Onboarding() {
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
-      setRole(data?.role ?? null);
+      if (!data?.role) {
+        setError("Rôle introuvable. Réessaie de t'inscrire.");
+        setLoading(false);
+        return;
+      }
+
+      setRole(data.role);
       setLoading(false);
     }
     loadRole();
