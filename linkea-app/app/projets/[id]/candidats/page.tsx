@@ -71,20 +71,33 @@ export default function CandidatsPage() {
   async function handleAccept(candidatureId: string, developerId: string) {
     setActing(candidatureId);
 
-    // Accepte ce candidat
     await supabase.from("candidatures").update({ statut: "accepted" }).eq("id", candidatureId);
-
-    // Refuse tous les autres candidats du même projet
-    await supabase
-      .from("candidatures")
-      .update({ statut: "refused" })
-      .eq("project_id", id)
-      .neq("id", candidatureId);
-
-    // Passe le projet en "matched"
+    await supabase.from("candidatures").update({ statut: "refused" }).eq("project_id", id).neq("id", candidatureId);
     await supabase.from("projects").update({ statut: "matched" }).eq("id", id);
 
-    // Refresh
+    // Email au dev accepté
+    const { data: devProfile } = await supabase.from("profiles_developer").select("email").eq("id", developerId).maybeSingle();
+    if (devProfile?.email && project) {
+      await fetch("/api/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "candidature_acceptee", to: devProfile.email, data: { projetTitre: project.titre } }),
+      });
+    }
+
+    // Emails aux devs refusés
+    const refusedCands = candidatures.filter((c) => c.id !== candidatureId && c.statut === "pending");
+    for (const c of refusedCands) {
+      const { data: refDevProfile } = await supabase.from("profiles_developer").select("email").eq("id", c.profiles_developer.id).maybeSingle();
+      if (refDevProfile?.email && project) {
+        await fetch("/api/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "candidature_refusee", to: refDevProfile.email, data: { projetTitre: project.titre } }),
+        });
+      }
+    }
+
     const { data: cands } = await supabase
       .from("candidatures")
       .select("id, statut, created_at, profiles_developer(id, nom, ecole, competences, github, linkedin, dispo_heures_semaine)")
@@ -99,6 +112,19 @@ export default function CandidatsPage() {
   async function handleRefuse(candidatureId: string) {
     setActing(candidatureId);
     await supabase.from("candidatures").update({ statut: "refused" }).eq("id", candidatureId);
+
+    // Email au dev refusé
+    const cand = candidatures.find((c) => c.id === candidatureId);
+    if (cand && project) {
+      const { data: devProfile } = await supabase.from("profiles_developer").select("email").eq("id", cand.profiles_developer.id).maybeSingle();
+      if (devProfile?.email) {
+        await fetch("/api/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "candidature_refusee", to: devProfile.email, data: { projetTitre: project.titre } }),
+        });
+      }
+    }
     setCandidatures((prev) => prev.map((c) => c.id === candidatureId ? { ...c, statut: "refused" } : c));
     setActing(null);
   }

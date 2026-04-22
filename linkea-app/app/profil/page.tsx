@@ -113,6 +113,12 @@ export default function ProfilPage() {
     router.push("/connexion");
   }
 
+  async function handleDeleteProject(projectId: string) {
+    if (!confirm("Supprimer ce projet ? Cette action est irréversible.")) return;
+    await supabase.from("projects").delete().eq("id", projectId);
+    setProjects((prev) => prev.filter((p) => p.id !== projectId));
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -198,12 +204,20 @@ export default function ProfilPage() {
                           {p.stack_souhaitee && <span>🛠 {p.stack_souhaitee}</span>}
                           {p.deadline && <span>📅 {p.deadline}</span>}
                         </div>
-                        <button
-                          onClick={() => router.push(`/projets/${p.id}/candidats`)}
-                          className="text-xs font-semibold text-pink-500 hover:text-pink-700 transition-colors"
-                        >
-                          Voir les candidats →
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleDeleteProject(p.id)}
+                            className="text-xs font-semibold text-red-400 hover:text-red-600 transition-colors"
+                          >
+                            Supprimer
+                          </button>
+                          <button
+                            onClick={() => router.push(`/projets/${p.id}/candidats`)}
+                            className="text-xs font-semibold text-pink-500 hover:text-pink-700 transition-colors"
+                          >
+                            Voir les candidats →
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

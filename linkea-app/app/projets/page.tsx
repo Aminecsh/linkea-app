@@ -16,6 +16,7 @@ type Project = {
   profiles_founder: {
     nom: string;
     ecole: string;
+    email: string;
   };
 };
 
@@ -58,7 +59,7 @@ export default function ProjetsPage() {
 
       const { data: projs } = await supabase
         .from("projects")
-        .select("*, profiles_founder(nom, ecole)")
+        .select("*, profiles_founder(nom, ecole, email)")
         .eq("statut", "pending")
         .order("created_at", { ascending: false });
 
@@ -93,6 +94,28 @@ export default function ProjetsPage() {
     setApplying(projectId);
     await supabase.from("candidatures").insert({ project_id: projectId, developer_id: developerId, statut: "pending" });
     setCandidatures((prev) => new Set([...prev, projectId]));
+
+    // Email au founder
+    const projet = projects.find((p) => p.id === projectId);
+    const { data: devProfile } = await supabase.from("profiles_developer").select("nom, email, ecole, competences").eq("id", developerId).maybeSingle();
+    if (projet?.profiles_founder?.email && devProfile) {
+      await fetch("/api/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "nouvelle_candidature",
+          to: projet.profiles_founder.email,
+          data: {
+            projetTitre: projet.titre,
+            projetId: projet.id,
+            devNom: devProfile.nom,
+            devEcole: devProfile.ecole,
+            devCompetences: devProfile.competences?.join(", "),
+          },
+        }),
+      });
+    }
+
     setApplying(null);
   }
 

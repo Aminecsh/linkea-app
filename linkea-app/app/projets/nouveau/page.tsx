@@ -76,7 +76,7 @@ export default function NouveauProjet() {
       return;
     }
 
-    router.push("/dashboard/founder");
+    router.push("/profil");
   }
 
   if (loading) {
