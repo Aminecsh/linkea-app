@@ -4,7 +4,8 @@
       "Bash(netstat -ano)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "WebFetch(domain:fr.indeed.com)"
     ]
   }
 }

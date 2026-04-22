@@ -193,9 +193,17 @@ export default function ProfilPage() {
                       {p.description && (
                         <p className="text-slate-500 text-sm line-clamp-2 mb-3">{p.description}</p>
                       )}
-                      <div className="flex gap-3 text-xs text-slate-400">
-                        {p.stack_souhaitee && <span>🛠 {p.stack_souhaitee}</span>}
-                        {p.deadline && <span>📅 {p.deadline}</span>}
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="flex gap-3 text-xs text-slate-400">
+                          {p.stack_souhaitee && <span>🛠 {p.stack_souhaitee}</span>}
+                          {p.deadline && <span>📅 {p.deadline}</span>}
+                        </div>
+                        <button
+                          onClick={() => router.push(`/projets/${p.id}/candidats`)}
+                          className="text-xs font-semibold text-pink-500 hover:text-pink-700 transition-colors"
+                        >
+                          Voir les candidats →
+                        </button>
                       </div>
                     </div>
                   );
