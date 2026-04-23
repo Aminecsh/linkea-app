@@ -32,6 +32,7 @@ export default function CandidatsPage() {
   const [candidatures, setCandidatures] = useState<Candidature[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
+  const [founderId, setFounderId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -45,6 +46,7 @@ export default function CandidatsPage() {
       const { data: profile } = await supabase
         .from("profiles_founder").select("id").eq("user_id", user.id).maybeSingle();
       if (!profile) { router.push("/onboarding"); return; }
+      setFounderId(profile.id);
 
       const { data: proj } = await supabase
         .from("projects")
@@ -74,6 +76,15 @@ export default function CandidatsPage() {
     await supabase.from("candidatures").update({ statut: "accepted" }).eq("id", candidatureId);
     await supabase.from("candidatures").update({ statut: "refused" }).eq("project_id", id).neq("id", candidatureId);
     await supabase.from("projects").update({ statut: "matched" }).eq("id", id);
+
+    // Créer la conversation
+    if (founderId) {
+      await supabase.from("conversations").insert({
+        project_id: id,
+        founder_id: founderId,
+        developer_id: developerId,
+      });
+    }
 
     // Email au dev accepté
     const { data: devProfile } = await supabase.from("profiles_developer").select("email").eq("id", developerId).maybeSingle();
