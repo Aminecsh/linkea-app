@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
+import NotificationBell from "@/components/NotificationBell";
 
 type Conversation = {
   id: string;
@@ -99,15 +100,18 @@ export default function MessagesPage() {
     <div className="min-h-screen bg-slate-50 pb-24">
       <div className="bg-white border-b border-slate-200 px-4 py-4 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <div>
+          <div className="flex-1">
             <p className="text-xs font-bold uppercase tracking-widest text-pink-500 mb-1">Linkea</p>
-            <h1 className="text-xl font-black text-slate-900">Messages</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-black text-slate-900">Messages</h1>
+              {totalUnread > 0 && (
+                <span className="bg-pink-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  {totalUnread}
+                </span>
+              )}
+            </div>
           </div>
-          {totalUnread > 0 && (
-            <span className="ml-2 bg-pink-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-              {totalUnread}
-            </span>
-          )}
+          <NotificationBell />
         </div>
       </div>
 

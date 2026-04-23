@@ -17,8 +17,8 @@ type Message = {
 type Conversation = {
   id: string;
   projects: { titre: string };
-  profiles_founder: { nom: string };
-  profiles_developer: { nom: string };
+  profiles_founder: { nom: string; user_id: string };
+  profiles_developer: { nom: string; user_id: string };
 };
 
 export default function ChatPage() {
@@ -53,7 +53,7 @@ export default function ChatPage() {
 
       const { data: conv } = await supabase
         .from("conversations")
-        .select("id, projects(titre), profiles_founder(nom), profiles_developer(nom)")
+        .select("id, projects(titre), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
         .eq("id", id)
         .maybeSingle();
 
@@ -136,6 +136,22 @@ export default function ChatPage() {
       sender_id: userId,
       content: newMsg.content,
     });
+
+    // Notification in-app à l'autre participant
+    if (conversation) {
+      const otherUserId = role === "founder"
+        ? conversation.profiles_developer?.user_id
+        : conversation.profiles_founder?.user_id;
+      if (otherUserId) {
+        await supabase.from("notifications").insert({
+          user_id: otherUserId,
+          type: "nouveau_message",
+          title: "Nouveau message 💬",
+          body: newMsg.content.slice(0, 80),
+          link: `/messages/${id}`,
+        });
+      }
+    }
 
     setSending(false);
   }

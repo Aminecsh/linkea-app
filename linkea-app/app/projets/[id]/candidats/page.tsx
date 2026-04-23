@@ -88,6 +88,18 @@ export default function CandidatsPage() {
       if (convError) console.error("Conversation error:", convError.message);
     }
 
+    // Notification in-app au dev accepté
+    const { data: devUser } = await supabase.from("profiles_developer").select("user_id").eq("id", developerId).maybeSingle();
+    if (devUser?.user_id) {
+      await supabase.from("notifications").insert({
+        user_id: devUser.user_id,
+        type: "candidature_acceptee",
+        title: "Candidature acceptée ✓",
+        body: `Tu as été sélectionné pour "${project?.titre}"`,
+        link: "/messages",
+      });
+    }
+
     // Email au dev accepté
     const { data: devProfile } = await supabase.from("profiles_developer").select("email").eq("id", developerId).maybeSingle();
     if (devProfile?.email && project) {
@@ -126,15 +138,24 @@ export default function CandidatsPage() {
     setActing(candidatureId);
     await supabase.from("candidatures").update({ statut: "refused" }).eq("id", candidatureId);
 
-    // Email au dev refusé
+    // Notification in-app + email au dev refusé
     const cand = candidatures.find((c) => c.id === candidatureId);
     if (cand && project) {
-      const { data: devProfile } = await supabase.from("profiles_developer").select("email").eq("id", cand.profiles_developer.id).maybeSingle();
-      if (devProfile?.email) {
+      const { data: devUserRef } = await supabase.from("profiles_developer").select("user_id, email").eq("id", cand.profiles_developer.id).maybeSingle();
+      if (devUserRef?.user_id) {
+        await supabase.from("notifications").insert({
+          user_id: devUserRef.user_id,
+          type: "candidature_refusee",
+          title: "Candidature non retenue",
+          body: `Ta candidature pour "${project.titre}" n'a pas été retenue`,
+          link: "/projets",
+        });
+      }
+      if (devUserRef?.email) {
         await fetch("/api/emails", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "candidature_refusee", to: devProfile.email, data: { projetTitre: project.titre } }),
+          body: JSON.stringify({ type: "candidature_refusee", to: devUserRef.email, data: { projetTitre: project.titre } }),
         });
       }
     }

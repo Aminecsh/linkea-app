@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
+import NotificationBell from "@/components/NotificationBell";
 
 type Project = {
   id: string;
@@ -17,6 +18,7 @@ type Project = {
     nom: string;
     ecole: string;
     email: string;
+    user_id: string;
   };
 };
 
@@ -59,7 +61,7 @@ export default function ProjetsPage() {
 
       const { data: projs } = await supabase
         .from("projects")
-        .select("*, profiles_founder(nom, ecole, email)")
+        .select("*, profiles_founder(nom, ecole, email, user_id)")
         .eq("statut", "pending")
         .order("created_at", { ascending: false });
 
@@ -116,6 +118,26 @@ export default function ProjetsPage() {
       });
     }
 
+    // Notification in-app au founder — lookup direct pour éviter les soucis de join
+    const projRaw = projet as unknown as { founder_id?: string };
+    if (projRaw?.founder_id) {
+      const { data: founderData } = await supabase
+        .from("profiles_founder")
+        .select("user_id")
+        .eq("id", projRaw.founder_id)
+        .maybeSingle();
+      if (founderData?.user_id) {
+        const { error: notifErr } = await supabase.from("notifications").insert({
+          user_id: founderData.user_id,
+          type: "nouveau_candidat",
+          title: "Nouveau candidat 🎉",
+          body: `${devProfile?.nom ?? "Un dev"} a candidaté sur "${projet?.titre}"`,
+          link: `/projets/${projectId}/candidats`,
+        });
+        if (notifErr) console.error("Notif error:", notifErr.message);
+      }
+    }
+
     setApplying(null);
   }
 
@@ -133,7 +155,10 @@ export default function ProjetsPage() {
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-4 py-4">
         <div className="max-w-6xl mx-auto">
-          <p className="text-xs font-bold uppercase tracking-widest text-pink-500 mb-3">Linkea</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-pink-500">Linkea</p>
+            <NotificationBell />
+          </div>
           {/* Search bar */}
           <div className="flex gap-3 mb-4">
             <div className="flex-1 relative">

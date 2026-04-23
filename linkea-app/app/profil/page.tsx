@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
+import NotificationBell from "@/components/NotificationBell";
 
 type Project = {
   id: string;
@@ -150,9 +151,12 @@ export default function ProfilPage() {
                 </span>
               </div>
             </div>
-            <button onClick={handleLogout} className="btn-ghost text-sm px-4 py-2">
-              Déconnexion
-            </button>
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <button onClick={handleLogout} className="btn-ghost text-sm px-4 py-2">
+                Déconnexion
+              </button>
+            </div>
           </div>
 
           {role === "developer" && competences.length > 0 && (
