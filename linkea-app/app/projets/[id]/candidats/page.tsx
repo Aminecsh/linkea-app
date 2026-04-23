@@ -78,12 +78,14 @@ export default function CandidatsPage() {
     await supabase.from("projects").update({ statut: "matched" }).eq("id", id);
 
     // Créer la conversation
-    if (founderId) {
-      await supabase.from("conversations").insert({
+    const fId = founderId ?? (await supabase.from("profiles_founder").select("id").eq("user_id", (await supabase.auth.getUser()).data.user!.id).maybeSingle()).data?.id;
+    if (fId) {
+      const { error: convError } = await supabase.from("conversations").insert({
         project_id: id,
-        founder_id: founderId,
+        founder_id: fId,
         developer_id: developerId,
       });
+      if (convError) console.error("Conversation error:", convError.message);
     }
 
     // Email au dev accepté
