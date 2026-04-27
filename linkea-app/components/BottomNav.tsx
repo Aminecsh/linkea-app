@@ -53,12 +53,17 @@ export default function BottomNav() {
     checkUnread();
   }, [pathname]);
 
-  const tabs = [
-    { label: "Projets",  icon: "🔍", href: "/projets" },
-    ...(role === "founder" ? [{ label: "Devs", icon: "👥", href: "/devs" }] : []),
-    { label: "Messages", icon: "💬", href: "/messages" },
-    { label: "Profil",   icon: "👤", href: "/profil" },
-  ];
+  const tabs = role === "founder"
+    ? [
+        { label: "Mes projets", icon: "📋", href: "/profil" },
+        { label: "Devs",        icon: "👥", href: "/devs" },
+        { label: "Messages",    icon: "💬", href: "/messages" },
+      ]
+    : [
+        { label: "Projets",  icon: "🔍", href: "/projets" },
+        { label: "Messages", icon: "💬", href: "/messages" },
+        { label: "Profil",   icon: "👤", href: "/profil" },
+      ];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50">

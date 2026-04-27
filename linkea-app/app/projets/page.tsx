@@ -50,6 +50,8 @@ export default function ProjetsPage() {
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       setRole(roleData?.role ?? null);
 
+      if (roleData?.role === "founder") { router.push("/profil"); return; }
+
       if (roleData?.role === "developer") {
         const { data: profile } = await supabase
           .from("profiles_developer").select("id").eq("user_id", user.id).maybeSingle();
