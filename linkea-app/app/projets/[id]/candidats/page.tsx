@@ -17,6 +17,7 @@ type Candidature = {
     linkedin: string;
     dispo_heures_semaine: number;
     user_id: string;
+    avatar_url?: string;
   };
 };
 
@@ -61,7 +62,7 @@ export default function CandidatsPage() {
 
       const { data: cands } = await supabase
         .from("candidatures")
-        .select("id, statut, created_at, profiles_developer(id, nom, ecole, competences, github, linkedin, dispo_heures_semaine, user_id)")
+        .select("id, statut, created_at, profiles_developer(id, nom, ecole, competences, github, linkedin, dispo_heures_semaine, user_id, avatar_url)")
         .eq("project_id", id)
         .order("created_at", { ascending: true });
 
@@ -276,9 +277,13 @@ function CandidatCard({
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5">
       <div className="flex items-start gap-4">
-        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-black shrink-0">
-          {dev.nom?.[0]?.toUpperCase() ?? "?"}
-        </div>
+        {dev.avatar_url ? (
+          <img src={dev.avatar_url} alt={dev.nom} className="w-11 h-11 rounded-full object-cover shrink-0 border border-slate-200" />
+        ) : (
+          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-black shrink-0">
+            {dev.nom?.[0]?.toUpperCase() ?? "?"}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-slate-900 text-base">{dev.nom}</h3>
           {dev.ecole && <p className="text-xs text-slate-400 mb-2">{dev.ecole}</p>}
