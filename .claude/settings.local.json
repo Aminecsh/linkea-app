@@ -7,7 +7,11 @@
       "Bash(git push *)",
       "WebFetch(domain:fr.indeed.com)",
       "Bash(npm install *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git checkout *)",
+      "Bash(gh pr create --title 'feat: notifications in-app' --body ' *)",
+      "Bash(winget install *)",
+      "Bash(git merge *)"
     ]
   }
 }

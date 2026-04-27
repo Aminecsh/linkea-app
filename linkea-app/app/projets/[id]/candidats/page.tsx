@@ -16,6 +16,7 @@ type Candidature = {
     github: string;
     linkedin: string;
     dispo_heures_semaine: number;
+    user_id: string;
   };
 };
 
@@ -60,7 +61,7 @@ export default function CandidatsPage() {
 
       const { data: cands } = await supabase
         .from("candidatures")
-        .select("id, statut, created_at, profiles_developer(id, nom, ecole, competences, github, linkedin, dispo_heures_semaine)")
+        .select("id, statut, created_at, profiles_developer(id, nom, ecole, competences, github, linkedin, dispo_heures_semaine, user_id)")
         .eq("project_id", id)
         .order("created_at", { ascending: true });
 
@@ -70,7 +71,7 @@ export default function CandidatsPage() {
     load();
   }, [id, router]);
 
-  async function handleAccept(candidatureId: string, developerId: string) {
+  async function handleAccept(candidatureId: string, developerId: string, developerUserId: string) {
     setActing(candidatureId);
 
     await supabase.from("candidatures").update({ statut: "accepted" }).eq("id", candidatureId);
@@ -89,10 +90,9 @@ export default function CandidatsPage() {
     }
 
     // Notification in-app au dev accepté
-    const { data: devUser } = await supabase.from("profiles_developer").select("user_id").eq("id", developerId).maybeSingle();
-    if (devUser?.user_id) {
+    if (developerUserId) {
       await supabase.from("notifications").insert({
-        user_id: devUser.user_id,
+        user_id: developerUserId,
         type: "candidature_acceptee",
         title: "Candidature acceptée ✓",
         body: `Tu as été sélectionné pour "${project?.titre}"`,
@@ -125,7 +125,7 @@ export default function CandidatsPage() {
 
     const { data: cands } = await supabase
       .from("candidatures")
-      .select("id, statut, created_at, profiles_developer(id, nom, ecole, competences, github, linkedin, dispo_heures_semaine)")
+      .select("id, statut, created_at, profiles_developer(id, nom, ecole, competences, github, linkedin, dispo_heures_semaine, user_id)")
       .eq("project_id", id)
       .order("created_at", { ascending: true });
 
@@ -217,7 +217,7 @@ export default function CandidatsPage() {
                   key={c.id}
                   c={c}
                   acting={acting}
-                  onAccept={() => handleAccept(c.id, c.profiles_developer.id)}
+                  onAccept={() => handleAccept(c.id, c.profiles_developer.id, c.profiles_developer.user_id)}
                   onRefuse={() => handleRefuse(c.id)}
                   showActions={project?.statut !== "matched"}
                 />
