@@ -8,6 +8,7 @@ export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
     async function checkUnread() {
@@ -17,6 +18,7 @@ export default function BottomNav() {
       const { data: roleData } = await supabase
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       const role = roleData?.role;
+      setRole(role ?? null);
       if (!role || role === "admin") return;
 
       let convQuery;
@@ -52,9 +54,10 @@ export default function BottomNav() {
   }, [pathname]);
 
   const tabs = [
-    { label: "Projets",    icon: "🔍", href: "/projets" },
-    { label: "Messages",   icon: "💬", href: "/messages" },
-    { label: "Mon profil", icon: "👤", href: "/profil" },
+    { label: "Projets",  icon: "🔍", href: "/projets" },
+    ...(role === "founder" ? [{ label: "Devs", icon: "👥", href: "/devs" }] : []),
+    { label: "Messages", icon: "💬", href: "/messages" },
+    { label: "Profil",   icon: "👤", href: "/profil" },
   ];
 
   return (

@@ -19,12 +19,24 @@ export default function NotificationBell() {
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [open, setOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [developerId, setDeveloperId] = useState<string | null>(null);
+  const [applying, setApplying] = useState<string | null>(null);
+  const [applied, setApplied] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
+
+      const { data: roleData } = await supabase
+        .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+
+      if (roleData?.role === "developer") {
+        const { data: profile } = await supabase
+          .from("profiles_developer").select("id").eq("user_id", user.id).maybeSingle();
+        if (profile) setDeveloperId(profile.id);
+      }
 
       const { data } = await supabase
         .from("notifications")
@@ -67,6 +79,48 @@ export default function NotificationBell() {
     if (n.link) router.push(n.link);
   }
 
+  async function handleCandidater(e: React.MouseEvent, n: Notif) {
+    e.stopPropagation();
+    if (!developerId || !n.link || applying) return;
+
+    const projectId = n.link.split("/projets/")[1];
+    if (!projectId || applied.has(projectId)) return;
+
+    setApplying(projectId);
+
+    const { error } = await supabase.from("candidatures").insert({
+      project_id: projectId,
+      developer_id: developerId,
+      statut: "pending",
+    });
+
+    if (!error) {
+      setApplied((prev) => new Set([...prev, projectId]));
+
+      // Notif au founder
+      const { data: proj } = await supabase
+        .from("projects").select("titre, founder_id").eq("id", projectId).maybeSingle();
+      if (proj?.founder_id) {
+        const { data: founder } = await supabase
+          .from("profiles_founder").select("user_id").eq("id", proj.founder_id).maybeSingle();
+        if (founder?.user_id) {
+          await supabase.from("notifications").insert({
+            user_id: founder.user_id,
+            type: "nouveau_candidat",
+            title: "Nouveau candidat 🎉",
+            body: `Un dev a candidaté sur "${proj.titre}"`,
+            link: `/projets/${projectId}/candidats`,
+          });
+        }
+      }
+
+      setOpen(false);
+      router.push(n.link);
+    }
+
+    setApplying(null);
+  }
+
   return (
     <div className="relative">
       <button
@@ -92,19 +146,38 @@ export default function NotificationBell() {
               <div className="px-4 py-8 text-center text-slate-400 text-sm">Aucune notification</div>
             ) : (
               <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
-                {notifs.map((n) => (
-                  <div
-                    key={n.id}
-                    onClick={() => handleClick(n)}
-                    className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${!n.read ? "bg-pink-50" : ""}`}
-                  >
-                    <p className={`text-sm font-semibold ${!n.read ? "text-pink-700" : "text-slate-900"}`}>{n.title}</p>
-                    {n.body && <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.body}</p>}
-                    <p className="text-xs text-slate-300 mt-1">
-                      {new Date(n.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  </div>
-                ))}
+                {notifs.map((n) => {
+                  const projectId = n.type === "pin" ? n.link?.split("/projets/")[1] : null;
+                  const isApplied = projectId ? applied.has(projectId) : false;
+                  return (
+                    <div
+                      key={n.id}
+                      onClick={() => handleClick(n)}
+                      className={`px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors ${!n.read ? "bg-pink-50" : ""}`}
+                    >
+                      <p className={`text-sm font-semibold ${!n.read ? "text-pink-700" : "text-slate-900"}`}>{n.title}</p>
+                      {n.body && <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.body}</p>}
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-xs text-slate-300">
+                          {new Date(n.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                        {n.type === "pin" && developerId && (
+                          <button
+                            onClick={(e) => handleCandidater(e, n)}
+                            disabled={isApplied || applying === projectId}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
+                              isApplied
+                                ? "bg-green-50 text-green-600 border border-green-200 cursor-default"
+                                : "btn-pink"
+                            }`}
+                          >
+                            {applying === projectId ? "..." : isApplied ? "✓ Candidaté" : "Candidater →"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

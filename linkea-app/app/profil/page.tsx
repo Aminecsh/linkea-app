@@ -47,6 +47,8 @@ export default function ProfilPage() {
   const [competences, setCompetences] = useState<string[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [candidatures, setCandidatures] = useState<Candidature[]>([]);
+  const [score, setScore] = useState<number | null>(null);
+  const [reviewCount, setReviewCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -102,6 +104,17 @@ export default function ProfilPage() {
           .order("created_at", { ascending: false });
 
         setCandidatures((cands as Candidature[]) ?? []);
+
+        // Score moyen du dev
+        const { data: reviews } = await supabase
+          .from("reviews")
+          .select("rating")
+          .eq("reviewed_id", user.id);
+        if (reviews && reviews.length > 0) {
+          const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+          setScore(Math.round(avg * 10) / 10);
+          setReviewCount(reviews.length);
+        }
       }
 
       setLoading(false);
@@ -118,6 +131,12 @@ export default function ProfilPage() {
     if (!confirm("Supprimer ce projet ? Cette action est irréversible.")) return;
     await supabase.from("projects").delete().eq("id", projectId);
     setProjects((prev) => prev.filter((p) => p.id !== projectId));
+  }
+
+  async function handleLivrer(projectId: string) {
+    await supabase.from("projects").update({ statut: "livre" }).eq("id", projectId);
+    setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, statut: "livre" } : p));
+    router.push(`/projets/${projectId}/review`);
   }
 
   if (loading) {
@@ -168,6 +187,18 @@ export default function ProfilPage() {
               ))}
             </div>
           )}
+
+          {role === "developer" && score !== null && (
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+              <div className="flex gap-0.5">
+                {[1,2,3,4,5].map((star) => (
+                  <span key={star} className={`text-lg ${star <= Math.round(score) ? "text-amber-400" : "text-slate-200"}`}>★</span>
+                ))}
+              </div>
+              <span className="font-bold text-slate-900 text-sm">{score}/5</span>
+              <span className="text-xs text-slate-400">({reviewCount} avis)</span>
+            </div>
+          )}
         </div>
 
         {/* Founder : ses projets */}
@@ -215,6 +246,14 @@ export default function ProfilPage() {
                           >
                             Supprimer
                           </button>
+                          {(p.statut === "matched" || p.statut === "en_cours") && (
+                            <button
+                              onClick={() => handleLivrer(p.id)}
+                              className="text-xs font-semibold text-green-600 hover:text-green-800 transition-colors"
+                            >
+                              ✓ Livrer
+                            </button>
+                          )}
                           <button
                             onClick={() => router.push(`/projets/${p.id}/candidats`)}
                             className="text-xs font-semibold text-pink-500 hover:text-pink-700 transition-colors"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
@@ -27,6 +27,8 @@ const STACKS = ["React", "Node.js", "Flutter", "Python", "Vue.js", "Laravel", "S
 
 export default function ProjetsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const projectParam = searchParams.get("project");
   const [projects, setProjects] = useState<Project[]>([]);
   const [filtered, setFiltered] = useState<Project[]>([]);
   const [search, setSearch] = useState("");
@@ -68,7 +70,8 @@ export default function ProjetsPage() {
       const p = (projs as Project[]) ?? [];
       setProjects(p);
       setFiltered(p);
-      if (p.length > 0) setSelected(p[0]);
+      const preselected = projectParam ? p.find((proj) => proj.id === projectParam) : null;
+      setSelected(preselected ?? p[0] ?? null);
       setLoading(false);
     }
     load();
