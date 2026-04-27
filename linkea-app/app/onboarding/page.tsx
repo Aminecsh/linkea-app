@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -10,6 +10,10 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     nom: "",
@@ -50,6 +54,23 @@ export default function Onboarding() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
+  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }
+
+  async function uploadAvatar(userId: string): Promise<string | null> {
+    if (!avatarFile) return null;
+    const ext = avatarFile.name.split(".").pop();
+    const path = `${userId}/avatar.${ext}`;
+    const { error } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true });
+    if (error) return null;
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    return data.publicUrl;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -57,6 +78,8 @@ export default function Onboarding() {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    const avatarUrl = await uploadAvatar(user.id);
 
     if (role === "founder") {
       const { error: dbError } = await supabase.from("profiles_founder").insert({
@@ -68,9 +91,10 @@ export default function Onboarding() {
         besoin_tech: form.besoin_tech,
         budget: form.budget,
         linkedin: form.linkedin,
+        avatar_url: avatarUrl,
       });
       if (dbError) { setError(dbError.message); setSaving(false); return; }
-      router.push("/projets");
+      router.push("/profil");
     } else if (role === "developer") {
       const competencesArray = form.competences.split(",").map((c) => c.trim()).filter(Boolean);
       const { error: dbError } = await supabase.from("profiles_developer").insert({
@@ -82,6 +106,7 @@ export default function Onboarding() {
         dispo_heures_semaine: parseInt(form.dispo_heures_semaine) || null,
         github: form.github,
         linkedin: form.linkedin,
+        avatar_url: avatarUrl,
       });
       if (dbError) { setError(dbError.message); setSaving(false); return; }
       router.push("/projets");
@@ -95,6 +120,8 @@ export default function Onboarding() {
       </div>
     );
   }
+
+  const initiale = form.nom?.[0]?.toUpperCase() ?? "?";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-4 py-16">
@@ -112,6 +139,41 @@ export default function Onboarding() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+
+          {/* Avatar upload */}
+          <div className="flex flex-col items-center gap-3 mb-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="relative group"
+            >
+              {avatarPreview ? (
+                <img
+                  src={avatarPreview}
+                  alt="Aperçu"
+                  className="w-20 h-20 rounded-full object-cover border-2 border-pink-300"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-2xl font-black border-2 border-transparent group-hover:border-pink-300 transition-all">
+                  {initiale !== "?" ? initiale : "📷"}
+                </div>
+              )}
+              <span className="absolute bottom-0 right-0 w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center text-white text-xs border-2 border-white">
+                +
+              </span>
+            </button>
+            <p className="text-xs text-slate-400">
+              {avatarPreview ? "Photo sélectionnée ✓" : "Ajouter une photo de profil"}
+            </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarChange}
+              className="hidden"
+            />
+          </div>
+
           <div>
             <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Nom complet</label>
             <input name="nom" value={form.nom} onChange={handleChange} placeholder="Jean Dupont" required className="input-field" />

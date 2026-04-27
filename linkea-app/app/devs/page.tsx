@@ -15,6 +15,7 @@ type Dev = {
   github?: string;
   linkedin?: string;
   user_id: string;
+  avatar_url?: string;
   score?: number;
   reviewCount?: number;
 };
@@ -64,7 +65,7 @@ export default function DevsPage() {
       // Tous les devs
       const { data: devsData } = await supabase
         .from("profiles_developer")
-        .select("id, nom, ecole, competences, dispo_heures_semaine, github, linkedin, user_id")
+        .select("id, nom, ecole, competences, dispo_heures_semaine, github, linkedin, user_id, avatar_url")
         .order("created_at", { ascending: false });
 
       // Score moyen par dev
@@ -199,9 +200,13 @@ export default function DevsPage() {
           return (
             <div key={dev.id} className="bg-white rounded-2xl border border-slate-200 p-5">
               <div className="flex items-start gap-4">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-black shrink-0">
-                  {dev.nom?.[0]?.toUpperCase() ?? "?"}
-                </div>
+                {dev.avatar_url ? (
+                  <img src={dev.avatar_url} alt={dev.nom} className="w-11 h-11 rounded-full object-cover shrink-0 border border-slate-200" />
+                ) : (
+                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-black shrink-0">
+                    {dev.nom?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div>

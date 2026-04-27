@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
@@ -49,12 +49,18 @@ export default function ProfilPage() {
   const [candidatures, setCandidatures] = useState<Candidature[]>([]);
   const [score, setScore] = useState<number | null>(null);
   const [reviewCount, setReviewCount] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/connexion"); return; }
+      setUserId(user.id);
 
       const { data: roleData } = await supabase
         .from("user_roles")
@@ -68,13 +74,15 @@ export default function ProfilPage() {
       if (r === "founder") {
         const { data: profile } = await supabase
           .from("profiles_founder")
-          .select("id, nom, ecole")
+          .select("id, nom, ecole, avatar_url")
           .eq("user_id", user.id)
           .maybeSingle();
 
         if (!profile) { router.push("/onboarding"); return; }
         setNom(profile.nom ?? "");
         setEcole(profile.ecole ?? "");
+        setAvatarUrl(profile.avatar_url ?? null);
+        setProfileId(profile.id);
 
         const { data: projs } = await supabase
           .from("projects")
@@ -88,7 +96,7 @@ export default function ProfilPage() {
       if (r === "developer") {
         const { data: profile } = await supabase
           .from("profiles_developer")
-          .select("id, nom, ecole, competences")
+          .select("id, nom, ecole, competences, avatar_url")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -96,6 +104,8 @@ export default function ProfilPage() {
         setNom(profile.nom ?? "");
         setEcole(profile.ecole ?? "");
         setCompetences(profile.competences ?? []);
+        setAvatarUrl(profile.avatar_url ?? null);
+        setProfileId(profile.id);
 
         const { data: cands } = await supabase
           .from("candidatures")
@@ -121,6 +131,23 @@ export default function ProfilPage() {
     }
     load();
   }, [router]);
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !userId || !profileId || !role) return;
+    setUploadingAvatar(true);
+
+    const ext = file.name.split(".").pop();
+    const path = `${userId}/avatar.${ext}`;
+    await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    const url = data.publicUrl;
+
+    const table = role === "founder" ? "profiles_founder" : "profiles_developer";
+    await supabase.from(table).update({ avatar_url: url }).eq("id", profileId);
+    setAvatarUrl(url);
+    setUploadingAvatar(false);
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -155,8 +182,22 @@ export default function ProfilPage() {
         <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-xl font-black">
-                {nom?.[0]?.toUpperCase() ?? "?"}
+              <div className="relative group">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={nom} className="w-14 h-14 rounded-full object-cover border-2 border-slate-200" />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-xl font-black">
+                    {nom?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold"
+                >
+                  {uploadingAvatar ? "..." : "Changer"}
+                </button>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
               </div>
               <div>
                 <h1 className="text-xl font-black text-slate-900">{nom}</h1>
