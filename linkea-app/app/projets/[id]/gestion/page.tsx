@@ -25,6 +25,19 @@ type Task = {
 
 type Member = { user_id: string; nom: string; role: "founder" | "developer" };
 
+type Deliverable = {
+  id: string;
+  project_id: string;
+  sprint_id: string | null;
+  uploaded_by: string;
+  nom: string;
+  file_url: string;
+  file_type: string | null;
+  file_size: number | null;
+  description: string | null;
+  created_at: string;
+};
+
 const COLONNES: { key: Task["statut"]; label: string; color: string }[] = [
   { key: "todo",     label: "À faire",    color: "bg-slate-100 text-slate-600" },
   { key: "en_cours", label: "En cours",   color: "bg-blue-50 text-blue-600" },
@@ -49,7 +62,16 @@ export default function GestionPage() {
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedSprintId, setSelectedSprintId] = useState<string | "all">("all");
+  const [activeTab, setActiveTab] = useState<"kanban" | "fichiers">("kanban");
   const [loading, setLoading] = useState(true);
+
+  // Fichiers
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [showFileModal, setShowFileModal] = useState(false);
+  const [fileDesc, setFileDesc] = useState("");
+  const [fileSprint, setFileSprint] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   // Modals
   const [showSprintModal, setShowSprintModal] = useState(false);
@@ -126,6 +148,14 @@ export default function GestionPage() {
         .eq("project_id", projectId)
         .order("created_at", { ascending: true });
       setTasks((tasksData as Task[]) ?? []);
+
+      // Fichiers
+      const { data: deliData } = await supabase
+        .from("deliverables")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false });
+      setDeliverables((deliData as Deliverable[]) ?? []);
 
       setLoading(false);
     }
@@ -222,6 +252,75 @@ export default function GestionPage() {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
   }
 
+  // ── Fichiers ─────────────────────────────────────────────────────────────
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingFile(file);
+    setFileDesc("");
+    setFileSprint(selectedSprintId === "all" ? (sprints[0]?.id ?? "") : selectedSprintId);
+    setShowFileModal(true);
+    e.target.value = "";
+  }
+
+  async function handleUpload() {
+    if (!pendingFile || !userId) return;
+    setUploading(true);
+
+    const ext = pendingFile.name.split(".").pop();
+    const path = `${projectId}/${crypto.randomUUID()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("project-files")
+      .upload(path, pendingFile);
+
+    if (uploadError) { setUploading(false); return; }
+
+    const { data: urlData } = supabase.storage.from("project-files").getPublicUrl(path);
+
+    const { data: newDeli } = await supabase.from("deliverables").insert({
+      project_id: projectId,
+      sprint_id: fileSprint || null,
+      uploaded_by: userId,
+      nom: pendingFile.name,
+      file_url: urlData.publicUrl,
+      file_type: pendingFile.type,
+      file_size: pendingFile.size,
+      description: fileDesc || null,
+    }).select().maybeSingle();
+
+    if (newDeli) setDeliverables((prev) => [newDeli as Deliverable, ...prev]);
+
+    setPendingFile(null);
+    setShowFileModal(false);
+    setUploading(false);
+  }
+
+  async function handleDeleteFile(deli: Deliverable) {
+    if (deli.uploaded_by !== userId && role !== "founder") return;
+    await supabase.from("deliverables").delete().eq("id", deli.id);
+    setDeliverables((prev) => prev.filter((d) => d.id !== deli.id));
+  }
+
+  function fileIcon(type: string | null) {
+    if (!type) return "📎";
+    if (type.startsWith("image/")) return "🖼️";
+    if (type === "application/pdf") return "📄";
+    if (type.includes("zip") || type.includes("rar")) return "🗜️";
+    if (type.includes("word") || type.includes("document")) return "📝";
+    if (type.includes("sheet") || type.includes("excel")) return "📊";
+    if (type.includes("video")) return "🎬";
+    return "📎";
+  }
+
+  function fileSize(bytes: number | null) {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} o`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
+  }
+
   // ── Filtrage ──────────────────────────────────────────────────────────────
 
   const filteredTasks = selectedSprintId === "all"
@@ -251,23 +350,45 @@ export default function GestionPage() {
 
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto flex items-center gap-3">
-          <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-600 text-sm shrink-0">←</button>
-          <div className="flex-1 min-w-0">
-            <h1 className="font-black text-slate-900 text-base truncate">{projectTitre}</h1>
-            <p className="text-xs text-slate-400">Gestion de projet</p>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-3 mb-3">
+            <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-600 text-sm shrink-0">←</button>
+            <div className="flex-1 min-w-0">
+              <h1 className="font-black text-slate-900 text-base truncate">{projectTitre}</h1>
+              <p className="text-xs text-slate-400">Gestion de projet</p>
+            </div>
+            {activeTab === "kanban" && (
+              <>
+                <button onClick={openCreateTask} className="btn-pink px-4 py-2 text-sm shrink-0">+ Tâche</button>
+                {role === "founder" && (
+                  <button onClick={() => setShowSprintModal(true)} className="btn-ghost px-4 py-2 text-sm shrink-0">+ Sprint</button>
+                )}
+              </>
+            )}
+            {activeTab === "fichiers" && (
+              <label className="btn-pink px-4 py-2 text-sm shrink-0 cursor-pointer">
+                ⬆️ Fichier
+                <input type="file" className="hidden" onChange={handleFileSelect} />
+              </label>
+            )}
           </div>
-          <button onClick={openCreateTask} className="btn-pink px-4 py-2 text-sm shrink-0">
-            + Tâche
-          </button>
-          {role === "founder" && (
-            <button
-              onClick={() => setShowSprintModal(true)}
-              className="btn-ghost px-4 py-2 text-sm shrink-0"
-            >
-              + Sprint
-            </button>
-          )}
+
+          {/* Onglets */}
+          <div className="flex gap-1">
+            {(["kanban", "fichiers"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`text-xs font-semibold px-4 py-1.5 rounded-full transition-all ${
+                  activeTab === tab
+                    ? "bg-pink-500 text-white"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                {tab === "kanban" ? "🗂 Kanban" : "📁 Fichiers"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -384,8 +505,48 @@ export default function GestionPage() {
           </div>
         )}
 
+        {/* ── Onglet Fichiers ───────────────────────────────────────────── */}
+        {activeTab === "fichiers" && (
+          <div className="flex flex-col gap-4">
+            {deliverables.length === 0 && (
+              <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
+                <p className="text-4xl mb-3">📁</p>
+                <p className="text-slate-400 text-sm mb-4">Aucun fichier partagé pour l'instant.</p>
+                <label className="btn-pink px-6 py-2 text-sm cursor-pointer inline-block">
+                  ⬆️ Uploader un fichier
+                  <input type="file" className="hidden" onChange={handleFileSelect} />
+                </label>
+              </div>
+            )}
+
+            {/* Grouper par sprint */}
+            {sprints.filter((s) => deliverables.some((d) => d.sprint_id === s.id)).map((sprint) => (
+              <div key={sprint.id}>
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">{sprint.nom}</p>
+                <div className="flex flex-col gap-2">
+                  {deliverables.filter((d) => d.sprint_id === sprint.id).map((d) => (
+                    <FileCard key={d.id} d={d} members={members} userId={userId} role={role} onDelete={() => handleDeleteFile(d)} fileIcon={fileIcon} fileSize={fileSize} sprints={sprints} />
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Fichiers sans sprint */}
+            {deliverables.filter((d) => !d.sprint_id).length > 0 && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Sans sprint</p>
+                <div className="flex flex-col gap-2">
+                  {deliverables.filter((d) => !d.sprint_id).map((d) => (
+                    <FileCard key={d.id} d={d} members={members} userId={userId} role={role} onDelete={() => handleDeleteFile(d)} fileIcon={fileIcon} fileSize={fileSize} sprints={sprints} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Kanban */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {activeTab === "kanban" && <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {COLONNES.map((col) => {
             const colTasks = filteredTasks.filter((t) => t.statut === col.key);
             return (
@@ -482,8 +643,54 @@ export default function GestionPage() {
               </div>
             );
           })}
-        </div>
+        </div>}
+
       </div>
+
+      {/* ── Modal Upload Fichier ─────────────────────────────────────────── */}
+      {showFileModal && pendingFile && (
+        <div className="fixed inset-0 bg-black/40 flex items-end justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <h2 className="text-lg font-black text-slate-900">Partager un fichier</h2>
+
+            {/* Aperçu fichier */}
+            <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+              <span className="text-2xl">{fileIcon(pendingFile.type)}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-800 truncate">{pendingFile.name}</p>
+                <p className="text-xs text-slate-400">{fileSize(pendingFile.size)}</p>
+              </div>
+            </div>
+
+            <textarea
+              placeholder="Description (optionnel)"
+              value={fileDesc}
+              onChange={(e) => setFileDesc(e.target.value)}
+              rows={2}
+              className="input-field resize-none"
+            />
+
+            {sprints.length > 0 && (
+              <div>
+                <label className="text-xs font-semibold text-slate-500 mb-1 block">Lier à un sprint</label>
+                <select value={fileSprint} onChange={(e) => setFileSprint(e.target.value)} className="input-field">
+                  <option value="">— Aucun sprint —</option>
+                  {sprints.map((s) => (
+                    <option key={s.id} value={s.id}>{s.nom}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <button onClick={handleUpload} disabled={uploading} className="btn-pink w-full py-3">
+              {uploading ? "Upload en cours..." : "⬆️ Envoyer"}
+            </button>
+            <button onClick={() => { setShowFileModal(false); setPendingFile(null); }} className="btn-ghost w-full py-3">
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal Sprint ─────────────────────────────────────────────────── */}
       {showSprintModal && (
@@ -596,6 +803,66 @@ export default function GestionPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function FileCard({ d, members, userId, role, onDelete, fileIcon, fileSize, sprints }: {
+  d: Deliverable;
+  members: Member[];
+  userId: string | null;
+  role: string | null;
+  onDelete: () => void;
+  fileIcon: (type: string | null) => string;
+  fileSize: (bytes: number | null) => string;
+  sprints: Sprint[];
+}) {
+  const uploader = members.find((m) => m.user_id === d.uploaded_by);
+  const sprint = sprints.find((s) => s.id === d.sprint_id);
+  const canDelete = d.uploaded_by === userId || role === "founder";
+  const date = new Date(d.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 hover:border-pink-200 transition-all group">
+      <span className="text-3xl shrink-0">{fileIcon(d.file_type)}</span>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-slate-900 text-sm truncate">{d.nom}</p>
+        {d.description && <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{d.description}</p>}
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          {uploader && (
+            <span className="text-xs text-slate-400 flex items-center gap-1">
+              <span className={`w-4 h-4 rounded-full inline-flex items-center justify-center text-white text-xs font-black ${uploader.role === "founder" ? "bg-gradient-to-br from-pink-400 to-purple-500" : "bg-gradient-to-br from-blue-400 to-indigo-500"}`}>
+                {uploader.nom[0].toUpperCase()}
+              </span>
+              {uploader.nom}
+            </span>
+          )}
+          {d.file_size && <span className="text-xs text-slate-400">{fileSize(d.file_size)}</span>}
+          <span className="text-xs text-slate-400">{date}</span>
+          {sprint && (
+            <span className="text-xs font-semibold bg-purple-50 text-purple-500 px-2 py-0.5 rounded-full">{sprint.nom}</span>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <a
+          href={d.file_url}
+          target="_blank"
+          rel="noreferrer"
+          download={d.nom}
+          className="text-xs font-semibold text-slate-500 hover:text-pink-500 border border-slate-200 hover:border-pink-300 px-3 py-1.5 rounded-full transition-all"
+        >
+          ⬇️
+        </a>
+        {canDelete && (
+          <button
+            onClick={onDelete}
+            className="text-xs text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all px-2 py-1.5"
+          >
+            ✕
+          </button>
+        )}
+      </div>
     </div>
   );
 }
