@@ -88,6 +88,12 @@ export default function Connexion() {
             </p>
           )}
 
+          <div className="text-right">
+            <Link href="/mot-de-passe-oublie" className="text-sm text-slate-400 hover:text-pink-500 transition-colors">
+              Mot de passe oublié ?
+            </Link>
+          </div>
+
           <button type="submit" disabled={loading} className="btn-pink w-full mt-2">
             {loading ? "Chargement..." : "Se connecter"}
           </button>
