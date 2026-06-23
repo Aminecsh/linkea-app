@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { generateMatchPdf } from "@/lib/generateMatchPdf";
 
 type ContractData = {
   projet: {
@@ -121,6 +122,15 @@ export default function ContratPage() {
 
   const d = contract.data;
   const bothSigned = !!contract.founder_signed_at && !!contract.dev_signed_at;
+
+  function handleDownloadPdf() {
+    generateMatchPdf({
+      projet: d.projet,
+      founder: d.founder,
+      dev: d.dev,
+      matchDate: d.matchDate,
+    });
+  }
   const isFounder = role === "founder";
   const alreadySigned = isFounder ? !!contract.founder_signed_at : !!contract.dev_signed_at;
   const stacks = d.projet.stack_souhaitee?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
@@ -137,7 +147,13 @@ export default function ContratPage() {
           <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-600 text-sm font-medium">
             ← Retour
           </button>
-          <div className="text-right">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownloadPdf}
+              className="text-xs font-semibold text-slate-500 hover:text-pink-500 border border-slate-200 hover:border-pink-300 px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5"
+            >
+              <span>⬇️</span> PDF
+            </button>
             {bothSigned ? (
               <span className="text-xs font-bold bg-green-50 text-green-600 border border-green-200 px-3 py-1 rounded-full">
                 ✓ Contrat signé

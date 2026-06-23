@@ -16,6 +16,7 @@ type Message = {
 
 type Conversation = {
   id: string;
+  project_id: string;
   projects: { titre: string };
   profiles_founder: { nom: string; user_id: string };
   profiles_developer: { nom: string; user_id: string };
@@ -35,6 +36,7 @@ export default function ChatPage() {
   const [otherTyping, setOtherTyping] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [contractId, setContractId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
@@ -53,12 +55,20 @@ export default function ChatPage() {
 
       const { data: conv } = await supabase
         .from("conversations")
-        .select("id, projects(titre), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
+        .select("id, project_id, projects(titre), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
         .eq("id", id)
         .maybeSingle();
 
       if (!conv) { router.push("/messages"); return; }
       setConversation(conv as Conversation);
+
+      // Charger le contrat lié à ce projet
+      const { data: contract } = await supabase
+        .from("contracts")
+        .select("id")
+        .eq("project_id", conv.project_id)
+        .maybeSingle();
+      if (contract) setContractId(contract.id);
 
       const { data: msgs } = await supabase
         .from("messages")
@@ -227,6 +237,14 @@ export default function ChatPage() {
               {otherTyping ? "En train d'écrire..." : `📋 ${conversation?.projects?.titre}`}
             </p>
           </div>
+          {contractId && (
+            <button
+              onClick={() => router.push(`/contrat/${contractId}`)}
+              className="shrink-0 flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-pink-500 border border-slate-200 hover:border-pink-300 px-3 py-1.5 rounded-full transition-all"
+            >
+              📄 Contrat
+            </button>
+          )}
         </div>
       </div>
 

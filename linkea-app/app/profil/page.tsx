@@ -18,6 +18,7 @@ type Project = {
 type Candidature = {
   id: string;
   statut: string;
+  project_id: string;
   projects: {
     titre: string;
     description: string;
@@ -47,6 +48,7 @@ export default function ProfilPage() {
   const [competences, setCompetences] = useState<string[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [candidatures, setCandidatures] = useState<Candidature[]>([]);
+  const [contractMap, setContractMap] = useState<Record<string, string>>({}); // project_id → contract_id
   const [score, setScore] = useState<number | null>(null);
   const [reviewCount, setReviewCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -91,6 +93,15 @@ export default function ProfilPage() {
           .order("created_at", { ascending: false });
 
         setProjects(projs ?? []);
+
+        // Contrats du founder
+        const { data: contracts } = await supabase
+          .from("contracts")
+          .select("id, project_id")
+          .eq("founder_id", profile.id);
+        const map: Record<string, string> = {};
+        (contracts ?? []).forEach((c) => { map[c.project_id] = c.id; });
+        setContractMap(map);
       }
 
       if (r === "developer") {
@@ -109,11 +120,20 @@ export default function ProfilPage() {
 
         const { data: cands } = await supabase
           .from("candidatures")
-          .select("id, statut, projects(titre, description, stack_souhaitee, deadline)")
+          .select("id, statut, project_id, projects(titre, description, stack_souhaitee, deadline)")
           .eq("developer_id", profile.id)
           .order("created_at", { ascending: false });
 
         setCandidatures((cands as Candidature[]) ?? []);
+
+        // Contrats du dev
+        const { data: devContracts } = await supabase
+          .from("contracts")
+          .select("id, project_id")
+          .eq("developer_id", profile.id);
+        const devMap: Record<string, string> = {};
+        (devContracts ?? []).forEach((c) => { devMap[c.project_id] = c.id; });
+        setContractMap(devMap);
 
         // Score moyen du dev
         const { data: reviews } = await supabase
@@ -288,12 +308,22 @@ export default function ProfilPage() {
                             Supprimer
                           </button>
                           {(p.statut === "matched" || p.statut === "en_cours") && (
-                            <button
-                              onClick={() => handleLivrer(p.id)}
-                              className="text-xs font-semibold text-green-600 hover:text-green-800 transition-colors"
-                            >
-                              ✓ Livrer
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleLivrer(p.id)}
+                                className="text-xs font-semibold text-green-600 hover:text-green-800 transition-colors"
+                              >
+                                ✓ Livrer
+                              </button>
+                              {contractMap[p.id] && (
+                                <button
+                                  onClick={() => router.push(`/contrat/${contractMap[p.id]}`)}
+                                  className="text-xs font-semibold text-slate-500 hover:text-pink-500 transition-colors"
+                                >
+                                  📄 Contrat
+                                </button>
+                              )}
+                            </>
                           )}
                           <button
                             onClick={() => router.push(`/projets/${p.id}/candidats`)}
@@ -338,9 +368,19 @@ export default function ProfilPage() {
                       {c.projects.description && (
                         <p className="text-slate-500 text-sm line-clamp-2 mb-3">{c.projects.description}</p>
                       )}
-                      <div className="flex gap-3 text-xs text-slate-400">
-                        {c.projects.stack_souhaitee && <span>🛠 {c.projects.stack_souhaitee}</span>}
-                        {c.projects.deadline && <span>📅 {c.projects.deadline}</span>}
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex gap-3 text-xs text-slate-400">
+                          {c.projects.stack_souhaitee && <span>🛠 {c.projects.stack_souhaitee}</span>}
+                          {c.projects.deadline && <span>📅 {c.projects.deadline}</span>}
+                        </div>
+                        {c.statut === "accepted" && contractMap[c.project_id] && (
+                          <button
+                            onClick={() => router.push(`/contrat/${contractMap[c.project_id]}`)}
+                            className="text-xs font-semibold text-slate-500 hover:text-pink-500 transition-colors shrink-0"
+                          >
+                            📄 Contrat
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
