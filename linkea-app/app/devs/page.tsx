@@ -26,12 +26,23 @@ type Project = {
   statut: string;
 };
 
+const STACKS = ["React", "Node.js", "Flutter", "Python", "Vue.js", "Laravel", "Swift", "Kotlin", "TypeScript", "MongoDB"];
+const DISPOS = [
+  { label: "5h+/sem", min: 5 },
+  { label: "10h+/sem", min: 10 },
+  { label: "20h+/sem", min: 20 },
+];
+
 export default function DevsPage() {
   const router = useRouter();
   const [devs, setDevs] = useState<Dev[]>([]);
+  const [filtered, setFiltered] = useState<Dev[]>([]);
+  const [search, setSearch] = useState("");
+  const [activeStack, setActiveStack] = useState<string | null>(null);
+  const [activeDispo, setActiveDispo] = useState<number | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [pins, setPins] = useState<Set<string>>(new Set()); // developer_id des devs déjà pinnés pour le projet sélectionné
+  const [pins, setPins] = useState<Set<string>>(new Set());
   const [pinCount, setPinCount] = useState(0);
   const [founderId, setFounderId] = useState<string | null>(null);
   const [pinning, setPinning] = useState<string | null>(null);
@@ -79,10 +90,32 @@ export default function DevsPage() {
       }));
 
       setDevs(devsWithScore);
+      setFiltered(devsWithScore);
       setLoading(false);
     }
     load();
   }, [router]);
+
+  useEffect(() => {
+    let result = [...devs];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((d) =>
+        d.nom.toLowerCase().includes(q) ||
+        d.ecole?.toLowerCase().includes(q) ||
+        d.competences?.some((c) => c.toLowerCase().includes(q))
+      );
+    }
+    if (activeStack) {
+      result = result.filter((d) =>
+        d.competences?.some((c) => c.toLowerCase().includes(activeStack.toLowerCase()))
+      );
+    }
+    if (activeDispo !== null) {
+      result = result.filter((d) => (d.dispo_heures_semaine ?? 0) >= activeDispo);
+    }
+    setFiltered(result);
+  }, [search, activeStack, activeDispo, devs]);
 
   // Charge les pins du projet sélectionné
   useEffect(() => {
@@ -150,6 +183,49 @@ export default function DevsPage() {
           </div>
           <h1 className="text-xl font-black text-slate-900 mb-3">Trouver un dev</h1>
 
+          {/* Barre de recherche */}
+          <div className="relative mb-3">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+            <input
+              type="text"
+              placeholder="Nom, école, compétence..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input-field pl-9 py-2.5 text-sm w-full"
+            />
+          </div>
+
+          {/* Filtres stack + dispo */}
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide mb-3">
+            {STACKS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setActiveStack(activeStack === s ? null : s)}
+                className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
+                  activeStack === s
+                    ? "bg-blue-500 text-white border-blue-500"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+            <div className="w-px bg-slate-200 shrink-0" />
+            {DISPOS.map((d) => (
+              <button
+                key={d.label}
+                onClick={() => setActiveDispo(activeDispo === d.min ? null : d.min)}
+                className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
+                  activeDispo === d.min
+                    ? "bg-green-500 text-white border-green-500"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-green-300"
+                }`}
+              >
+                ⏱ {d.label}
+              </button>
+            ))}
+          </div>
+
           {projects.length === 0 ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700 font-medium">
               Tu n'as aucun projet actif. Dépose un projet d'abord.
@@ -188,13 +264,17 @@ export default function DevsPage() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-3">
-        {devs.length === 0 && (
+        <p className="text-sm text-slate-500 font-medium">
+          {filtered.length} développeur{filtered.length > 1 ? "s" : ""} trouvé{filtered.length > 1 ? "s" : ""}
+        </p>
+
+        {filtered.length === 0 && (
           <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
-            <p className="text-slate-400 text-sm">Aucun développeur inscrit pour l'instant.</p>
+            <p className="text-slate-400 text-sm">Aucun développeur trouvé.</p>
           </div>
         )}
 
-        {devs.map((dev) => {
+        {filtered.map((dev) => {
           const isPinned = pins.has(dev.id);
           const canPin = !isPinned && pinsLeft > 0 && projects.length > 0;
           return (
