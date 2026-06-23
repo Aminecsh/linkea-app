@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { generateMatchPdf } from "@/lib/generateMatchPdf";
 
 type Candidature = {
   id: string;
@@ -25,6 +26,13 @@ type Project = {
   id: string;
   titre: string;
   statut: string;
+  description?: string;
+  stack_souhaitee?: string;
+  deadline?: string;
+  profiles_founder?: {
+    nom: string;
+    ecole?: string;
+  };
 };
 
 export default function CandidatsPage() {
@@ -52,7 +60,7 @@ export default function CandidatsPage() {
 
       const { data: proj } = await supabase
         .from("projects")
-        .select("id, titre, statut")
+        .select("id, titre, statut, description, stack_souhaitee, deadline, profiles_founder(nom, ecole)")
         .eq("id", id)
         .eq("founder_id", profile.id)
         .maybeSingle();
@@ -88,6 +96,33 @@ export default function CandidatsPage() {
         developer_id: developerId,
       });
       if (convError) console.error("Conversation error:", convError.message);
+    }
+
+    // Génération du PDF de mission
+    const acceptedCand = candidatures.find((c) => c.id === candidatureId);
+    if (acceptedCand && project) {
+      generateMatchPdf({
+        projet: {
+          id: project.id,
+          titre: project.titre,
+          description: project.description,
+          stack_souhaitee: project.stack_souhaitee,
+          deadline: project.deadline,
+        },
+        founder: {
+          nom: project.profiles_founder?.nom ?? "Founder",
+          ecole: project.profiles_founder?.ecole,
+        },
+        dev: {
+          nom: acceptedCand.profiles_developer.nom,
+          ecole: acceptedCand.profiles_developer.ecole,
+          competences: acceptedCand.profiles_developer.competences,
+          dispo_heures_semaine: acceptedCand.profiles_developer.dispo_heures_semaine,
+          github: acceptedCand.profiles_developer.github,
+          linkedin: acceptedCand.profiles_developer.linkedin,
+        },
+        matchDate: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
+      });
     }
 
     // Notification in-app au dev accepté
