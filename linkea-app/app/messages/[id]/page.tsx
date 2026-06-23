@@ -237,6 +237,12 @@ export default function ChatPage() {
               {otherTyping ? "En train d'écrire..." : `📋 ${conversation?.projects?.titre}`}
             </p>
           </div>
+          <button
+            onClick={() => router.push(`/projets/${conversation?.project_id}/gestion`)}
+            className="shrink-0 flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-pink-500 border border-slate-200 hover:border-pink-300 px-3 py-1.5 rounded-full transition-all"
+          >
+            🗂 Gestion
+          </button>
           {contractId && (
             <button
               onClick={() => router.push(`/contrat/${contractId}`)}

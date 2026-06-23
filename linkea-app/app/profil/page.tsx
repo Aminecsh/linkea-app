@@ -310,6 +310,12 @@ export default function ProfilPage() {
                           {(p.statut === "matched" || p.statut === "en_cours") && (
                             <>
                               <button
+                                onClick={() => router.push(`/projets/${p.id}/gestion`)}
+                                className="text-xs font-semibold text-slate-500 hover:text-pink-500 transition-colors"
+                              >
+                                🗂 Gestion
+                              </button>
+                              <button
                                 onClick={() => handleLivrer(p.id)}
                                 className="text-xs font-semibold text-green-600 hover:text-green-800 transition-colors"
                               >
