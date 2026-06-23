@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { generateMatchPdf } from "@/lib/generateMatchPdf";
 
 type Candidature = {
   id: string;
@@ -98,10 +97,11 @@ export default function CandidatsPage() {
       if (convError) console.error("Conversation error:", convError.message);
     }
 
-    // Génération du PDF de mission
+    // Créer le contrat en base + notifier les deux parties
     const acceptedCand = candidatures.find((c) => c.id === candidatureId);
-    if (acceptedCand && project) {
-      generateMatchPdf({
+    const fId2 = fId ?? founderId;
+    if (acceptedCand && project && fId2) {
+      const contractData = {
         projet: {
           id: project.id,
           titre: project.titre,
@@ -119,10 +119,43 @@ export default function CandidatsPage() {
           competences: acceptedCand.profiles_developer.competences,
           dispo_heures_semaine: acceptedCand.profiles_developer.dispo_heures_semaine,
           github: acceptedCand.profiles_developer.github,
-          linkedin: acceptedCand.profiles_developer.linkedin,
         },
         matchDate: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
-      });
+      };
+
+      const { data: newContract } = await supabase.from("contracts").insert({
+        project_id: id,
+        founder_id: fId2,
+        developer_id: developerId,
+        data: contractData,
+      }).select().maybeSingle();
+
+      if (newContract) {
+        const contractLink = `/contrat/${newContract.id}`;
+
+        // Notif founder
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          await supabase.from("notifications").insert({
+            user_id: currentUser.id,
+            type: "contrat_disponible",
+            title: "Contrat disponible 📄",
+            body: `La lettre de mission pour "${project.titre}" est prête à signer.`,
+            link: contractLink,
+          });
+        }
+
+        // Notif dev
+        if (developerUserId) {
+          await supabase.from("notifications").insert({
+            user_id: developerUserId,
+            type: "contrat_disponible",
+            title: "Contrat disponible 📄",
+            body: `Tu as été sélectionné pour "${project.titre}". Signe ta lettre de mission !`,
+            link: contractLink,
+          });
+        }
+      }
     }
 
     // Notification in-app au dev accepté
