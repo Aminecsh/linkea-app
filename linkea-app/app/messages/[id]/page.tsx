@@ -17,7 +17,7 @@ type Message = {
 type Conversation = {
   id: string;
   project_id: string;
-  projects: { titre: string };
+  projects: { titre: string; statut: string };
   profiles_founder: { nom: string; user_id: string };
   profiles_developer: { nom: string; user_id: string };
 };
@@ -58,7 +58,7 @@ export default function ChatPage() {
 
       const { data: conv } = await supabase
         .from("conversations")
-        .select("id, project_id, projects(titre), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
+        .select("id, project_id, projects(titre, statut), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
         .eq("id", id)
         .maybeSingle();
 
@@ -234,6 +234,8 @@ export default function ChatPage() {
     ? conversation?.profiles_developer?.nom
     : conversation?.profiles_founder?.nom;
 
+  const isArchived = ["livre", "termine"].includes(conversation?.projects?.statut ?? "");
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
 
@@ -388,8 +390,20 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
+      {/* Bannière archive */}
+      {isArchived && (
+        <div className="bg-slate-50 border-t border-slate-200 px-4 py-3 sticky bottom-0">
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-center justify-center gap-2 bg-slate-100 border border-slate-200 rounded-xl px-4 py-3">
+              <span className="text-base">📦</span>
+              <p className="text-sm text-slate-500 font-medium">Ce projet est terminé — conversation archivée (lecture seule)</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Input */}
-      <div className="bg-white border-t border-slate-200 px-4 py-3 sticky bottom-0">
+      {!isArchived && <div className="bg-white border-t border-slate-200 px-4 py-3 sticky bottom-0">
         <div className="max-w-2xl mx-auto">
           <form onSubmit={handleSend} className="flex gap-2 items-center">
             {/* Inputs fichiers cachés */}
@@ -479,7 +493,7 @@ export default function ChatPage() {
             </button>
           </form>
         </div>
-      </div>
+      </div>}
 
     </div>
   );
