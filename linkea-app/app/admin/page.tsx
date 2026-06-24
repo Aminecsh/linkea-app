@@ -444,8 +444,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-      </div>
-
         {/* Bans actifs */}
         {tab === "bans" && (
           <div className="flex flex-col gap-3">
