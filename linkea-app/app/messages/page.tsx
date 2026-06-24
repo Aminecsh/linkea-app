@@ -336,16 +336,21 @@ export default function MessagesPage() {
       <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
         <div className="page-header px-4 py-4">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
-            <div>
-              <p className="label mb-1">Admin</p>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>Support</h1>
-                {totalUnreadAdmin > 0 && (
-                  <div className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-white"
-                    style={{ background: "var(--rose)", fontSize: 11, fontWeight: 800 }}>
-                    {totalUnreadAdmin}
-                  </div>
-                )}
+            <div className="flex items-center gap-3">
+              <button onClick={() => router.push("/admin")} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/5 transition-colors text-slate-400 hover:text-slate-700">
+                <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M7 1L1 7l6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              <div>
+                <p className="label mb-1">Admin</p>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>Support</h1>
+                  {totalUnreadAdmin > 0 && (
+                    <div className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-white"
+                      style={{ background: "var(--rose)", fontSize: 11, fontWeight: 800 }}>
+                      {totalUnreadAdmin}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <NotificationBell />
