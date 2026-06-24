@@ -383,7 +383,7 @@ export default function GestionPage() {
       <div className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-3 mb-3">
-            <button onClick={() => router.back()} className="text-slate-400 hover:text-slate-600 text-sm shrink-0">←</button>
+            <button onClick={() => router.push("/messages")} className="text-slate-400 hover:text-slate-600 text-sm shrink-0">← Messages</button>
             <div className="flex-1 min-w-0">
               <h1 className="font-black text-slate-900 text-base truncate">{projectTitre}</h1>
               <p className="text-xs text-slate-400">Gestion de projet</p>
