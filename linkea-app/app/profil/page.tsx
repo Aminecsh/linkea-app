@@ -6,20 +6,9 @@ import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type Experience = {
-  id: string; titre: string; entreprise: string;
-  date_debut: string; date_fin?: string; description?: string;
-};
-type Formation = {
-  id: string; diplome: string; etablissement: string;
-  annee?: string; description?: string;
-};
-type Project = {
-  id: string; titre: string; description: string;
-  stack_souhaitee: string; deadline: string; statut: string;
-};
+type Experience = { id: string; titre: string; entreprise: string; date_debut: string; date_fin?: string; description?: string; };
+type Formation  = { id: string; diplome: string; etablissement: string; annee?: string; description?: string; };
+type Project    = { id: string; titre: string; description: string; stack_souhaitee: string; deadline: string; statut: string; };
 type Candidature = {
   id: string; statut: string; project_id: string;
   projects: { titre: string; description: string; stack_souhaitee: string; deadline: string; statut: string; };
@@ -40,87 +29,64 @@ const STATUT_CAND: Record<string, { label: string; color: string }> = {
 
 function newId() { return crypto.randomUUID(); }
 
-// ── Section header ─────────────────────────────────────────────────────────
-
-function SectionHeader({ title, onAdd, onEdit }: { title: string; onAdd?: () => void; onEdit?: () => void }) {
-  return (
-    <div className="flex items-center justify-between mb-3">
-      <h2 className="text-base font-black text-slate-900">{title}</h2>
-      <div className="flex gap-1">
-        {onEdit && (
-          <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors text-sm">✏️</button>
-        )}
-        {onAdd && (
-          <button onClick={onAdd} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors font-bold text-lg">+</button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-
 export default function ProfilPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Auth & identité ────────────────────────────────────────────────────────
-  const [role, setRole]           = useState<string | null>(null);
-  const [userId, setUserId]       = useState<string | null>(null);
+  // ── Auth ─────────────────────────────────────────────────────────────────────
+  const [role, setRole]         = useState<string | null>(null);
+  const [userId, setUserId]     = useState<string | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading]   = useState(true);
 
-  // ── Champs profil ──────────────────────────────────────────────────────────
-  const [nom, setNom]             = useState("");
-  const [ecole, setEcole]         = useState("");
-  const [bio, setBio]             = useState("");
+  // ── Données profil ────────────────────────────────────────────────────────────
+  const [nom, setNom]           = useState("");
+  const [ecole, setEcole]       = useState("");
+  const [bio, setBio]           = useState("");
   const [competences, setCompetences] = useState<string[]>([]);
-  const [github, setGithub]       = useState("");
-  const [linkedin, setLinkedin]   = useState("");
-  const [dispo, setDispo]         = useState<number | "">(0);
+  const [github, setGithub]     = useState("");
+  const [linkedin, setLinkedin] = useState("");
+  const [dispo, setDispo]       = useState<number | "">(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-
-  // ── Expériences & Formation ────────────────────────────────────────────────
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [formation, setFormation]     = useState<Formation[]>([]);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
-  const [score, setScore]           = useState<number | null>(null);
+  // ── Stats & projets ───────────────────────────────────────────────────────────
+  const [score, setScore]       = useState<number | null>(null);
   const [reviewCount, setReviewCount] = useState(0);
   const [reviewedProjects, setReviewedProjects] = useState<Set<string>>(new Set());
-
-  // ── Projets & Candidatures ─────────────────────────────────────────────────
-  const [projects, setProjects]       = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [candidatures, setCandidatures] = useState<Candidature[]>([]);
   const [contractMap, setContractMap] = useState<Record<string, string>>({});
 
-  // ── Édition sections ───────────────────────────────────────────────────────
-  const [editingBio, setEditingBio]           = useState(false);
-  const [editingInfo, setEditingInfo]         = useState(false);
-  const [editingComp, setEditingComp]         = useState(false);
-  const [newComp, setNewComp]                 = useState("");
+  // ── Mode édition ─────────────────────────────────────────────────────────────
+  const [editing, setEditing]   = useState(false);
+  const [saving, setSaving]     = useState(false);
+
+  // Champs édition temporaires
+  const [editNom, setEditNom]           = useState("");
+  const [editEcole, setEditEcole]       = useState("");
+  const [editBio, setEditBio]           = useState("");
+  const [editGithub, setEditGithub]     = useState("");
+  const [editLinkedin, setEditLinkedin] = useState("");
+  const [editDispo, setEditDispo]       = useState<number | "">(0);
+  const [editComp, setEditComp]         = useState<string[]>([]);
+  const [newComp, setNewComp]           = useState("");
+  const [editExps, setEditExps]         = useState<Experience[]>([]);
+  const [editForms, setEditForms]       = useState<Formation[]>([]);
 
   // Modal expérience
-  const [showExpModal, setShowExpModal]   = useState(false);
-  const [editingExp, setEditingExp]       = useState<Experience | null>(null);
-  const [expTitre, setExpTitre]           = useState("");
-  const [expEntreprise, setExpEntreprise] = useState("");
-  const [expDebut, setExpDebut]           = useState("");
-  const [expFin, setExpFin]               = useState("");
-  const [expDesc, setExpDesc]             = useState("");
-  const [savingExp, setSavingExp]         = useState(false);
+  const [showExpModal, setShowExpModal] = useState(false);
+  const [editingExp, setEditingExp]     = useState<Experience | null>(null);
+  const [expFields, setExpFields]       = useState({ titre: "", entreprise: "", date_debut: "", date_fin: "", description: "" });
 
   // Modal formation
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingForm, setEditingForm]     = useState<Formation | null>(null);
-  const [formDiplome, setFormDiplome]     = useState("");
-  const [formEtab, setFormEtab]           = useState("");
-  const [formAnnee, setFormAnnee]         = useState("");
-  const [formDesc, setFormDesc]           = useState("");
-  const [savingForm, setSavingForm]       = useState(false);
+  const [formFields, setFormFields]       = useState({ diplome: "", etablissement: "", annee: "", description: "" });
 
-  // ── Chargement ─────────────────────────────────────────────────────────────
+  // ── Chargement ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     async function load() {
@@ -134,90 +100,80 @@ export default function ProfilPage() {
       setRole(r);
 
       if (r === "founder") {
-        // Colonnes stables — toujours présentes
-        const { data: profile } = await supabase
-          .from("profiles_founder")
-          .select("id, nom, ecole, avatar_url")
+        const { data: p } = await supabase
+          .from("profiles_founder").select("id, nom, ecole, avatar_url")
           .eq("user_id", user.id).maybeSingle();
-        if (!profile) { router.push("/onboarding"); return; }
+        if (!p) { router.push("/onboarding"); return; }
+        setNom(p.nom ?? ""); setEcole(p.ecole ?? "");
+        setAvatarUrl(p.avatar_url ?? null); setProfileId(p.id);
 
-        setNom(profile.nom ?? ""); setEcole(profile.ecole ?? "");
-        setAvatarUrl(profile.avatar_url ?? null); setProfileId(profile.id);
+        // Nouvelles colonnes (optionnelles)
+        supabase.from("profiles_founder").select("bio, experiences, formation")
+          .eq("user_id", user.id).maybeSingle()
+          .then(({ data: extra }) => {
+            if (extra) {
+              setBio((extra as { bio?: string }).bio ?? "");
+              setExperiences((extra as { experiences?: Experience[] }).experiences ?? []);
+              setFormation((extra as { formation?: Formation[] }).formation ?? []);
+            }
+          });
 
-        // Nouvelles colonnes — optionnelles (SQL migration)
-        const { data: extra } = await supabase
-          .from("profiles_founder")
-          .select("bio, experiences, formation")
-          .eq("user_id", user.id).maybeSingle();
-        if (extra) {
-          setBio((extra as { bio?: string }).bio ?? "");
-          setExperiences((extra as { experiences?: Experience[] }).experiences ?? []);
-          setFormation((extra as { formation?: Formation[] }).formation ?? []);
-        }
-
-        const { data: projs } = await supabase.from("projects").select("*")
-          .eq("founder_id", profile.id).order("created_at", { ascending: false });
+        const [{ data: projs }, { data: contracts }, { data: fReviews }, { data: myR }] = await Promise.all([
+          supabase.from("projects").select("*").eq("founder_id", p.id).order("created_at", { ascending: false }),
+          supabase.from("contracts").select("id, project_id").eq("founder_id", p.id),
+          supabase.from("reviews").select("rating").eq("reviewed_id", user.id),
+          supabase.from("reviews").select("project_id").eq("reviewer_id", user.id),
+        ]);
         setProjects(projs ?? []);
-
-        const { data: contracts } = await supabase.from("contracts").select("id, project_id").eq("founder_id", profile.id);
         const map: Record<string, string> = {};
         (contracts ?? []).forEach((c) => { map[c.project_id] = c.id; });
         setContractMap(map);
-
-        const [{ data: founderReviews }, { data: myR }] = await Promise.all([
-          supabase.from("reviews").select("rating").eq("reviewed_id", user.id),
-          supabase.from("reviews").select("project_id").eq("reviewer_id", user.id),
-        ]);
-        if (founderReviews?.length) {
-          setScore(Math.round(founderReviews.reduce((s, r) => s + r.rating, 0) / founderReviews.length * 10) / 10);
-          setReviewCount(founderReviews.length);
+        if (fReviews?.length) {
+          setScore(Math.round(fReviews.reduce((s, rv) => s + rv.rating, 0) / fReviews.length * 10) / 10);
+          setReviewCount(fReviews.length);
         }
-        if (myR) setReviewedProjects(new Set(myR.map((r) => r.project_id)));
+        if (myR) setReviewedProjects(new Set(myR.map((rv) => rv.project_id)));
       }
 
       if (r === "developer") {
-        // Colonnes stables — toujours présentes
-        const { data: devProfile } = await supabase
+        const { data: p } = await supabase
           .from("profiles_developer")
           .select("id, nom, ecole, competences, github, linkedin, dispo_heures_semaine, avatar_url")
           .eq("user_id", user.id).maybeSingle();
-        if (!devProfile) { router.push("/onboarding"); return; }
+        if (!p) { router.push("/onboarding"); return; }
+        setNom(p.nom ?? ""); setEcole(p.ecole ?? "");
+        setCompetences(p.competences ?? []); setGithub(p.github ?? "");
+        setLinkedin(p.linkedin ?? ""); setDispo(p.dispo_heures_semaine ?? "");
+        setAvatarUrl(p.avatar_url ?? null); setProfileId(p.id);
 
-        setNom(devProfile.nom ?? ""); setEcole(devProfile.ecole ?? "");
-        setCompetences(devProfile.competences ?? []); setGithub(devProfile.github ?? "");
-        setLinkedin(devProfile.linkedin ?? ""); setDispo(devProfile.dispo_heures_semaine ?? "");
-        setAvatarUrl(devProfile.avatar_url ?? null); setProfileId(devProfile.id);
+        // Nouvelles colonnes (optionnelles)
+        supabase.from("profiles_developer").select("bio, experiences, formation")
+          .eq("user_id", user.id).maybeSingle()
+          .then(({ data: extra }) => {
+            if (extra) {
+              setBio((extra as { bio?: string }).bio ?? "");
+              setExperiences((extra as { experiences?: Experience[] }).experiences ?? []);
+              setFormation((extra as { formation?: Formation[] }).formation ?? []);
+            }
+          });
 
-        // Nouvelles colonnes — optionnelles (SQL migration)
-        const { data: extra } = await supabase
-          .from("profiles_developer")
-          .select("bio, experiences, formation")
-          .eq("user_id", user.id).maybeSingle();
-        if (extra) {
-          setBio((extra as { bio?: string }).bio ?? "");
-          setExperiences((extra as { experiences?: Experience[] }).experiences ?? []);
-          setFormation((extra as { formation?: Formation[] }).formation ?? []);
-        }
-
-        const { data: cands } = await supabase.from("candidatures")
-          .select("id, statut, project_id, projects(titre, description, stack_souhaitee, deadline, statut)")
-          .eq("developer_id", devProfile.id).order("created_at", { ascending: false });
-        setCandidatures((cands as unknown as Candidature[]) ?? []);
-
-        const { data: devContracts } = await supabase.from("contracts").select("id, project_id").eq("developer_id", devProfile.id);
-        const devMap: Record<string, string> = {};
-        (devContracts ?? []).forEach((c) => { devMap[c.project_id] = c.id; });
-        setContractMap(devMap);
-
-        const [{ data: reviews }, { data: myR }] = await Promise.all([
+        const [{ data: cands }, { data: devContracts }, { data: reviews }, { data: myR }] = await Promise.all([
+          supabase.from("candidatures")
+            .select("id, statut, project_id, projects(titre, description, stack_souhaitee, deadline, statut)")
+            .eq("developer_id", p.id).order("created_at", { ascending: false }),
+          supabase.from("contracts").select("id, project_id").eq("developer_id", p.id),
           supabase.from("reviews").select("rating").eq("reviewed_id", user.id),
           supabase.from("reviews").select("project_id").eq("reviewer_id", user.id),
         ]);
+        setCandidatures((cands as unknown as Candidature[]) ?? []);
+        const devMap: Record<string, string> = {};
+        (devContracts ?? []).forEach((c) => { devMap[c.project_id] = c.id; });
+        setContractMap(devMap);
         if (reviews?.length) {
-          setScore(Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length * 10) / 10);
+          setScore(Math.round(reviews.reduce((s, rv) => s + rv.rating, 0) / reviews.length * 10) / 10);
           setReviewCount(reviews.length);
         }
-        if (myR) setReviewedProjects(new Set(myR.map((r) => r.project_id)));
+        if (myR) setReviewedProjects(new Set(myR.map((rv) => rv.project_id)));
       }
 
       setLoading(false);
@@ -225,43 +181,38 @@ export default function ProfilPage() {
     load();
   }, [router]);
 
-  // ── Sauvegarde ─────────────────────────────────────────────────────────────
+  // ── Ouvrir / fermer le mode édition ──────────────────────────────────────────
 
-  async function saveField(fields: Record<string, unknown>) {
+  function openEdit() {
+    setEditNom(nom); setEditEcole(ecole); setEditBio(bio);
+    setEditGithub(github); setEditLinkedin(linkedin); setEditDispo(dispo);
+    setEditComp([...competences]); setEditExps([...experiences]); setEditForms([...formation]);
+    setEditing(true);
+  }
+
+  function cancelEdit() { setEditing(false); }
+
+  async function saveEdit() {
     if (!profileId || !role) return;
+    setSaving(true);
     const table = role === "founder" ? "profiles_founder" : "profiles_developer";
-    await supabase.from(table).update(fields).eq("id", profileId);
-  }
-
-  async function saveBio() {
-    await saveField({ bio });
-    setEditingBio(false);
-  }
-
-  async function saveInfo() {
+    const base: Record<string, unknown> = { nom: editNom, ecole: editEcole };
     if (role === "developer") {
-      await saveField({ github, linkedin, dispo_heures_semaine: dispo || null });
-    } else {
-      await saveField({ ecole });
+      base.github = editGithub; base.linkedin = editLinkedin;
+      base.dispo_heures_semaine = editDispo || null;
+      base.competences = editComp;
     }
-    setEditingInfo(false);
+    // Toujours tenter d'enregistrer bio/exp/formation (ignoré si colonnes absentes)
+    try { Object.assign(base, { bio: editBio, experiences: editExps, formation: editForms }); } catch {}
+    await supabase.from(table).update(base).eq("id", profileId);
+    setNom(editNom); setEcole(editEcole); setBio(editBio);
+    setGithub(editGithub); setLinkedin(editLinkedin); setDispo(editDispo);
+    setCompetences(editComp); setExperiences(editExps); setFormation(editForms);
+    setSaving(false);
+    setEditing(false);
   }
 
-  async function addComp() {
-    if (!newComp.trim()) return;
-    const updated = [...competences, newComp.trim()];
-    setCompetences(updated);
-    setNewComp("");
-    await saveField({ competences: updated });
-  }
-
-  async function removeComp(c: string) {
-    const updated = competences.filter((x) => x !== c);
-    setCompetences(updated);
-    await saveField({ competences: updated });
-  }
-
-  // ── Avatar ─────────────────────────────────────────────────────────────────
+  // ── Avatar ────────────────────────────────────────────────────────────────────
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -271,72 +222,59 @@ export default function ProfilPage() {
     const path = `${userId}/avatar.${ext}`;
     await supabase.storage.from("avatars").upload(path, file, { upsert: true });
     const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-    await saveField({ avatar_url: data.publicUrl });
+    const table = role === "founder" ? "profiles_founder" : "profiles_developer";
+    await supabase.from(table).update({ avatar_url: data.publicUrl }).eq("id", profileId);
     setAvatarUrl(data.publicUrl);
     setUploadingAvatar(false);
   }
 
-  // ── Expériences ────────────────────────────────────────────────────────────
+  // ── Modals expérience ─────────────────────────────────────────────────────────
 
   function openExpModal(exp?: Experience) {
-    if (exp) { setEditingExp(exp); setExpTitre(exp.titre); setExpEntreprise(exp.entreprise); setExpDebut(exp.date_debut); setExpFin(exp.date_fin ?? ""); setExpDesc(exp.description ?? ""); }
-    else { setEditingExp(null); setExpTitre(""); setExpEntreprise(""); setExpDebut(""); setExpFin(""); setExpDesc(""); }
+    setEditingExp(exp ?? null);
+    setExpFields(exp
+      ? { titre: exp.titre, entreprise: exp.entreprise, date_debut: exp.date_debut, date_fin: exp.date_fin ?? "", description: exp.description ?? "" }
+      : { titre: "", entreprise: "", date_debut: "", date_fin: "", description: "" });
     setShowExpModal(true);
   }
 
-  async function saveExp() {
-    if (!expTitre || !expEntreprise) return;
-    setSavingExp(true);
-    let updated: Experience[];
-    if (editingExp) {
-      updated = experiences.map((e) => e.id === editingExp.id
-        ? { ...e, titre: expTitre, entreprise: expEntreprise, date_debut: expDebut, date_fin: expFin || undefined, description: expDesc || undefined }
-        : e);
-    } else {
-      updated = [...experiences, { id: newId(), titre: expTitre, entreprise: expEntreprise, date_debut: expDebut, date_fin: expFin || undefined, description: expDesc || undefined }];
-    }
-    setExperiences(updated);
-    await saveField({ experiences: updated });
-    setShowExpModal(false); setSavingExp(false);
+  function saveExp() {
+    if (!expFields.titre || !expFields.entreprise) return;
+    const entry: Experience = {
+      id: editingExp?.id ?? newId(), titre: expFields.titre, entreprise: expFields.entreprise,
+      date_debut: expFields.date_debut, date_fin: expFields.date_fin || undefined,
+      description: expFields.description || undefined,
+    };
+    setEditExps(editingExp ? editExps.map((e) => e.id === editingExp.id ? entry : e) : [...editExps, entry]);
+    setShowExpModal(false);
   }
 
-  async function deleteExp(id: string) {
-    const updated = experiences.filter((e) => e.id !== id);
-    setExperiences(updated);
-    await saveField({ experiences: updated });
-  }
+  function deleteExp(id: string) { setEditExps(editExps.filter((e) => e.id !== id)); }
 
-  // ── Formation ──────────────────────────────────────────────────────────────
+  // ── Modals formation ──────────────────────────────────────────────────────────
 
   function openFormModal(f?: Formation) {
-    if (f) { setEditingForm(f); setFormDiplome(f.diplome); setFormEtab(f.etablissement); setFormAnnee(f.annee ?? ""); setFormDesc(f.description ?? ""); }
-    else { setEditingForm(null); setFormDiplome(""); setFormEtab(""); setFormAnnee(""); setFormDesc(""); }
+    setEditingForm(f ?? null);
+    setFormFields(f
+      ? { diplome: f.diplome, etablissement: f.etablissement, annee: f.annee ?? "", description: f.description ?? "" }
+      : { diplome: "", etablissement: "", annee: "", description: "" });
     setShowFormModal(true);
   }
 
-  async function saveForm() {
-    if (!formDiplome || !formEtab) return;
-    setSavingForm(true);
-    let updated: Formation[];
-    if (editingForm) {
-      updated = formation.map((f) => f.id === editingForm.id
-        ? { ...f, diplome: formDiplome, etablissement: formEtab, annee: formAnnee || undefined, description: formDesc || undefined }
-        : f);
-    } else {
-      updated = [...formation, { id: newId(), diplome: formDiplome, etablissement: formEtab, annee: formAnnee || undefined, description: formDesc || undefined }];
-    }
-    setFormation(updated);
-    await saveField({ formation: updated });
-    setShowFormModal(false); setSavingForm(false);
+  function saveForm() {
+    if (!formFields.diplome || !formFields.etablissement) return;
+    const entry: Formation = {
+      id: editingForm?.id ?? newId(), diplome: formFields.diplome,
+      etablissement: formFields.etablissement, annee: formFields.annee || undefined,
+      description: formFields.description || undefined,
+    };
+    setEditForms(editingForm ? editForms.map((f) => f.id === editingForm.id ? entry : f) : [...editForms, entry]);
+    setShowFormModal(false);
   }
 
-  async function deleteForm(id: string) {
-    const updated = formation.filter((f) => f.id !== id);
-    setFormation(updated);
-    await saveField({ formation: updated });
-  }
+  function deleteForm(id: string) { setEditForms(editForms.filter((f) => f.id !== id)); }
 
-  // ── Projet founder ─────────────────────────────────────────────────────────
+  // ── Projet founder ────────────────────────────────────────────────────────────
 
   async function handleLivrer(projectId: string) {
     const proj = projects.find((p) => p.id === projectId);
@@ -355,14 +293,9 @@ export default function ProfilPage() {
   }
 
   async function handleDeleteProject(projectId: string) {
-    if (!confirm("Supprimer ce projet ? Cette action est irréversible.")) return;
+    if (!confirm("Supprimer ce projet ?")) return;
     await supabase.from("projects").delete().eq("id", projectId);
     setProjects((prev) => prev.filter((p) => p.id !== projectId));
-  }
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push("/connexion");
   }
 
   if (loading) return (
@@ -374,258 +307,355 @@ export default function ProfilPage() {
   const isFounder = role === "founder";
 
   // ══════════════════════════════════════════════════════════════════════════════
-  // Rendu
+  // RENDU — Mode édition
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  if (editing) {
+    return (
+      <div className="min-h-screen bg-slate-100 pb-24">
+        {/* Header édition */}
+        <div className="bg-white border-b border-slate-200 px-4 py-4 sticky top-0 z-10">
+          <div className="max-w-2xl mx-auto flex items-center justify-between">
+            <button onClick={cancelEdit} className="text-slate-500 hover:text-slate-800 font-semibold text-sm">
+              ← Annuler
+            </button>
+            <h1 className="text-base font-black text-slate-900">Modifier le profil</h1>
+            <button onClick={saveEdit} disabled={saving} className="btn-pink px-4 py-2 text-sm">
+              {saving ? "..." : "Enregistrer"}
+            </button>
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto px-4 py-5 flex flex-col gap-4">
+
+          {/* Photo */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Photo de profil</p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={nom} className="w-20 h-20 rounded-full object-cover border-2 border-slate-200" />
+                ) : (
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-black ${isFounder ? "bg-gradient-to-br from-pink-400 to-purple-500" : "bg-gradient-to-br from-blue-400 to-indigo-500"}`}>
+                    {nom?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
+              </div>
+              <button onClick={() => fileInputRef.current?.click()} className="btn-ghost px-4 py-2 text-sm">
+                {uploadingAvatar ? "Envoi..." : "Changer la photo"}
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+            </div>
+          </div>
+
+          {/* Infos de base */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Informations</p>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Nom complet</label>
+              <input value={editNom} onChange={(e) => setEditNom(e.target.value)} className="input-field" placeholder="Ton nom" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">École / Université</label>
+              <input value={editEcole} onChange={(e) => setEditEcole(e.target.value)} className="input-field" placeholder="HEC, 42, EPITECH..." />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Bio</label>
+              <textarea value={editBio} onChange={(e) => setEditBio(e.target.value)} rows={3} maxLength={300}
+                className="input-field resize-none" placeholder="Présente-toi en quelques mots..." />
+            </div>
+          </div>
+
+          {/* Liens (dev uniquement) */}
+          {!isFounder && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Liens & disponibilité</p>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 mb-1 block">GitHub</label>
+                <input value={editGithub} onChange={(e) => setEditGithub(e.target.value)} className="input-field" placeholder="https://github.com/..." />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 mb-1 block">LinkedIn</label>
+                <input value={editLinkedin} onChange={(e) => setEditLinkedin(e.target.value)} className="input-field" placeholder="https://linkedin.com/in/..." />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 mb-1 block">Disponibilité (h/semaine)</label>
+                <input type="number" value={editDispo} onChange={(e) => setEditDispo(Number(e.target.value))} className="input-field w-32" placeholder="10" />
+              </div>
+            </div>
+          )}
+
+          {/* Compétences (dev uniquement) */}
+          {!isFounder && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Compétences</p>
+              <div className="flex flex-wrap gap-2">
+                {editComp.map((c) => (
+                  <div key={c} className="flex items-center gap-1 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full">
+                    <span className="text-sm font-semibold text-blue-600">{c}</span>
+                    <button onClick={() => setEditComp(editComp.filter((x) => x !== c))} className="text-blue-400 hover:text-red-500 text-xs font-bold ml-1">✕</button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input value={newComp} onChange={(e) => setNewComp(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && newComp.trim()) { setEditComp([...editComp, newComp.trim()]); setNewComp(""); } }}
+                  placeholder="React, Node.js..." className="input-field flex-1 text-sm" />
+                <button onClick={() => { if (newComp.trim()) { setEditComp([...editComp, newComp.trim()]); setNewComp(""); } }}
+                  className="btn-pink px-4 py-2 text-sm">Ajouter</button>
+              </div>
+            </div>
+          )}
+
+          {/* Expériences */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Expériences</p>
+              <button onClick={() => openExpModal()} className="text-sm font-semibold text-pink-500 hover:text-pink-700">+ Ajouter</button>
+            </div>
+            {editExps.length === 0 ? (
+              <p className="text-sm text-slate-400 italic">Aucune expérience ajoutée</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {editExps.map((exp) => (
+                  <div key={exp.id} className="flex items-start gap-3 bg-slate-50 rounded-xl p-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-900 text-sm">{exp.titre}</p>
+                      <p className="text-xs text-slate-500">{exp.entreprise} · {exp.date_debut}{exp.date_fin ? ` → ${exp.date_fin}` : " → Présent"}</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => openExpModal(exp)} className="text-xs text-slate-400 hover:text-slate-700">✏️</button>
+                      <button onClick={() => deleteExp(exp.id)} className="text-xs text-slate-400 hover:text-red-500">✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Formation */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Formation</p>
+              <button onClick={() => openFormModal()} className="text-sm font-semibold text-pink-500 hover:text-pink-700">+ Ajouter</button>
+            </div>
+            {editForms.length === 0 ? (
+              <p className="text-sm text-slate-400 italic">Aucune formation ajoutée</p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {editForms.map((f) => (
+                  <div key={f.id} className="flex items-start gap-3 bg-slate-50 rounded-xl p-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-900 text-sm">{f.diplome}</p>
+                      <p className="text-xs text-slate-500">{f.etablissement}{f.annee ? ` · ${f.annee}` : ""}</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => openFormModal(f)} className="text-xs text-slate-400 hover:text-slate-700">✏️</button>
+                      <button onClick={() => deleteForm(f.id)} className="text-xs text-slate-400 hover:text-red-500">✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button onClick={saveEdit} disabled={saving} className="btn-pink w-full py-4">
+            {saving ? "Enregistrement..." : "Enregistrer les modifications"}
+          </button>
+          <button onClick={cancelEdit} className="btn-ghost w-full py-3">Annuler</button>
+        </div>
+
+        {/* Modal expérience */}
+        {showExpModal && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 flex flex-col gap-3">
+              <h2 className="text-base font-black">{editingExp ? "Modifier" : "Ajouter"} une expérience</h2>
+              <input value={expFields.titre} onChange={(e) => setExpFields({ ...expFields, titre: e.target.value })} placeholder="Titre du poste" className="input-field" />
+              <input value={expFields.entreprise} onChange={(e) => setExpFields({ ...expFields, entreprise: e.target.value })} placeholder="Entreprise / Projet" className="input-field" />
+              <div className="grid grid-cols-2 gap-2">
+                <input value={expFields.date_debut} onChange={(e) => setExpFields({ ...expFields, date_debut: e.target.value })} placeholder="Début (ex: Jan 2024)" className="input-field text-sm py-2" />
+                <input value={expFields.date_fin} onChange={(e) => setExpFields({ ...expFields, date_fin: e.target.value })} placeholder="Fin (vide=présent)" className="input-field text-sm py-2" />
+              </div>
+              <textarea value={expFields.description} onChange={(e) => setExpFields({ ...expFields, description: e.target.value })} placeholder="Description (optionnel)" rows={2} className="input-field resize-none" />
+              <button onClick={saveExp} className="btn-pink w-full py-3">Valider</button>
+              <button onClick={() => setShowExpModal(false)} className="btn-ghost w-full py-2">Annuler</button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal formation */}
+        {showFormModal && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 flex flex-col gap-3">
+              <h2 className="text-base font-black">{editingForm ? "Modifier" : "Ajouter"} une formation</h2>
+              <input value={formFields.diplome} onChange={(e) => setFormFields({ ...formFields, diplome: e.target.value })} placeholder="Diplôme / Certification" className="input-field" />
+              <input value={formFields.etablissement} onChange={(e) => setFormFields({ ...formFields, etablissement: e.target.value })} placeholder="École / Établissement" className="input-field" />
+              <input value={formFields.annee} onChange={(e) => setFormFields({ ...formFields, annee: e.target.value })} placeholder="Année (ex: 2024)" className="input-field" />
+              <textarea value={formFields.description} onChange={(e) => setFormFields({ ...formFields, description: e.target.value })} placeholder="Description (optionnel)" rows={2} className="input-field resize-none" />
+              <button onClick={saveForm} className="btn-pink w-full py-3">Valider</button>
+              <button onClick={() => setShowFormModal(false)} className="btn-ghost w-full py-2">Annuler</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════════
+  // RENDU — Mode vue
   // ══════════════════════════════════════════════════════════════════════════════
 
   return (
     <div className="min-h-screen bg-slate-100 pb-24">
 
-      {/* ── Bannière + Hero ───────────────────────────────────────────────── */}
-      <div className="relative">
-        <div className={`h-32 ${isFounder ? "bg-gradient-to-r from-pink-400 to-purple-500" : "bg-gradient-to-r from-blue-400 to-indigo-500"}`} />
-        <div className="bg-white border-b border-slate-200 px-4 pb-4">
-          <div className="max-w-2xl mx-auto">
-            <div className="flex items-end justify-between -mt-12 mb-3">
-              {/* Avatar cliquable */}
-              <div className="relative group">
-                <button onClick={() => fileInputRef.current?.click()} className="block">
-                  {avatarUrl ? (
-                    <img src={avatarUrl} alt={nom} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md" />
-                  ) : (
-                    <div className={`w-24 h-24 rounded-full border-4 border-white shadow-md flex items-center justify-center text-white text-3xl font-black ${isFounder ? "bg-gradient-to-br from-pink-400 to-purple-500" : "bg-gradient-to-br from-blue-400 to-indigo-500"}`}>
-                      {nom?.[0]?.toUpperCase() ?? "?"}
-                    </div>
-                  )}
-                  <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
-                    {uploadingAvatar ? "..." : "📷"}
-                  </div>
-                </button>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
-              </div>
-              {/* Actions header */}
-              <div className="flex items-center gap-2 pb-1">
-                <NotificationBell />
-                <button onClick={() => router.push(`/profil/${userId}`)}
-                  className="text-xs font-semibold border border-slate-300 text-slate-600 px-3 py-2 rounded-full hover:bg-slate-50 transition-colors">
-                  Aperçu public
-                </button>
-                <button onClick={handleLogout} className="text-xs font-semibold border border-slate-300 text-slate-600 px-3 py-2 rounded-full hover:bg-slate-50 transition-colors">
-                  Déconnexion
-                </button>
-              </div>
-            </div>
-
-            {/* Identité */}
-            <h1 className="text-2xl font-black text-slate-900">{nom}</h1>
-
-            {/* Bio inline */}
-            {editingBio ? (
-              <div className="mt-2">
-                <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} maxLength={300}
-                  placeholder="Décris-toi en quelques mots — ton rôle, ta vision, tes objectifs..."
-                  className="input-field text-sm resize-none w-full" />
-                <div className="flex gap-2 mt-2">
-                  <button onClick={saveBio} className="btn-pink px-4 py-2 text-xs">Enregistrer</button>
-                  <button onClick={() => setEditingBio(false)} className="btn-ghost px-4 py-2 text-xs">Annuler</button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-start gap-2 mt-1 group">
-                <p className={`text-sm leading-relaxed flex-1 ${bio ? "text-slate-600" : "text-slate-400 italic"}`}>
-                  {bio || "Ajoute une courte présentation..."}
-                </p>
-                <button onClick={() => setEditingBio(true)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-700 transition-all shrink-0">✏️</button>
-              </div>
-            )}
-
-            {/* École + badge */}
-            <div className="flex items-center gap-2 mt-2">
-              {ecole && <span className="text-sm text-slate-500">{ecole}</span>}
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${isFounder ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}>
-                {isFounder ? "Founder" : "Développeur"}
-              </span>
-            </div>
-
-            {/* Score */}
-            {score !== null && (
-              <div className="flex items-center gap-2 mt-2">
-                <div className="flex gap-0.5">{[1,2,3,4,5].map((s) => <span key={s} className={`text-base ${s <= Math.round(score) ? "text-amber-400" : "text-slate-200"}`}>★</span>)}</div>
-                <span className="font-bold text-slate-900 text-sm">{score}/5</span>
-                <span className="text-xs text-slate-400">({reviewCount} avis)</span>
-              </div>
-            )}
-
-            {/* Infos dev (github, linkedin, dispo) */}
-            {!isFounder && (
-              <div className="mt-3">
-                {editingInfo ? (
-                  <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="URL GitHub" className="input-field text-xs py-2" />
-                      <input value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="URL LinkedIn" className="input-field text-xs py-2" />
-                    </div>
-                    <input type="number" value={dispo} onChange={(e) => setDispo(Number(e.target.value))} placeholder="Dispo h/semaine" className="input-field text-xs py-2 w-40" />
-                    <div className="flex gap-2">
-                      <button onClick={saveInfo} className="btn-pink px-4 py-2 text-xs">Enregistrer</button>
-                      <button onClick={() => setEditingInfo(false)} className="btn-ghost px-4 py-2 text-xs">Annuler</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-2 items-center group">
-                    {dispo ? <span className="text-xs font-semibold bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full">⏱ {dispo}h/sem</span> : null}
-                    {github ? <a href={github} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded-full transition-colors">⌥ GitHub ↗</a> : null}
-                    {linkedin ? <a href={linkedin} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors">in LinkedIn ↗</a> : null}
-                    <button onClick={() => setEditingInfo(true)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-700 transition-all text-sm">✏️</button>
-                    {!dispo && !github && !linkedin && <span className="text-xs text-slate-400 italic">Ajoute tes liens...</span>}
-                  </div>
-                )}
-              </div>
-            )}
+      {/* Header */}
+      <div className="bg-white border-b border-slate-200 px-4 py-4 sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <p className="text-xs font-bold uppercase tracking-widest text-pink-500">Mon profil</p>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <button onClick={openEdit} className="btn-ghost px-4 py-2 text-sm font-semibold">
+              ✏️ Modifier
+            </button>
           </div>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-5 flex flex-col gap-4">
 
-        {/* ── CTA Founder ───────────────────────────────────────────────── */}
+        {/* Carte identité */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <div className="flex items-center gap-4">
+            <div className="relative group shrink-0">
+              <button onClick={() => fileInputRef.current?.click()}>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={nom} className="w-20 h-20 rounded-full object-cover border-2 border-slate-200" />
+                ) : (
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-black ${isFounder ? "bg-gradient-to-br from-pink-400 to-purple-500" : "bg-gradient-to-br from-blue-400 to-indigo-500"}`}>
+                    {nom?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
+                <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs">
+                  {uploadingAvatar ? "..." : "📷"}
+                </div>
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-black text-slate-900">{nom || "—"}</h1>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${isFounder ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}>
+                  {isFounder ? "Founder" : "Développeur"}
+                </span>
+              </div>
+              {ecole && <p className="text-sm text-slate-500 mt-0.5">{ecole}</p>}
+              {score !== null && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <div className="flex gap-0.5">{[1,2,3,4,5].map((s) => <span key={s} className={`text-sm ${s <= Math.round(score) ? "text-amber-400" : "text-slate-200"}`}>★</span>)}</div>
+                  <span className="text-sm font-bold text-slate-900">{score}/5</span>
+                  <span className="text-xs text-slate-400">({reviewCount} avis)</span>
+                </div>
+              )}
+            </div>
+          </div>
+          {bio && <p className="text-sm text-slate-600 leading-relaxed mt-4 pt-4 border-t border-slate-100">{bio}</p>}
+        </div>
+
+        {/* Liens dev */}
+        {!isFounder && (dispo || github || linkedin) && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Liens & dispo</p>
+            <div className="flex flex-wrap gap-2">
+              {dispo ? <span className="text-sm font-semibold bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full">⏱ {dispo}h/sem</span> : null}
+              {github ? <a href={github} target="_blank" rel="noreferrer" className="text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1.5 rounded-full transition-colors">GitHub ↗</a> : null}
+              {linkedin ? <a href={linkedin} target="_blank" rel="noreferrer" className="text-sm font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full transition-colors">LinkedIn ↗</a> : null}
+            </div>
+          </div>
+        )}
+
+        {/* Compétences dev */}
+        {!isFounder && competences.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Compétences</p>
+            <div className="flex flex-wrap gap-2">
+              {competences.map((c) => (
+                <span key={c} className="text-sm font-semibold bg-blue-50 border border-blue-100 text-blue-600 px-3 py-1.5 rounded-full">{c}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Expériences */}
+        {experiences.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Expériences</p>
+            <div className="flex flex-col divide-y divide-slate-100">
+              {experiences.map((exp) => (
+                <div key={exp.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                  <span className="text-xl mt-0.5">💼</span>
+                  <div>
+                    <p className="font-bold text-slate-900 text-sm">{exp.titre}</p>
+                    <p className="text-xs text-slate-500">{exp.entreprise} · {exp.date_debut}{exp.date_fin ? ` → ${exp.date_fin}` : " → Présent"}</p>
+                    {exp.description && <p className="text-xs text-slate-400 mt-1">{exp.description}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Formation */}
+        {formation.length > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Formation</p>
+            <div className="flex flex-col divide-y divide-slate-100">
+              {formation.map((f) => (
+                <div key={f.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                  <span className="text-xl mt-0.5">🎓</span>
+                  <div>
+                    <p className="font-bold text-slate-900 text-sm">{f.diplome}</p>
+                    <p className="text-xs text-slate-500">{f.etablissement}{f.annee ? ` · ${f.annee}` : ""}</p>
+                    {f.description && <p className="text-xs text-slate-400 mt-1">{f.description}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* CTA Founder */}
         {isFounder && (
           <button onClick={() => router.push("/projets/nouveau")} className="btn-pink w-full py-3">
             + Déposer un nouveau projet
           </button>
         )}
 
-        {/* ── Compétences (dev) ─────────────────────────────────────────── */}
-        {!isFounder && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-5">
-            <SectionHeader title="Compétences" onEdit={() => setEditingComp(!editingComp)} />
-            <div className="flex flex-wrap gap-2">
-              {competences.map((c) => (
-                <div key={c} className="flex items-center gap-1 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-full">
-                  <span className="text-sm font-semibold text-blue-600">{c}</span>
-                  {editingComp && (
-                    <button onClick={() => removeComp(c)} className="text-blue-400 hover:text-red-500 ml-1 text-xs font-bold">✕</button>
-                  )}
-                </div>
-              ))}
-              {editingComp && (
-                <div className="flex items-center gap-2">
-                  <input value={newComp} onChange={(e) => setNewComp(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addComp()}
-                    placeholder="React, Node.js..."
-                    className="input-field text-sm py-1.5 w-36" />
-                  <button onClick={addComp} className="btn-pink px-3 py-1.5 text-sm">+</button>
-                </div>
-              )}
-              {competences.length === 0 && !editingComp && (
-                <button onClick={() => setEditingComp(true)} className="text-sm text-slate-400 italic hover:text-slate-600">Ajoute tes compétences...</button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Expériences ───────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
-          <SectionHeader title="Expériences" onAdd={() => openExpModal()} />
-          {experiences.length === 0 ? (
-            <button onClick={() => openExpModal()} className="text-sm text-slate-400 italic hover:text-slate-600">
-              Ajoute une expérience professionnelle ou projet...
-            </button>
-          ) : (
-            <div className="flex flex-col divide-y divide-slate-100">
-              {experiences.map((exp) => (
-                <div key={exp.id} className="py-4 first:pt-0 last:pb-0 group">
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-lg ${isFounder ? "bg-pink-50" : "bg-blue-50"}`}>💼</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-bold text-slate-900">{exp.titre}</p>
-                          <p className="text-sm text-slate-600">{exp.entreprise}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">{exp.date_debut}{exp.date_fin ? ` → ${exp.date_fin}` : " → Présent"}</p>
-                        </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                          <button onClick={() => openExpModal(exp)} className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100">✏️</button>
-                          <button onClick={() => deleteExp(exp.id)} className="text-xs text-slate-400 hover:text-red-500 px-2 py-1 rounded-lg hover:bg-red-50">✕</button>
-                        </div>
-                      </div>
-                      {exp.description && <p className="text-sm text-slate-500 mt-1 leading-relaxed">{exp.description}</p>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Formation ─────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
-          <SectionHeader title="Formation" onAdd={() => openFormModal()} />
-          {formation.length === 0 ? (
-            <button onClick={() => openFormModal()} className="text-sm text-slate-400 italic hover:text-slate-600">
-              Ajoute ton parcours académique...
-            </button>
-          ) : (
-            <div className="flex flex-col divide-y divide-slate-100">
-              {formation.map((f) => (
-                <div key={f.id} className="py-4 first:pt-0 last:pb-0 group">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0 text-lg">🎓</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-bold text-slate-900">{f.diplome}</p>
-                          <p className="text-sm text-slate-600">{f.etablissement}</p>
-                          {f.annee && <p className="text-xs text-slate-400 mt-0.5">{f.annee}</p>}
-                        </div>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                          <button onClick={() => openFormModal(f)} className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100">✏️</button>
-                          <button onClick={() => deleteForm(f.id)} className="text-xs text-slate-400 hover:text-red-500 px-2 py-1 rounded-lg hover:bg-red-50">✕</button>
-                        </div>
-                      </div>
-                      {f.description && <p className="text-sm text-slate-500 mt-1">{f.description}</p>}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* ── Projets founder ───────────────────────────────────────────── */}
+        {/* Projets founder */}
         {isFounder && projects.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 p-5">
-            <SectionHeader title={`Mes projets (${projects.length})`} />
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Mes projets ({projects.length})</p>
             <div className="flex flex-col gap-3">
               {projects.map((p) => {
                 const s = STATUT_PROJET[p.statut] ?? { label: p.statut, color: "bg-slate-100 text-slate-500" };
                 return (
-                  <div key={p.id} className="border border-slate-100 rounded-xl p-4 hover:border-slate-200 transition-colors">
+                  <div key={p.id} className="border border-slate-100 rounded-xl p-4">
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <h3 className="font-bold text-slate-900 text-sm">{p.titre}</h3>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${s.color}`}>{s.label}</span>
                     </div>
-                    {p.description && <p className="text-xs text-slate-500 line-clamp-2 mb-3">{p.description}</p>}
-                    <div className="flex items-center justify-between">
-                      <div className="flex gap-2 text-xs text-slate-400">
-                        {p.stack_souhaitee && <span>🛠 {p.stack_souhaitee}</span>}
-                        {p.deadline && <span>📅 {p.deadline}</span>}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {(p.statut === "matched" || p.statut === "en_cours") && (
-                          <>
-                            <button onClick={() => router.push(`/projets/${p.id}/gestion`)} className="text-xs font-semibold text-slate-500 hover:text-pink-500 transition-colors">🗂 Gestion</button>
-                            <button onClick={() => handleLivrer(p.id)} className="text-xs font-semibold text-green-600 hover:text-green-800 transition-colors">✓ Livrer</button>
-                          </>
-                        )}
-                        {(p.statut === "livre" || p.statut === "termine") && !reviewedProjects.has(p.id) && (
-                          <button onClick={() => router.push(`/projets/${p.id}/review`)} className="text-xs font-semibold text-amber-500 hover:text-amber-700 transition-colors">⭐ Avis</button>
-                        )}
-                        {contractMap[p.id] && (
-                          <button onClick={() => router.push(`/contrat/${contractMap[p.id]}`)} className="text-xs font-semibold text-slate-500 hover:text-pink-500 transition-colors">📄 Contrat</button>
-                        )}
-                        <button onClick={() => router.push(`/projets/${p.id}/candidats`)} className="text-xs font-semibold text-pink-500 hover:text-pink-700 transition-colors">Candidats →</button>
-                        <button onClick={() => handleDeleteProject(p.id)} className="text-xs text-red-400 hover:text-red-600 transition-colors">Supprimer</button>
-                      </div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {(p.statut === "matched" || p.statut === "en_cours") && <>
+                        <button onClick={() => router.push(`/projets/${p.id}/gestion`)} className="text-xs font-semibold text-slate-500 hover:text-pink-500">🗂 Gestion</button>
+                        <button onClick={() => handleLivrer(p.id)} className="text-xs font-semibold text-green-600 hover:text-green-800">✓ Livrer</button>
+                      </>}
+                      {(p.statut === "livre" || p.statut === "termine") && !reviewedProjects.has(p.id) && (
+                        <button onClick={() => router.push(`/projets/${p.id}/review`)} className="text-xs font-semibold text-amber-500">⭐ Avis</button>
+                      )}
+                      {contractMap[p.id] && (
+                        <button onClick={() => router.push(`/contrat/${contractMap[p.id]}`)} className="text-xs font-semibold text-slate-500 hover:text-pink-500">📄 Contrat</button>
+                      )}
+                      <button onClick={() => router.push(`/projets/${p.id}/candidats`)} className="text-xs font-semibold text-pink-500 hover:text-pink-700">Candidats →</button>
+                      <button onClick={() => handleDeleteProject(p.id)} className="text-xs text-red-400 hover:text-red-600 ml-auto">Supprimer</button>
                     </div>
                   </div>
                 );
@@ -634,10 +664,10 @@ export default function ProfilPage() {
           </div>
         )}
 
-        {/* ── Candidatures dev ──────────────────────────────────────────── */}
+        {/* Candidatures dev */}
         {!isFounder && candidatures.length > 0 && (
           <div className="bg-white rounded-2xl border border-slate-200 p-5">
-            <SectionHeader title={`Mes candidatures (${candidatures.length})`} />
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Mes candidatures ({candidatures.length})</p>
             <div className="flex flex-col gap-3">
               {candidatures.map((c) => {
                 const s = STATUT_CAND[c.statut] ?? { label: c.statut, color: "bg-slate-100 text-slate-500" };
@@ -647,19 +677,13 @@ export default function ProfilPage() {
                       <h3 className="font-bold text-slate-900 text-sm">{c.projects.titre}</h3>
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${s.color}`}>{s.label}</span>
                     </div>
-                    {c.projects.description && <p className="text-xs text-slate-500 line-clamp-1 mb-2">{c.projects.description}</p>}
-                    <div className="flex items-center justify-between">
-                      <div className="flex gap-2 text-xs text-slate-400">
-                        {c.projects.stack_souhaitee && <span>🛠 {c.projects.stack_souhaitee}</span>}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {c.statut === "accepted" && contractMap[c.project_id] && (
-                          <button onClick={() => router.push(`/contrat/${contractMap[c.project_id]}`)} className="text-xs font-semibold text-slate-500 hover:text-pink-500 transition-colors">📄 Contrat</button>
-                        )}
-                        {c.statut === "accepted" && ["livre","termine"].includes(c.projects?.statut) && !reviewedProjects.has(c.project_id) && (
-                          <button onClick={() => router.push(`/projets/${c.project_id}/review`)} className="text-xs font-semibold text-amber-500 hover:text-amber-700 transition-colors">⭐ Avis</button>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-3">
+                      {c.statut === "accepted" && contractMap[c.project_id] && (
+                        <button onClick={() => router.push(`/contrat/${contractMap[c.project_id]}`)} className="text-xs font-semibold text-slate-500 hover:text-pink-500">📄 Contrat</button>
+                      )}
+                      {c.statut === "accepted" && ["livre","termine"].includes(c.projects?.statut ?? "") && !reviewedProjects.has(c.project_id) && (
+                        <button onClick={() => router.push(`/projets/${c.project_id}/review`)} className="text-xs font-semibold text-amber-500">⭐ Avis</button>
+                      )}
                     </div>
                   </div>
                 );
@@ -667,47 +691,19 @@ export default function ProfilPage() {
             </div>
           </div>
         )}
+
+        {/* Aperçu public + déconnexion */}
+        <div className="flex gap-3">
+          <button onClick={() => router.push(`/profil/${userId}`)} className="flex-1 btn-ghost py-3 text-sm">
+            Aperçu public
+          </button>
+          <button onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }}
+            className="flex-1 btn-ghost py-3 text-sm text-red-500 hover:text-red-700">
+            Déconnexion
+          </button>
+        </div>
+
       </div>
-
-      {/* ── Modal Expérience ──────────────────────────────────────────────── */}
-      {showExpModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-end justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-black text-slate-900">{editingExp ? "Modifier" : "Ajouter"} une expérience</h2>
-            <input value={expTitre} onChange={(e) => setExpTitre(e.target.value)} placeholder="Titre du poste / rôle" className="input-field" />
-            <input value={expEntreprise} onChange={(e) => setExpEntreprise(e.target.value)} placeholder="Entreprise / Projet" className="input-field" />
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-xs font-semibold text-slate-500 mb-1 block">Début</label>
-                <input value={expDebut} onChange={(e) => setExpDebut(e.target.value)} placeholder="Jan 2024" className="input-field py-2 text-sm" /></div>
-              <div><label className="text-xs font-semibold text-slate-500 mb-1 block">Fin (vide = présent)</label>
-                <input value={expFin} onChange={(e) => setExpFin(e.target.value)} placeholder="Juin 2024" className="input-field py-2 text-sm" /></div>
-            </div>
-            <textarea value={expDesc} onChange={(e) => setExpDesc(e.target.value)} placeholder="Description (optionnel)" rows={3} className="input-field resize-none" />
-            <button onClick={saveExp} disabled={savingExp || !expTitre || !expEntreprise} className="btn-pink w-full py-3">
-              {savingExp ? "Enregistrement..." : "Enregistrer"}
-            </button>
-            <button onClick={() => setShowExpModal(false)} className="btn-ghost w-full py-3">Annuler</button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal Formation ───────────────────────────────────────────────── */}
-      {showFormModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-end justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4">
-            <h2 className="text-lg font-black text-slate-900">{editingForm ? "Modifier" : "Ajouter"} une formation</h2>
-            <input value={formDiplome} onChange={(e) => setFormDiplome(e.target.value)} placeholder="Diplôme / Certification" className="input-field" />
-            <input value={formEtab} onChange={(e) => setFormEtab(e.target.value)} placeholder="École / Établissement" className="input-field" />
-            <input value={formAnnee} onChange={(e) => setFormAnnee(e.target.value)} placeholder="Année (ex: 2024 ou 2022-2024)" className="input-field" />
-            <textarea value={formDesc} onChange={(e) => setFormDesc(e.target.value)} placeholder="Description (optionnel)" rows={2} className="input-field resize-none" />
-            <button onClick={saveForm} disabled={savingForm || !formDiplome || !formEtab} className="btn-pink w-full py-3">
-              {savingForm ? "Enregistrement..." : "Enregistrer"}
-            </button>
-            <button onClick={() => setShowFormModal(false)} className="btn-ghost w-full py-3">Annuler</button>
-          </div>
-        </div>
-      )}
-
       <BottomNav />
     </div>
   );
