@@ -3,6 +3,20 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import {
+  LayoutDashboard,
+  Users,
+  MessageCircle,
+  Search,
+  User,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type Tab = {
+  label: string;
+  icon: React.ElementType;
+  href: string;
+};
 
 export default function BottomNav() {
   const router = useRouter();
@@ -17,12 +31,12 @@ export default function BottomNav() {
 
       const { data: roleData } = await supabase
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-      const role = roleData?.role;
-      setRole(role ?? null);
-      if (!role || role === "admin") return;
+      const r = roleData?.role;
+      setRole(r ?? null);
+      if (!r || r === "admin") return;
 
       let convQuery;
-      if (role === "founder") {
+      if (r === "founder") {
         const { data: p } = await supabase.from("profiles_founder").select("id").eq("user_id", user.id).maybeSingle();
         if (!p) return;
         convQuery = await supabase.from("conversations").select("id").eq("founder_id", p.id);
@@ -35,7 +49,6 @@ export default function BottomNav() {
       const convIds = convQuery?.data?.map((c: { id: string }) => c.id) ?? [];
       if (convIds.length === 0) return;
 
-      // Vérifie si des messages non lus existent
       let total = 0;
       for (const convId of convIds) {
         const lastRead = localStorage.getItem(`lastRead_${convId}`) ?? "1970-01-01";
@@ -53,40 +66,77 @@ export default function BottomNav() {
     checkUnread();
   }, [pathname]);
 
-  const tabs = role === "founder"
+  const tabs: Tab[] = role === "founder"
     ? [
-        { label: "Mes projets", icon: "📋", href: "/profil" },
-        { label: "Devs",        icon: "👥", href: "/devs" },
-        { label: "Messages",    icon: "💬", href: "/messages" },
+        { label: "Projets",  icon: LayoutDashboard, href: "/profil"   },
+        { label: "Devs",     icon: Users,           href: "/devs"     },
+        { label: "Messages", icon: MessageCircle,   href: "/messages" },
       ]
     : [
-        { label: "Projets",  icon: "🔍", href: "/projets" },
-        { label: "Messages", icon: "💬", href: "/messages" },
-        { label: "Profil",   icon: "👤", href: "/profil" },
+        { label: "Projets",  icon: Search,          href: "/projets"  },
+        { label: "Messages", icon: MessageCircle,   href: "/messages" },
+        { label: "Profil",   icon: User,            href: "/profil"   },
       ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50">
-      <div className="max-w-3xl mx-auto flex">
+    <div
+      className="fixed bottom-0 left-0 right-0 z-50"
+      style={{
+        background: "rgba(242,242,247,0.85)",
+        backdropFilter: "blur(32px) saturate(200%)",
+        WebkitBackdropFilter: "blur(32px) saturate(200%)",
+        borderTop: "1px solid rgba(0,0,0,0.06)",
+        boxShadow: "0 -4px 24px rgba(0,0,0,0.06)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}
+    >
+      <div className="max-w-lg mx-auto flex items-stretch h-[60px]">
         {tabs.map((tab) => {
           const active = pathname.startsWith(tab.href);
           const showBadge = tab.href === "/messages" && unreadCount > 0 && !pathname.startsWith("/messages");
+          const Icon = tab.icon;
+
           return (
             <button
               key={tab.href}
               onClick={() => router.push(tab.href)}
-              className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors relative"
-              style={{ color: active ? "#ec4899" : "#94a3b8" }}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-[3px] transition-all duration-200 relative",
+                active ? "opacity-100" : "opacity-40 hover:opacity-60"
+              )}
             >
-              <span className="text-xl relative">
-                {tab.icon}
+              <span className="relative">
+                <Icon
+                  size={22}
+                  strokeWidth={active ? 2.2 : 1.8}
+                  style={{ color: active ? "var(--rose)" : "var(--text)" }}
+                  className="transition-all duration-200"
+                />
                 {showBadge && (
-                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-pink-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 border border-white">
+                  <span
+                    className="absolute -top-1 -right-1.5 min-w-[16px] h-4 flex items-center justify-center px-1 text-white font-bold rounded-full border-2 border-white"
+                    style={{
+                      fontSize: 9,
+                      background: "var(--rose)",
+                      boxShadow: "0 2px 6px rgba(244,63,94,0.4)",
+                    }}
+                  >
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </span>
-              <span className="text-xs font-semibold">{tab.label}</span>
+              <span
+                className="text-[10px] font-semibold tracking-tight transition-all duration-200"
+                style={{ color: active ? "var(--rose)" : "var(--muted)" }}
+              >
+                {tab.label}
+              </span>
+              {active && (
+                <span
+                  className="absolute top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full"
+                  style={{ background: "var(--rose)" }}
+                />
+              )}
             </button>
           );
         })}

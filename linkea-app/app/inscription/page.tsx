@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { Eye, EyeOff, ArrowLeft, AlertCircle, ArrowRight, Rocket, Code2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function Inscription() {
   const router = useRouter();
@@ -40,102 +42,130 @@ export default function Inscription() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8">
-          <Link href="/" className="text-sm text-slate-400 hover:text-slate-600 transition-colors mb-6 inline-block">
-            ← Retour
-          </Link>
-          <span className="label-tag bg-pink-50 text-pink-600 mb-4 inline-flex">
-            Inscription
-          </span>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-            Créer un compte
-          </h1>
-          <p className="text-slate-500 mt-2">Rejoins la plateforme Linkea.</p>
-        </div>
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
+      style={{ background: "var(--bg)" }}
+    >
+      {/* Ambient blob */}
+      <div
+        className="fixed -top-20 -left-20 w-96 h-96 rounded-full pointer-events-none opacity-20"
+        style={{
+          background: "radial-gradient(circle, rgba(244,63,94,0.20) 0%, transparent 70%)",
+          filter: "blur(60px)",
+        }}
+        aria-hidden
+      />
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <p className="text-sm font-semibold text-slate-700 mb-2">Tu es :</p>
-            <div className="flex gap-3">
+      <div className="w-full max-w-sm relative z-10">
+        {/* Back */}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-sm font-medium mb-8 transition-opacity hover:opacity-60"
+          style={{ color: "var(--muted)" }}
+        >
+          <ArrowLeft size={14} strokeWidth={2} /> Accueil
+        </Link>
+
+        {/* Card */}
+        <div className="card p-8">
+          <div className="mb-7">
+            <span className="tag tag-rose mb-4 inline-flex">Inscription</span>
+            <h1 className="text-3xl font-black tracking-tight leading-tight mb-2" style={{ color: "var(--text)" }}>
+              Créer un compte
+            </h1>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>Rejoins la plateforme Linkea.</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+            {/* Role selector */}
+            <div>
+              <p className="text-xs font-bold mb-2.5" style={{ color: "var(--muted)" }}>Tu es :</p>
+              <div className="flex gap-2.5">
+                {([
+                  { value: "founder", label: "Founder", icon: Rocket, color: "rose" },
+                  { value: "developer", label: "Dev", icon: Code2, color: "blue" },
+                ] as const).map(({ value, label, icon: Icon, color }) => {
+                  const active = role === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setRole(value)}
+                      className={cn("flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-semibold transition-all duration-200")}
+                      style={active ? {
+                        background: `linear-gradient(135deg, ${color === "rose" ? "#f43f5e, #fb7185" : "#3b82f6, #60a5fa"})`,
+                        color: "white",
+                        border: "1px solid transparent",
+                        boxShadow: color === "rose" ? "var(--shadow-rose)" : "var(--shadow-blue)",
+                      } : {
+                        background: "rgba(255,255,255,0.70)",
+                        color: "var(--muted)",
+                        border: "1px solid var(--border-2)",
+                      }}
+                    >
+                      <Icon size={15} strokeWidth={active ? 2.2 : 1.8} />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="input-field"
+            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Mot de passe"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="input-field pr-11"
+              />
               <button
                 type="button"
-                onClick={() => setRole("founder")}
-                className="flex-1 py-3 px-4 rounded-2xl border text-sm font-semibold transition-all duration-200"
-                style={role === "founder" ? {
-                  background: "linear-gradient(145deg, #be185d, #ec4899, #f472b6)",
-                  color: "white",
-                  border: "1px solid transparent",
-                  boxShadow: "0 4px 16px rgba(236,72,153,0.3)"
-                } : {
-                  background: "white",
-                  color: "#64748b",
-                  border: "1px solid rgba(15,23,42,0.14)"
-                }}
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-60"
+                style={{ color: "var(--subtle)" }}
+                tabIndex={-1}
               >
-                🚀 Founder
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole("developer")}
-                className="flex-1 py-3 px-4 rounded-2xl border text-sm font-semibold transition-all duration-200"
-                style={role === "developer" ? {
-                  background: "linear-gradient(145deg, #be185d, #ec4899, #f472b6)",
-                  color: "white",
-                  border: "1px solid transparent",
-                  boxShadow: "0 4px 16px rgba(236,72,153,0.3)"
-                } : {
-                  background: "white",
-                  color: "#64748b",
-                  border: "1px solid rgba(15,23,42,0.14)"
-                }}
-              >
-                💻 Développeur
+                {showPassword ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
               </button>
             </div>
-          </div>
 
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="input-field"
-          />
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Mot de passe"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="input-field pr-12"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              {showPassword ? "🙈" : "👁"}
+            {error && (
+              <div
+                className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl text-sm"
+                style={{
+                  background: "var(--red-soft)",
+                  border: "1px solid var(--red-border)",
+                  color: "var(--red)",
+                }}
+              >
+                <AlertCircle size={15} strokeWidth={2} className="shrink-0 mt-0.5" />
+                {error}
+              </div>
+            )}
+
+            <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
+              {loading ? (
+                <span className="spinner" style={{ width: 17, height: 17, borderWidth: 2 }} />
+              ) : (
+                <>Créer mon compte <ArrowRight size={15} strokeWidth={2.2} /></>
+              )}
             </button>
-          </div>
+          </form>
+        </div>
 
-          {error && (
-            <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-xl">
-              {error}
-            </p>
-          )}
-
-          <button type="submit" disabled={loading} className="btn-pink w-full mt-2">
-            {loading ? "Chargement..." : "Créer mon compte"}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-slate-500 mt-6">
+        <p className="text-center text-sm mt-5" style={{ color: "var(--muted)" }}>
           Déjà un compte ?{" "}
-          <Link href="/connexion" className="text-pink-500 font-semibold hover:underline">
+          <Link href="/connexion" className="font-bold transition-opacity hover:opacity-70" style={{ color: "var(--rose)" }}>
             Se connecter
           </Link>
         </p>

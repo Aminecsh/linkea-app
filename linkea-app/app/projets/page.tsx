@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
+import { Search, Calendar, Check, ArrowRight, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Project = {
   id: string;
@@ -103,7 +105,6 @@ export default function ProjetsPage() {
     await supabase.from("candidatures").insert({ project_id: projectId, developer_id: developerId, statut: "pending" });
     setCandidatures((prev) => new Set([...prev, projectId]));
 
-    // Email au founder
     const projet = projects.find((p) => p.id === projectId);
     const { data: devProfile } = await supabase.from("profiles_developer").select("nom, email, ecole, competences").eq("id", developerId).maybeSingle();
     if (projet?.profiles_founder?.email && devProfile) {
@@ -124,23 +125,18 @@ export default function ProjetsPage() {
       });
     }
 
-    // Notification in-app au founder — lookup direct pour éviter les soucis de join
     const projRaw = projet as unknown as { founder_id?: string };
     if (projRaw?.founder_id) {
       const { data: founderData } = await supabase
-        .from("profiles_founder")
-        .select("user_id")
-        .eq("id", projRaw.founder_id)
-        .maybeSingle();
+        .from("profiles_founder").select("user_id").eq("id", projRaw.founder_id).maybeSingle();
       if (founderData?.user_id) {
-        const { error: notifErr } = await supabase.from("notifications").insert({
+        await supabase.from("notifications").insert({
           user_id: founderData.user_id,
           type: "nouveau_candidat",
-          title: "Nouveau candidat 🎉",
+          title: "Nouveau candidat",
           body: `${devProfile?.nom ?? "Un dev"} a candidaté sur "${projet?.titre}"`,
           link: `/projets/${projectId}/candidats`,
         });
-        if (notifErr) console.error("Notif error:", notifErr.message);
       }
     }
 
@@ -149,68 +145,86 @@ export default function ProjetsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-pink-400 border-t-transparent animate-spin" />
+      <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+        {/* Header skeleton */}
+        <div className="page-header px-4 py-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-between mb-3">
+              <div className="skeleton w-16 h-4" />
+              <div className="skeleton w-9 h-9 rounded-xl" />
+            </div>
+            <div className="skeleton w-full h-11 rounded-xl mb-3" />
+            <div className="flex gap-2">
+              {[...Array(4)].map((_, i) => <div key={i} className="skeleton w-20 h-7 rounded-full" />)}
+            </div>
+          </div>
+        </div>
+        <div className="max-w-6xl mx-auto px-4 py-6 flex gap-5">
+          <div className="w-full lg:w-[420px] flex flex-col gap-3">
+            {[...Array(4)].map((_, i) => <div key={i} className="skeleton h-24 rounded-2xl" />)}
+          </div>
+        </div>
+        <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
+    <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
 
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-4">
+      <div className="page-header px-4 py-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-pink-500">Linkea</p>
+            <div className="flex items-center gap-2">
+              <Sparkles size={14} strokeWidth={2} style={{ color: "var(--rose)" }} />
+              <span className="label" style={{ color: "var(--rose)" }}>Linkea</span>
+            </div>
             <NotificationBell />
           </div>
-          {/* Search bar */}
-          <div className="flex gap-3 mb-4">
+
+          {/* Search */}
+          <div className="flex gap-2 mb-3">
             <div className="flex-1 relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+              <Search
+                size={15}
+                strokeWidth={2}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: "var(--subtle)" }}
+              />
               <input
                 type="text"
                 placeholder="Projet, stack, mot-clé..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="input-field pl-9 py-3 text-sm"
+                className="input-field pl-9 py-2.5 text-sm"
               />
             </div>
             {role === "founder" && (
-              <button onClick={() => router.push("/projets/nouveau")} className="btn-pink px-5 py-3 text-sm whitespace-nowrap">
+              <button onClick={() => router.push("/projets/nouveau")} className="btn-primary text-sm" style={{ padding: "0 18px" }}>
                 + Déposer
               </button>
             )}
           </div>
 
           {/* Filters */}
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {/* Deadline filters */}
+          <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
             {DEADLINES.map((d) => (
               <button
                 key={d}
                 onClick={() => setActiveDeadline(activeDeadline === d ? null : d)}
-                className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
-                  activeDeadline === d
-                    ? "bg-pink-500 text-white border-pink-500"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-pink-300"
-                }`}
+                className={cn("chip", activeDeadline === d && "chip-active-rose")}
               >
-                📅 {d}
+                <Calendar size={11} strokeWidth={2} />
+                {d}
               </button>
             ))}
-            <div className="w-px bg-slate-200 shrink-0" />
-            {/* Stack filters */}
+            <div className="w-px shrink-0 my-1" style={{ background: "var(--border-2)" }} />
             {STACKS.map((s) => (
               <button
                 key={s}
                 onClick={() => setActiveStack(activeStack === s ? null : s)}
-                className={`shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
-                  activeStack === s
-                    ? "bg-blue-500 text-white border-blue-500"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
-                }`}
+                className={cn("chip", activeStack === s && "chip-active-blue")}
               >
                 {s}
               </button>
@@ -220,20 +234,22 @@ export default function ProjetsPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        <p className="text-sm text-slate-500 mb-4 font-medium">
+      <div className="max-w-6xl mx-auto px-4 py-5">
+        <p className="text-xs font-semibold mb-4" style={{ color: "var(--muted)" }}>
           {filtered.length} projet{filtered.length > 1 ? "s" : ""} disponible{filtered.length > 1 ? "s" : ""}
         </p>
 
         {filtered.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
-            <p className="text-slate-400">Aucun projet trouvé.</p>
+          <div className="card flex flex-col items-center justify-center py-20 text-center">
+            <Search size={32} strokeWidth={1.2} className="mb-3" style={{ color: "var(--subtle)" }} />
+            <p className="font-semibold text-sm mb-1" style={{ color: "var(--text-2)" }}>Aucun projet trouvé</p>
+            <p className="text-xs" style={{ color: "var(--muted)" }}>Essayez d&apos;autres filtres</p>
           </div>
         ) : (
           <div className="flex gap-5 items-start">
 
             {/* Liste des projets */}
-            <div className="w-full lg:w-[420px] shrink-0 flex flex-col gap-3">
+            <div className="w-full lg:w-[400px] shrink-0 flex flex-col gap-2.5">
               {filtered.map((p) => {
                 const isSelected = selected?.id === p.id;
                 const hasApplied = candidatures.has(p.id);
@@ -242,38 +258,53 @@ export default function ProjetsPage() {
                   <div
                     key={p.id}
                     onClick={() => setSelected(p)}
-                    className={`bg-white rounded-xl border-2 p-4 cursor-pointer transition-all ${
-                      isSelected ? "border-pink-400 shadow-md" : "border-slate-200 hover:border-slate-300"
-                    }`}
+                    className={cn("card cursor-pointer p-4", isSelected && "card-selected")}
+                    style={isSelected ? {
+                      borderColor: "rgba(244,63,94,0.25)",
+                      boxShadow: "var(--shadow-sm), 0 0 0 1px rgba(244,63,94,0.15)",
+                    } : undefined}
                   >
                     <div className="flex items-start gap-3">
-                      <button onClick={(e) => { e.stopPropagation(); router.push(`/profil/${p.profiles_founder?.user_id}`); }} className="shrink-0 hover:opacity-80 transition-opacity">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); router.push(`/profil/${p.profiles_founder?.user_id}`); }}
+                        className="shrink-0 hover:opacity-80 transition-opacity"
+                      >
                         {p.profiles_founder?.avatar_url ? (
-                          <img src={p.profiles_founder.avatar_url} alt={p.profiles_founder.nom} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                          <img src={p.profiles_founder.avatar_url} alt={p.profiles_founder.nom} className="avatar w-9 h-9" />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-sm font-black">
+                          <div className="avatar-placeholder w-9 h-9 text-sm">
                             {p.profiles_founder?.nom?.[0]?.toUpperCase() ?? "?"}
                           </div>
                         )}
                       </button>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-slate-900 text-sm leading-snug mb-0.5">{p.titre}</h3>
-                        <button onClick={(e) => { e.stopPropagation(); router.push(`/profil/${p.profiles_founder?.user_id}`); }}
-                          className="text-xs text-slate-400 hover:text-pink-500 transition-colors text-left">
+                        <h3 className="font-bold text-sm leading-snug mb-0.5 truncate" style={{ color: "var(--text)" }}>
+                          {p.titre}
+                        </h3>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); router.push(`/profil/${p.profiles_founder?.user_id}`); }}
+                          className="text-xs transition-colors text-left hover:opacity-70"
+                          style={{ color: "var(--muted)" }}
+                        >
                           {p.profiles_founder?.nom ?? "Founder"}
                           {p.profiles_founder?.ecole ? ` · ${p.profiles_founder.ecole}` : ""}
                         </button>
                       </div>
                       {hasApplied && (
-                        <span className="text-xs font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full shrink-0">✓</span>
+                        <span className="tag tag-green shrink-0">
+                          <Check size={10} strokeWidth={2.5} />
+                        </span>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-3">
                       {stacks.slice(0, 3).map((s) => (
-                        <span key={s} className="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full font-medium">{s}</span>
+                        <span key={s} className="tag tag-blue">{s}</span>
                       ))}
                       {p.deadline && (
-                        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">📅 {p.deadline}</span>
+                        <span className="tag tag-amber">
+                          <Calendar size={10} strokeWidth={2} />
+                          {p.deadline}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -281,48 +312,65 @@ export default function ProjetsPage() {
               })}
             </div>
 
-            {/* Panneau détail — desktop uniquement */}
+            {/* Panneau détail — desktop */}
             {selected && (
-              <div className="hidden lg:block flex-1 bg-white rounded-2xl border border-slate-200 p-8 sticky top-6">
+              <div
+                className="hidden lg:block flex-1 sticky top-[132px]"
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  borderRadius: 24,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.07), 0 8px 32px rgba(0,0,0,0.04)",
+                  padding: 32,
+                }}
+              >
+                {/* Header projet */}
                 <div className="flex items-start gap-4 mb-6">
-                  <button onClick={() => router.push(`/profil/${selected.profiles_founder?.user_id}`)} className="shrink-0 hover:opacity-80 transition-opacity">
+                  <button
+                    onClick={() => router.push(`/profil/${selected.profiles_founder?.user_id}`)}
+                    className="shrink-0 hover:opacity-80 transition-opacity"
+                  >
                     {selected.profiles_founder?.avatar_url ? (
-                      <img src={selected.profiles_founder.avatar_url} alt={selected.profiles_founder.nom} className="w-14 h-14 rounded-full object-cover border border-slate-200" />
+                      <img src={selected.profiles_founder.avatar_url} alt={selected.profiles_founder.nom} className="avatar w-14 h-14" />
                     ) : (
-                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-xl font-black">
+                      <div className="avatar-placeholder w-14 h-14 text-xl">
                         {selected.profiles_founder?.nom?.[0]?.toUpperCase() ?? "?"}
                       </div>
                     )}
                   </button>
-                  <div>
-                    <h2 className="text-xl font-black text-slate-900 leading-tight">{selected.titre}</h2>
-                    <button onClick={() => router.push(`/profil/${selected.profiles_founder?.user_id}`)}
-                      className="text-slate-400 text-sm mt-1 hover:text-pink-500 transition-colors text-left">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-xl font-black leading-tight mb-1" style={{ color: "var(--text)" }}>
+                      {selected.titre}
+                    </h2>
+                    <button
+                      onClick={() => router.push(`/profil/${selected.profiles_founder?.user_id}`)}
+                      className="text-sm transition-colors hover:opacity-70 text-left"
+                      style={{ color: "var(--muted)" }}
+                    >
                       {selected.profiles_founder?.nom ?? "Founder"}
                       {selected.profiles_founder?.ecole ? ` · ${selected.profiles_founder.ecole}` : ""}
                     </button>
                   </div>
                 </div>
 
-                {/* Infos clés */}
-                <div className="flex gap-3 mb-6">
+                {/* Badges */}
+                <div className="flex flex-wrap gap-2 mb-6">
                   {selected.deadline && (
-                    <span className="text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-200 px-3 py-1.5 rounded-full">
-                      📅 {selected.deadline}
+                    <span className="tag tag-amber">
+                      <Calendar size={11} strokeWidth={2} />
+                      {selected.deadline}
                     </span>
                   )}
-                  <span className="text-xs font-semibold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full">
-                    En attente d'un dev
-                  </span>
+                  <span className="tag tag-gray">En attente d&apos;un dev</span>
                 </div>
 
                 {/* Stack */}
                 {selected.stack_souhaitee && (
                   <div className="mb-6">
-                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Stack souhaitée</p>
+                    <p className="label mb-2">Stack souhaitée</p>
                     <div className="flex flex-wrap gap-2">
                       {selected.stack_souhaitee.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
-                        <span key={s} className="text-sm font-semibold bg-blue-50 text-blue-600 border border-blue-100 px-3 py-1 rounded-full">{s}</span>
+                        <span key={s} className="tag tag-blue" style={{ fontSize: 13, padding: "5px 12px" }}>{s}</span>
                       ))}
                     </div>
                   </div>
@@ -331,8 +379,10 @@ export default function ProjetsPage() {
                 {/* Description */}
                 {selected.description && (
                   <div className="mb-8">
-                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Description du projet</p>
-                    <p className="text-slate-600 text-sm leading-relaxed">{selected.description}</p>
+                    <p className="label mb-2">Description du projet</p>
+                    <p className="text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
+                      {selected.description}
+                    </p>
                   </div>
                 )}
 
@@ -341,13 +391,25 @@ export default function ProjetsPage() {
                   <button
                     onClick={() => { if (!candidatures.has(selected.id)) handleCandidater(selected.id); }}
                     disabled={candidatures.has(selected.id) || applying === selected.id}
-                    className={`w-full py-4 rounded-xl text-sm font-bold transition-all ${
+                    className={cn(
+                      "w-full py-3.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2",
                       candidatures.has(selected.id)
-                        ? "bg-green-50 text-green-600 border border-green-200 cursor-default"
-                        : "btn-pink"
-                    }`}
+                        ? "cursor-default"
+                        : "btn-primary"
+                    )}
+                    style={candidatures.has(selected.id) ? {
+                      background: "var(--green-soft)",
+                      color: "var(--green)",
+                      border: "1px solid var(--green-border)",
+                    } : undefined}
                   >
-                    {applying === selected.id ? "Envoi..." : candidatures.has(selected.id) ? "✓ Candidature envoyée" : "Candidater à ce projet"}
+                    {applying === selected.id ? (
+                      <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                    ) : candidatures.has(selected.id) ? (
+                      <><Check size={15} strokeWidth={2.5} /> Candidature envoyée</>
+                    ) : (
+                      <>Candidater à ce projet <ArrowRight size={15} strokeWidth={2.2} /></>
+                    )}
                   </button>
                 )}
               </div>

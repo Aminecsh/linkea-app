@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
+import {
+  Camera, LogOut, Plus, ArrowRight, Star,
+  Calendar, Wrench, FileText, Trash2, CheckCircle, FolderOpen,
+  AlertTriangle, Layers, Users, MoreHorizontal, TrendingUp,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Project = {
   id: string;
@@ -27,18 +33,20 @@ type Candidature = {
   };
 };
 
-const statutProjet: Record<string, { label: string; color: string }> = {
-  pending:  { label: "En attente",  color: "bg-amber-50 text-amber-600 border border-amber-200" },
-  matched:  { label: "Matchée",     color: "bg-blue-50 text-blue-600 border border-blue-200" },
-  en_cours: { label: "En cours",    color: "bg-green-50 text-green-600 border border-green-200" },
-  livre:    { label: "Livré",       color: "bg-slate-100 text-slate-500 border border-slate-200" },
+const STATUT_CONFIG: Record<string, { label: string; cls: string; accent: string }> = {
+  pending:  { label: "En attente", cls: "tag-amber", accent: "#f59e0b" },
+  matched:  { label: "Matchée",    cls: "tag-blue",  accent: "#3b82f6" },
+  en_cours: { label: "En cours",   cls: "tag-green", accent: "#10b981" },
+  livre:    { label: "Livré",      cls: "tag-gray",  accent: "#a1a1aa" },
 };
 
-const statutCand: Record<string, { label: string; color: string }> = {
-  pending:  { label: "En attente",  color: "bg-amber-50 text-amber-600 border border-amber-200" },
-  accepted: { label: "Accepté ✓",  color: "bg-green-50 text-green-600 border border-green-200" },
-  refused:  { label: "Refusé",     color: "bg-red-50 text-red-400 border border-red-200" },
+const STATUT_CAND: Record<string, { label: string; cls: string }> = {
+  pending:  { label: "En attente", cls: "tag-amber" },
+  accepted: { label: "Accepté",   cls: "tag-green"  },
+  refused:  { label: "Refusé",    cls: "tag-red"    },
 };
+
+type FilterKey = "all" | "pending" | "active" | "livre";
 
 export default function ProfilPage() {
   const router = useRouter();
@@ -48,13 +56,16 @@ export default function ProfilPage() {
   const [competences, setCompetences] = useState<string[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [candidatures, setCandidatures] = useState<Candidature[]>([]);
-  const [contractMap, setContractMap] = useState<Record<string, string>>({}); // project_id → contract_id
+  const [contractMap, setContractMap] = useState<Record<string, string>>({});
+  const [candidateCounts, setCandidateCounts] = useState<Record<string, number>>({});
   const [score, setScore] = useState<number | null>(null);
   const [reviewCount, setReviewCount] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,21 +76,13 @@ export default function ProfilPage() {
       setUserId(user.id);
 
       const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
+        .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       const r = roleData?.role ?? null;
       setRole(r);
 
       if (r === "founder") {
         const { data: profile } = await supabase
-          .from("profiles_founder")
-          .select("id, nom, ecole, avatar_url")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
+          .from("profiles_founder").select("id, nom, ecole, avatar_url").eq("user_id", user.id).maybeSingle();
         if (!profile) { setLoading(false); return; }
         setNom(profile.nom ?? "");
         setEcole(profile.ecole ?? "");
@@ -87,18 +90,22 @@ export default function ProfilPage() {
         setProfileId(profile.id);
 
         const { data: projs } = await supabase
-          .from("projects")
-          .select("*")
-          .eq("founder_id", profile.id)
-          .order("created_at", { ascending: false });
-
+          .from("projects").select("*").eq("founder_id", profile.id).order("created_at", { ascending: false });
         setProjects(projs ?? []);
 
-        // Contrats du founder
-        const { data: contracts } = await supabase
-          .from("contracts")
-          .select("id, project_id")
-          .eq("founder_id", profile.id);
+        // Comptage des candidats par projet
+        const ids = (projs ?? []).map((p) => p.id);
+        if (ids.length > 0) {
+          const { data: allCands } = await supabase
+            .from("candidatures").select("project_id").in("project_id", ids);
+          const counts: Record<string, number> = {};
+          (allCands ?? []).forEach((c) => {
+            counts[c.project_id] = (counts[c.project_id] ?? 0) + 1;
+          });
+          setCandidateCounts(counts);
+        }
+
+        const { data: contracts } = await supabase.from("contracts").select("id, project_id").eq("founder_id", profile.id);
         const map: Record<string, string> = {};
         (contracts ?? []).forEach((c) => { map[c.project_id] = c.id; });
         setContractMap(map);
@@ -106,11 +113,7 @@ export default function ProfilPage() {
 
       if (r === "developer") {
         const { data: profile } = await supabase
-          .from("profiles_developer")
-          .select("id, nom, ecole, competences, avatar_url")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
+          .from("profiles_developer").select("id, nom, ecole, competences, avatar_url").eq("user_id", user.id).maybeSingle();
         if (!profile) { setLoading(false); return; }
         setNom(profile.nom ?? "");
         setEcole(profile.ecole ?? "");
@@ -123,25 +126,16 @@ export default function ProfilPage() {
           .select("id, statut, project_id, projects(titre, description, stack_souhaitee, deadline)")
           .eq("developer_id", profile.id)
           .order("created_at", { ascending: false });
-
         setCandidatures((cands as unknown as Candidature[]) ?? []);
 
-        // Contrats du dev
-        const { data: devContracts } = await supabase
-          .from("contracts")
-          .select("id, project_id")
-          .eq("developer_id", profile.id);
+        const { data: devContracts } = await supabase.from("contracts").select("id, project_id").eq("developer_id", profile.id);
         const devMap: Record<string, string> = {};
         (devContracts ?? []).forEach((c) => { devMap[c.project_id] = c.id; });
         setContractMap(devMap);
 
-        // Score moyen du dev
-        const { data: reviews } = await supabase
-          .from("reviews")
-          .select("rating")
-          .eq("reviewed_id", user.id);
+        const { data: reviews } = await supabase.from("reviews").select("rating").eq("reviewed_id", user.id);
         if (reviews && reviews.length > 0) {
-          const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+          const avg = reviews.reduce((sum, rv) => sum + rv.rating, 0) / reviews.length;
           setScore(Math.round(avg * 10) / 10);
           setReviewCount(reviews.length);
         }
@@ -156,16 +150,13 @@ export default function ProfilPage() {
     const file = e.target.files?.[0];
     if (!file || !userId || !profileId || !role) return;
     setUploadingAvatar(true);
-
     const ext = file.name.split(".").pop();
     const path = `${userId}/avatar.${ext}`;
     await supabase.storage.from("avatars").upload(path, file, { upsert: true });
     const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-    const url = data.publicUrl;
-
     const table = role === "founder" ? "profiles_founder" : "profiles_developer";
-    await supabase.from(table).update({ avatar_url: url }).eq("id", profileId);
-    setAvatarUrl(url);
+    await supabase.from(table).update({ avatar_url: data.publicUrl }).eq("id", profileId);
+    setAvatarUrl(data.publicUrl);
     setUploadingAvatar(false);
   }
 
@@ -176,185 +167,390 @@ export default function ProfilPage() {
 
   async function handleDeleteProject(projectId: string) {
     if (!confirm("Supprimer ce projet ? Cette action est irréversible.")) return;
+    setMenuOpenId(null);
     await supabase.from("projects").delete().eq("id", projectId);
     setProjects((prev) => prev.filter((p) => p.id !== projectId));
   }
 
   async function handleLivrer(projectId: string) {
+    setMenuOpenId(null);
     await supabase.from("projects").update({ statut: "livre" }).eq("id", projectId);
     setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, statut: "livre" } : p));
     router.push(`/projets/${projectId}/review`);
   }
 
+  // ── Stats founder ──────────────────────────────────────────────────────
+  // Uniquement les candidats sur projets encore ouverts (pending)
+  const pendingProjectIds = new Set(projects.filter((p) => p.statut === "pending").map((p) => p.id));
+  const totalCandidates = Object.entries(candidateCounts)
+    .filter(([id]) => pendingProjectIds.has(id))
+    .reduce((a, [, b]) => a + b, 0);
+  const activeProjects  = projects.filter((p) => p.statut === "matched" || p.statut === "en_cours").length;
+  const pendingCount    = projects.filter((p) => p.statut === "pending").length;
+  const livreCount      = projects.filter((p) => p.statut === "livre").length;
+
+  // ── Filter tabs ────────────────────────────────────────────────────────
+  const TABS: { key: FilterKey; label: string; count: number }[] = [
+    { key: "all",     label: "Tous",        count: projects.length },
+    { key: "pending", label: "En attente",  count: pendingCount    },
+    { key: "active",  label: "Actifs",      count: activeProjects  },
+    { key: "livre",   label: "Livrés",      count: livreCount      },
+  ];
+
+  const filteredProjects = filter === "all"     ? projects
+    : filter === "pending" ? projects.filter((p) => p.statut === "pending")
+    : filter === "active"  ? projects.filter((p) => p.statut === "matched" || p.statut === "en_cours")
+    : projects.filter((p) => p.statut === "livre");
+
+  // ── Loading state ──────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-pink-400 border-t-transparent animate-spin" />
+      <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+        <div className="max-w-2xl mx-auto px-4 py-8">
+          <div className="card p-6 mb-5">
+            <div className="flex items-center gap-4">
+              <div className="skeleton w-14 h-14 rounded-full" />
+              <div className="flex-1">
+                <div className="skeleton w-32 h-5 mb-2" />
+                <div className="skeleton w-24 h-3.5" />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            {[...Array(3)].map((_, i) => <div key={i} className="skeleton h-16 rounded-2xl" />)}
+          </div>
+          {[...Array(3)].map((_, i) => <div key={i} className="skeleton h-32 rounded-2xl mb-3" />)}
+        </div>
+        <BottomNav />
       </div>
     );
   }
 
-  // Profil introuvable — ne pas rediriger vers onboarding, montrer un état d'erreur
   if (!profileId) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 bg-slate-50">
-        <p className="text-2xl">⚠️</p>
-        <h1 className="text-lg font-black text-slate-900">Profil introuvable</h1>
-        <p className="text-slate-500 text-sm text-center">Ton profil n'a pas pu être chargé. Essaie de te reconnecter.</p>
-        <button onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }}
-          className="btn-pink px-6 py-3">
-          Se reconnecter
-        </button>
-        <button onClick={() => router.push("/onboarding")} className="text-sm text-slate-400 hover:text-slate-600">
-          Compléter mon profil →
-        </button>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4" style={{ background: "var(--bg)" }}>
+        <div className="card p-8 text-center max-w-sm w-full">
+          <AlertTriangle size={32} strokeWidth={1.5} className="mx-auto mb-3" style={{ color: "var(--amber)" }} />
+          <h1 className="text-lg font-black mb-2" style={{ color: "var(--text)" }}>Profil introuvable</h1>
+          <p className="text-sm mb-6" style={{ color: "var(--muted)" }}>Ton profil n'a pas pu être chargé. Essaie de te reconnecter.</p>
+          <button onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }} className="btn-primary w-full mb-3">
+            Se reconnecter
+          </button>
+          <button onClick={() => router.push("/onboarding")} className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
+            Compléter mon profil →
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
-      <div className="max-w-2xl mx-auto px-4 py-10">
+    <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+      <div className="max-w-2xl mx-auto px-4 py-8">
 
-        {/* Header profil */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <div className="relative group">
+        {/* ── Header profil ── */}
+        <div className="card p-5 mb-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="relative group cursor-pointer shrink-0" onClick={() => fileInputRef.current?.click()}>
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt={nom} className="w-14 h-14 rounded-full object-cover border-2 border-slate-200" />
+                  <img src={avatarUrl} alt={nom} className="avatar w-12 h-12" />
                 ) : (
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-xl font-black">
-                    {nom?.[0]?.toUpperCase() ?? "?"}
-                  </div>
+                  <div className="avatar-placeholder w-12 h-12 text-lg">{nom?.[0]?.toUpperCase() ?? "?"}</div>
                 )}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingAvatar}
-                  className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold"
-                >
-                  {uploadingAvatar ? "..." : "Changer"}
-                </button>
+                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  {uploadingAvatar
+                    ? <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
+                    : <Camera size={14} strokeWidth={2} color="white" />}
+                </div>
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
               </div>
               <div>
-                <h1 className="text-xl font-black text-slate-900">{nom}</h1>
-                <p className="text-sm text-slate-400">{ecole}</p>
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-full mt-1 inline-block ${
-                  role === "founder"
-                    ? "bg-pink-50 text-pink-600"
-                    : "bg-blue-50 text-blue-600"
-                }`}>
-                  {role === "founder" ? "Founder" : "Développeur"}
-                </span>
+                <h1 className="font-black text-base leading-tight" style={{ color: "var(--text)" }}>{nom}</h1>
+                <p className="text-xs" style={{ color: "var(--muted)" }}>{ecole}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <NotificationBell />
-              <button onClick={handleLogout} className="btn-ghost text-sm px-4 py-2">
-                Déconnexion
+              <button onClick={handleLogout} className="btn-icon" aria-label="Déconnexion">
+                <LogOut size={14} strokeWidth={1.8} />
               </button>
             </div>
           </div>
 
+          {/* Compétences dev */}
           {role === "developer" && competences.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {competences.map((c) => (
-                <span key={c} className="text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100 px-2.5 py-1 rounded-full">
-                  {c}
-                </span>
-              ))}
+            <div className="flex flex-wrap gap-1.5 pt-3 mt-3" style={{ borderTop: "1px solid var(--border)" }}>
+              {competences.map((c) => <span key={c} className="tag tag-blue">{c}</span>)}
             </div>
           )}
 
+          {/* Score dev */}
           {role === "developer" && score !== null && (
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+            <div className="flex items-center gap-2 pt-3 mt-3" style={{ borderTop: "1px solid var(--border)" }}>
               <div className="flex gap-0.5">
                 {[1,2,3,4,5].map((star) => (
-                  <span key={star} className={`text-lg ${star <= Math.round(score) ? "text-amber-400" : "text-slate-200"}`}>★</span>
+                  <Star key={star} size={13} strokeWidth={1.5}
+                    fill={star <= Math.round(score) ? "var(--amber)" : "none"}
+                    style={{ color: star <= Math.round(score) ? "var(--amber)" : "var(--subtle)" }}
+                  />
                 ))}
               </div>
-              <span className="font-bold text-slate-900 text-sm">{score}/5</span>
-              <span className="text-xs text-slate-400">({reviewCount} avis)</span>
+              <span className="text-sm font-bold" style={{ color: "var(--text)" }}>{score}/5</span>
+              <span className="text-xs" style={{ color: "var(--muted)" }}>({reviewCount} avis)</span>
             </div>
           )}
         </div>
 
-        {/* Founder : ses projets */}
+        {/* ══════════════════════════════════════════════════════════════
+            FOUNDER SECTION
+        ══════════════════════════════════════════════════════════════ */}
         {role === "founder" && (
           <>
-            <button
-              onClick={() => router.push("/projets/nouveau")}
-              className="btn-pink w-full mb-6"
-            >
-              + Déposer un nouveau projet
-            </button>
-
-            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4">
-              Mes projets ({projects.length})
-            </h2>
-
-            {projects.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-                <p className="text-slate-400 text-sm">Aucun projet déposé pour l'instant.</p>
+            {/* Stats row */}
+            {projects.length > 0 && (
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                {[
+                  { icon: Layers,      value: projects.length, label: "Projets",   color: "var(--rose)"   },
+                  { icon: Users,       value: totalCandidates, label: "Candidats", color: "var(--blue)"   },
+                  { icon: TrendingUp,  value: activeProjects,  label: "Actifs",    color: "var(--green)"  },
+                ].map(({ icon: Icon, value, label, color }) => (
+                  <div
+                    key={label}
+                    className="card p-3.5 flex flex-col items-center gap-1 text-center"
+                    style={{ borderRadius: 16 }}
+                  >
+                    <Icon size={15} strokeWidth={1.8} style={{ color }} />
+                    <span className="text-xl font-black leading-none" style={{ color: "var(--text)" }}>{value}</span>
+                    <span className="text-[10px] font-semibold" style={{ color: "var(--muted)" }}>{label}</span>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {projects.map((p) => {
-                  const s = statutProjet[p.statut] ?? { label: p.statut, color: "bg-slate-100 text-slate-500" };
+            )}
+
+            {/* Filter tabs */}
+            {projects.length > 0 && (
+              <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide mb-4">
+                {TABS.map((tab) => {
+                  const active = filter === tab.key;
                   return (
-                    <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-5">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <h3 className="font-bold text-slate-900 text-base">{p.titre}</h3>
-                        <span className={`text-xs font-semibold px-3 py-1 rounded-full shrink-0 ${s.color}`}>
-                          {s.label}
+                    <button
+                      key={tab.key}
+                      onClick={() => setFilter(tab.key)}
+                      className="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150"
+                      style={active ? {
+                        background: "var(--text)",
+                        color: "#fff",
+                        boxShadow: "var(--shadow-xs)",
+                      } : {
+                        background: "#fff",
+                        color: "var(--muted)",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                      }}
+                    >
+                      {tab.label}
+                      {tab.count > 0 && (
+                        <span
+                          className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                          style={active
+                            ? { background: "rgba(255,255,255,0.18)", color: "#fff" }
+                            : { background: "rgba(0,0,0,0.06)", color: "var(--muted)" }
+                          }
+                        >
+                          {tab.count}
                         </span>
-                      </div>
-                      {p.description && (
-                        <p className="text-slate-500 text-sm line-clamp-2 mb-3">{p.description}</p>
                       )}
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="flex gap-3 text-xs text-slate-400">
-                          {p.stack_souhaitee && <span>🛠 {p.stack_souhaitee}</span>}
-                          {p.deadline && <span>📅 {p.deadline}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Empty state */}
+            {filteredProjects.length === 0 && (
+              <div className="card flex flex-col items-center py-16 text-center" style={{ borderRadius: 24 }}>
+                <Layers size={36} strokeWidth={1} className="mb-4" style={{ color: "var(--subtle)" }} />
+                <p className="font-bold text-sm mb-1" style={{ color: "var(--text-2)" }}>
+                  {projects.length === 0 ? "Aucun projet déposé" : "Aucun projet dans cette catégorie"}
+                </p>
+                <p className="text-xs mb-6" style={{ color: "var(--muted)" }}>
+                  {projects.length === 0 ? "Crée ton premier projet pour trouver un dev." : "Essaie un autre filtre."}
+                </p>
+                {projects.length === 0 && (
+                  <button onClick={() => router.push("/projets/nouveau")} className="btn-primary text-sm" style={{ padding: "10px 20px" }}>
+                    <Plus size={14} strokeWidth={2.5} /> Déposer un projet
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Project cards */}
+            {filteredProjects.length > 0 && (
+              <div className="flex flex-col gap-3">
+                {filteredProjects.map((p) => {
+                  const s = STATUT_CONFIG[p.statut] ?? { label: p.statut, cls: "tag-gray", accent: "#a1a1aa" };
+                  const stacks = p.stack_souhaitee?.split(",").map((st) => st.trim()).filter(Boolean) ?? [];
+                  const candCount = candidateCounts[p.id] ?? 0;
+                  const isActive = p.statut === "matched" || p.statut === "en_cours";
+                  const menuOpen = menuOpenId === p.id;
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="card relative overflow-hidden"
+                      style={{ borderRadius: 20 }}
+                    >
+                      {/* Accent strip gauche */}
+                      <div
+                        className="absolute left-0 top-0 bottom-0 w-[3px]"
+                        style={{ background: s.accent }}
+                      />
+
+                      <div className="pl-5 pr-4 pt-4 pb-0">
+                        {/* Titre + badge statut */}
+                        <div className="flex items-start justify-between gap-3 mb-1.5">
+                          <h3 className="font-bold text-[15px] leading-snug flex-1" style={{ color: "var(--text)" }}>
+                            {p.titre}
+                          </h3>
+                          <span className={cn("tag shrink-0", s.cls)} style={{ fontSize: 11 }}>
+                            {s.label}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleDeleteProject(p.id)}
-                            className="text-xs font-semibold text-red-400 hover:text-red-600 transition-colors"
-                          >
-                            Supprimer
-                          </button>
-                          {(p.statut === "matched" || p.statut === "en_cours") && (
-                            <>
-                              <button
-                                onClick={() => router.push(`/projets/${p.id}/gestion`)}
-                                className="text-xs font-semibold text-slate-500 hover:text-pink-500 transition-colors"
-                              >
-                                🗂 Gestion
-                              </button>
-                              <button
-                                onClick={() => handleLivrer(p.id)}
-                                className="text-xs font-semibold text-green-600 hover:text-green-800 transition-colors"
-                              >
-                                ✓ Livrer
-                              </button>
-                              {contractMap[p.id] && (
-                                <button
-                                  onClick={() => router.push(`/contrat/${contractMap[p.id]}`)}
-                                  className="text-xs font-semibold text-slate-500 hover:text-pink-500 transition-colors"
-                                >
-                                  📄 Contrat
-                                </button>
-                              )}
-                            </>
+
+                        {/* Description */}
+                        {p.description && (
+                          <p className="text-xs leading-relaxed line-clamp-2 mb-3" style={{ color: "var(--muted)" }}>
+                            {p.description}
+                          </p>
+                        )}
+
+                        {/* Chips stack + deadline + candidats */}
+                        <div className="flex flex-wrap items-center gap-1.5 mb-4">
+                          {stacks.slice(0, 3).map((st) => (
+                            <span key={st} className="tag tag-blue" style={{ fontSize: 11 }}>{st}</span>
+                          ))}
+                          {p.deadline && (
+                            <span className="tag tag-amber" style={{ fontSize: 11 }}>
+                              <Calendar size={9} strokeWidth={2} />{p.deadline}
+                            </span>
                           )}
+                          {candCount > 0 && p.statut === "pending" && (
+                            <span className="tag tag-rose" style={{ fontSize: 11 }}>
+                              <Users size={9} strokeWidth={2} />
+                              {candCount} candidat{candCount > 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action bar */}
+                      <div
+                        className="flex items-center justify-between px-5 py-3"
+                        style={{ borderTop: "1px solid rgba(0,0,0,0.05)" }}
+                      >
+                        {/* CTA principal — adapté au statut */}
+                        {p.statut === "pending" && candCount === 0 && (
+                          <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>
+                            En attente de candidats…
+                          </span>
+                        )}
+                        {p.statut === "pending" && candCount > 0 && (
                           <button
                             onClick={() => router.push(`/projets/${p.id}/candidats`)}
-                            className="text-xs font-semibold text-pink-500 hover:text-pink-700 transition-colors"
+                            className="flex items-center gap-1.5 text-sm font-bold transition-opacity hover:opacity-70"
+                            style={{ color: "var(--rose)" }}
                           >
-                            Voir les candidats →
+                            {candCount} candidat{candCount > 1 ? "s" : ""} à voir
+                            <ArrowRight size={14} strokeWidth={2.2} />
                           </button>
+                        )}
+                        {(p.statut === "matched" || p.statut === "en_cours") && (
+                          <button
+                            onClick={() => router.push(`/projets/${p.id}/gestion`)}
+                            className="flex items-center gap-1.5 text-sm font-bold transition-opacity hover:opacity-70"
+                            style={{ color: "var(--green)" }}
+                          >
+                            Gestion du projet
+                            <ArrowRight size={14} strokeWidth={2.2} />
+                          </button>
+                        )}
+                        {p.statut === "livre" && (
+                          <span className="text-xs font-medium" style={{ color: "var(--subtle)" }}>
+                            Projet livré
+                          </span>
+                        )}
+
+                        {/* Menu contextuel ··· */}
+                        <div className="relative">
+                          <button
+                            onClick={() => setMenuOpenId(menuOpen ? null : p.id)}
+                            className="btn-icon"
+                            style={{ width: 32, height: 32, borderRadius: 10 }}
+                          >
+                            <MoreHorizontal size={15} strokeWidth={1.8} />
+                          </button>
+
+                          {menuOpen && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setMenuOpenId(null)} />
+                              <div
+                                className="absolute right-0 bottom-10 z-20 min-w-[160px] rounded-2xl overflow-hidden"
+                                style={{
+                                  background: "#fff",
+                                  border: "1px solid rgba(0,0,0,0.09)",
+                                  boxShadow: "0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
+                                }}
+                              >
+                                {isActive && (
+                                  <button
+                                    onClick={() => { setMenuOpenId(null); router.push(`/projets/${p.id}/gestion`); }}
+                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-left transition-colors hover:bg-[rgba(0,0,0,0.03)]"
+                                    style={{ color: "var(--text-2)" }}
+                                  >
+                                    <FolderOpen size={14} strokeWidth={1.8} /> Gestion
+                                  </button>
+                                )}
+                                {contractMap[p.id] && (
+                                  <button
+                                    onClick={() => { setMenuOpenId(null); router.push(`/contrat/${contractMap[p.id]}`); }}
+                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-left transition-colors hover:bg-[rgba(0,0,0,0.03)]"
+                                    style={{ color: "var(--text-2)" }}
+                                  >
+                                    <FileText size={14} strokeWidth={1.8} /> Contrat
+                                  </button>
+                                )}
+                                {isActive && (
+                                  <>
+                                    <div style={{ height: 1, background: "rgba(0,0,0,0.06)" }} />
+                                    <button
+                                      onClick={() => handleLivrer(p.id)}
+                                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-left transition-colors hover:bg-[rgba(16,185,129,0.05)]"
+                                      style={{ color: "var(--green)" }}
+                                    >
+                                      <CheckCircle size={14} strokeWidth={1.8} /> Marquer livré
+                                    </button>
+                                  </>
+                                )}
+                                {p.statut === "livre" && contractMap[p.id] && (
+                                  <button
+                                    onClick={() => { setMenuOpenId(null); router.push(`/contrat/${contractMap[p.id]}`); }}
+                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-left transition-colors hover:bg-[rgba(0,0,0,0.03)]"
+                                    style={{ color: "var(--text-2)" }}
+                                  >
+                                    <FileText size={14} strokeWidth={1.8} /> Voir le contrat
+                                  </button>
+                                )}
+                                <div style={{ height: 1, background: "rgba(0,0,0,0.06)" }} />
+                                <button
+                                  onClick={() => handleDeleteProject(p.id)}
+                                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-left transition-colors hover:bg-[rgba(239,68,68,0.05)]"
+                                  style={{ color: "var(--red)" }}
+                                >
+                                  <Trash2 size={14} strokeWidth={1.8} /> Supprimer
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -365,47 +561,55 @@ export default function ProfilPage() {
           </>
         )}
 
-        {/* Developer : ses candidatures */}
+        {/* ══════════════════════════════════════════════════════════════
+            DEVELOPER SECTION (inchangée)
+        ══════════════════════════════════════════════════════════════ */}
         {role === "developer" && (
           <>
-            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4">
-              Mes candidatures ({candidatures.length})
-            </h2>
+            <p className="label mb-3">Mes candidatures ({candidatures.length})</p>
 
             {candidatures.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-                <p className="text-slate-400 text-sm">Tu n'as pas encore candidaté.</p>
-                <p className="text-slate-400 text-sm mt-1">Explore les projets depuis l'onglet Projets.</p>
+              <div className="card flex flex-col items-center py-16 text-center">
+                <Wrench size={32} strokeWidth={1.2} className="mb-3" style={{ color: "var(--subtle)" }} />
+                <p className="text-sm font-semibold mb-1" style={{ color: "var(--text-2)" }}>Aucune candidature</p>
+                <p className="text-xs mb-5" style={{ color: "var(--muted)" }}>Explore les projets et candidate !</p>
+                <button onClick={() => router.push("/projets")} className="btn-primary text-sm" style={{ padding: "10px 20px" }}>
+                  Voir les projets <ArrowRight size={14} strokeWidth={2.2} />
+                </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
                 {candidatures.map((c) => {
-                  const s = statutCand[c.statut] ?? { label: c.statut, color: "bg-slate-100 text-slate-500" };
+                  const s = STATUT_CAND[c.statut] ?? { label: c.statut, cls: "tag-gray" };
+                  const stacks = c.projects.stack_souhaitee?.split(",").map((st) => st.trim()).filter(Boolean) ?? [];
                   return (
-                    <div key={c.id} className="bg-white rounded-2xl border border-slate-200 p-5">
+                    <div key={c.id} className="card p-5">
                       <div className="flex items-start justify-between gap-3 mb-2">
-                        <h3 className="font-bold text-slate-900 text-base">{c.projects.titre}</h3>
-                        <span className={`text-xs font-semibold px-3 py-1 rounded-full shrink-0 ${s.color}`}>
-                          {s.label}
-                        </span>
+                        <h3 className="font-bold text-base leading-snug flex-1" style={{ color: "var(--text)" }}>
+                          {c.projects.titre}
+                        </h3>
+                        <span className={cn("tag shrink-0", s.cls)}>{s.label}</span>
                       </div>
                       {c.projects.description && (
-                        <p className="text-slate-500 text-sm line-clamp-2 mb-3">{c.projects.description}</p>
+                        <p className="text-sm line-clamp-2 mb-3" style={{ color: "var(--muted)" }}>{c.projects.description}</p>
                       )}
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex gap-3 text-xs text-slate-400">
-                          {c.projects.stack_souhaitee && <span>🛠 {c.projects.stack_souhaitee}</span>}
-                          {c.projects.deadline && <span>📅 {c.projects.deadline}</span>}
-                        </div>
-                        {c.statut === "accepted" && contractMap[c.project_id] && (
-                          <button
-                            onClick={() => router.push(`/contrat/${contractMap[c.project_id]}`)}
-                            className="text-xs font-semibold text-slate-500 hover:text-pink-500 transition-colors shrink-0"
-                          >
-                            📄 Contrat
-                          </button>
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {stacks.slice(0, 3).map((st) => <span key={st} className="tag tag-blue">{st}</span>)}
+                        {c.projects.deadline && (
+                          <span className="tag tag-amber"><Calendar size={10} strokeWidth={2} />{c.projects.deadline}</span>
                         )}
                       </div>
+                      {c.statut === "accepted" && contractMap[c.project_id] && (
+                        <div className="pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+                          <button
+                            onClick={() => router.push(`/contrat/${contractMap[c.project_id]}`)}
+                            className="flex items-center gap-1.5 text-xs font-semibold"
+                            style={{ color: "var(--rose)" }}
+                          >
+                            <FileText size={13} strokeWidth={2} /> Voir le contrat <ArrowRight size={12} strokeWidth={2.2} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -415,6 +619,37 @@ export default function ProfilPage() {
         )}
 
       </div>
+
+      {/* FAB — Nouveau projet (founder uniquement) */}
+      {role === "founder" && (
+        <button
+          onClick={() => router.push("/projets/nouveau")}
+          className="fixed z-40 flex items-center justify-center"
+          style={{
+            bottom: "calc(72px + env(safe-area-inset-bottom, 0px) + 16px)",
+            right: 20,
+            width: 52,
+            height: 52,
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #f43f5e, #fb7185)",
+            boxShadow: "0 8px 24px rgba(244,63,94,0.35), 0 2px 8px rgba(244,63,94,0.20)",
+            color: "white",
+            transition: "transform 0.18s ease, box-shadow 0.18s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "scale(1.08)";
+            e.currentTarget.style.boxShadow = "0 12px 32px rgba(244,63,94,0.40), 0 4px 12px rgba(244,63,94,0.25)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.boxShadow = "0 8px 24px rgba(244,63,94,0.35), 0 2px 8px rgba(244,63,94,0.20)";
+          }}
+          aria-label="Nouveau projet"
+        >
+          <Plus size={22} strokeWidth={2.5} />
+        </button>
+      )}
+
       <BottomNav />
     </div>
   );
