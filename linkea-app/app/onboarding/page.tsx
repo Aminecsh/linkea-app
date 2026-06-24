@@ -82,7 +82,7 @@ export default function Onboarding() {
     const avatarUrl = await uploadAvatar(user.id);
 
     if (role === "founder") {
-      const { error: dbError } = await supabase.from("profiles_founder").insert({
+      const { error: dbError } = await supabase.from("profiles_founder").upsert({
         user_id: user.id,
         email: user.email,
         nom: form.nom,
@@ -92,12 +92,12 @@ export default function Onboarding() {
         budget: form.budget,
         linkedin: form.linkedin,
         avatar_url: avatarUrl,
-      });
+      }, { onConflict: "user_id" });
       if (dbError) { setError(dbError.message); setSaving(false); return; }
       router.push("/profil");
     } else if (role === "developer") {
       const competencesArray = form.competences.split(",").map((c) => c.trim()).filter(Boolean);
-      const { error: dbError } = await supabase.from("profiles_developer").insert({
+      const { error: dbError } = await supabase.from("profiles_developer").upsert({
         user_id: user.id,
         email: user.email,
         nom: form.nom,
@@ -107,7 +107,7 @@ export default function Onboarding() {
         github: form.github,
         linkedin: form.linkedin,
         avatar_url: avatarUrl,
-      });
+      }, { onConflict: "user_id" });
       if (dbError) { setError(dbError.message); setSaving(false); return; }
       router.push("/projets");
     }
