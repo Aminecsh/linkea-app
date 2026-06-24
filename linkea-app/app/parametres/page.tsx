@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { logAudit } from "@/lib/audit";
 import {
   Shield, Download, Trash2, LogOut, ChevronLeft,
   CheckCircle, AlertTriangle, Smartphone, Eye, EyeOff,
@@ -76,6 +77,7 @@ export default function ParametresPage() {
     if (cErr || !challenge) { setTwoFaMsg({ type: "err", text: cErr?.message ?? "Erreur challenge" }); setVerifying(false); return; }
     const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code: totpCode });
     if (error) { setTwoFaMsg({ type: "err", text: "Code invalide" }); setVerifying(false); return; }
+    logAudit(userId, "2fa_enabled");
     setTwoFaMsg({ type: "ok", text: "2FA activé avec succès !" });
     const { data: mfa } = await supabase.auth.mfa.listFactors();
     setFactors(mfa?.totp ?? []);
@@ -90,6 +92,7 @@ export default function ParametresPage() {
     setTwoFaMsg(null);
     const { error } = await supabase.auth.mfa.unenroll({ factorId: fId });
     if (error) { setTwoFaMsg({ type: "err", text: error.message }); return; }
+    logAudit(userId, "2fa_disabled");
     setTwoFaMsg({ type: "ok", text: "2FA désactivé" });
     const { data: mfa } = await supabase.auth.mfa.listFactors();
     setFactors(mfa?.totp ?? []);
@@ -119,6 +122,7 @@ export default function ParametresPage() {
     const { data: notifs } = await supabase.from("notifications").select("*").eq("user_id", userId);
     payload.notifications = notifs ?? [];
 
+    logAudit(userId, "data_exported");
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -136,6 +140,7 @@ export default function ParametresPage() {
     setPwMsg(null);
     const { error } = await supabase.auth.updateUser({ password: pwNew });
     if (error) { setPwMsg({ type: "err", text: error.message }); setPwLoading(false); return; }
+    logAudit(userId, "password_change");
     setPwMsg({ type: "ok", text: "Mot de passe mis à jour !" });
     setPwCurrent("");
     setPwNew("");

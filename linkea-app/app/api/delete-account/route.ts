@@ -48,6 +48,13 @@ export async function POST(req: NextRequest) {
     supabaseAdmin.from("user_roles").delete().eq("user_id", user.id),
   ]);
 
+  // Log audit avant suppression définitive
+  await supabaseAdmin.from("audit_logs").insert({
+    user_id: user.id,
+    action: "account_deleted",
+    metadata: { email: user.email },
+  });
+
   // Supprimer l'utilisateur Auth
   const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(user.id);
   if (deleteErr) {

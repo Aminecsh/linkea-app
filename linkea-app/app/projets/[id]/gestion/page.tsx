@@ -139,6 +139,7 @@ export default function GestionPage() {
   const [fileDesc, setFileDesc]       = useState("");
   const [fileSprint, setFileSprint]   = useState("");
   const [uploading, setUploading]     = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // ── Chargement ──────────────────────────────────────────────────────────────
 
@@ -328,16 +329,26 @@ export default function GestionPage() {
   async function uploadFile() {
     if (!pendingFile || !userId) return;
     setUploading(true);
+    setUploadError(null);
     const ext = pendingFile.name.split(".").pop();
     const path = `${projectId}/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage.from("project-files").upload(path, pendingFile);
-    if (error) { setUploading(false); return; }
+    const { error: storageErr } = await supabase.storage.from("project-files").upload(path, pendingFile);
+    if (storageErr) {
+      setUploadError(storageErr.message);
+      setUploading(false);
+      return;
+    }
     const { data: urlData } = supabase.storage.from("project-files").getPublicUrl(path);
-    const { data } = await supabase.from("deliverables").insert({
+    const { data, error: dbErr } = await supabase.from("deliverables").insert({
       project_id: projectId, sprint_id: fileSprint || null, uploaded_by: userId,
       nom: pendingFile.name, file_url: urlData.publicUrl,
       file_type: pendingFile.type, file_size: pendingFile.size, description: fileDesc || null,
     }).select().maybeSingle();
+    if (dbErr) {
+      setUploadError(dbErr.message);
+      setUploading(false);
+      return;
+    }
     if (data) setDeliverables((prev) => [data as Deliverable, ...prev]);
     setPendingFile(null); setShowFileModal(false); setUploading(false);
   }
@@ -920,10 +931,15 @@ export default function GestionPage() {
                 {sprints.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
               </select>
             )}
+            {uploadError && (
+              <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                ❌ {uploadError}
+              </p>
+            )}
             <button onClick={uploadFile} disabled={uploading} className="btn-pink w-full py-3">
               {uploading ? "Upload en cours..." : "⬆️ Envoyer"}
             </button>
-            <button onClick={() => { setShowFileModal(false); setPendingFile(null); }} className="btn-ghost w-full py-3">Annuler</button>
+            <button onClick={() => { setShowFileModal(false); setPendingFile(null); setUploadError(null); }} className="btn-ghost w-full py-3">Annuler</button>
           </div>
         </div>
       )}

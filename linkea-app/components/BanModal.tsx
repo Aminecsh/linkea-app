@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { logAudit } from "@/lib/audit";
 
 type Props = {
   isOpen: boolean;
@@ -53,6 +54,8 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
 
     // Désactive les bans actifs précédents
     await supabase.from("bans").update({ is_active: false }).eq("user_id", targetUserId).eq("is_active", true);
+
+    logAudit(adminId, "ban_applied", { target_user_id: targetUserId, type, raison });
 
     // Crée le nouveau ban
     await supabase.from("bans").insert({
