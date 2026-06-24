@@ -14,6 +14,8 @@ type Project = {
   profiles_founder: {
     nom: string;
     ecole?: string;
+    user_id: string;
+    avatar_url?: string;
   };
 };
 
@@ -39,12 +41,12 @@ export default function ProjectDetailPage() {
 
       const { data: proj } = await supabase
         .from("projects")
-        .select("id, titre, description, stack_souhaitee, deadline, statut, profiles_founder(nom, ecole)")
+        .select("id, titre, description, stack_souhaitee, deadline, statut, profiles_founder(nom, ecole, user_id, avatar_url)")
         .eq("id", id)
         .maybeSingle();
 
       if (!proj) { router.push("/projets"); return; }
-      setProject(proj as Project);
+      setProject(proj as unknown as Project);
 
       if (r === "developer") {
         const { data: profile } = await supabase
@@ -120,18 +122,27 @@ export default function ProjectDetailPage() {
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
 
-          {/* Founder */}
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-lg font-black shrink-0">
-              {project.profiles_founder?.nom?.[0]?.toUpperCase() ?? "?"}
-            </div>
+          {/* Founder cliquable */}
+          <button
+            onClick={() => router.push(`/profil/${project.profiles_founder?.user_id}`)}
+            className="flex items-center gap-3 mb-5 group w-full text-left"
+          >
+            {project.profiles_founder?.avatar_url ? (
+              <img src={project.profiles_founder.avatar_url} alt={project.profiles_founder.nom}
+                className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0 group-hover:opacity-80 transition-opacity" />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-lg font-black shrink-0 group-hover:opacity-80 transition-opacity">
+                {project.profiles_founder?.nom?.[0]?.toUpperCase() ?? "?"}
+              </div>
+            )}
             <div>
-              <p className="font-bold text-slate-900">{project.profiles_founder?.nom}</p>
+              <p className="font-bold text-slate-900 group-hover:text-pink-500 transition-colors">{project.profiles_founder?.nom}</p>
               {project.profiles_founder?.ecole && (
                 <p className="text-xs text-slate-400">{project.profiles_founder.ecole}</p>
               )}
+              <p className="text-xs text-slate-400 mt-0.5">Voir le profil →</p>
             </div>
-          </div>
+          </button>
 
           <h1 className="text-2xl font-black text-slate-900 mb-2">{project.titre}</h1>
 

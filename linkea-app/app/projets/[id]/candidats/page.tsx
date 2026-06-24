@@ -380,24 +380,32 @@ function CandidatCard({
             )}
           </div>
 
-          {showActions && (
-            <div className="flex gap-2">
-              <button
-                onClick={onAccept}
-                disabled={acting === c.id}
-                className="btn-pink px-5 py-2 text-sm"
-              >
-                {acting === c.id ? "..." : "✓ Accepter"}
-              </button>
-              <button
-                onClick={onRefuse}
-                disabled={acting === c.id}
-                className="btn-ghost px-5 py-2 text-sm"
-              >
-                Refuser
-              </button>
-            </div>
-          )}
+          <div className="flex gap-2 flex-wrap">
+            <a
+              href={`/profil/${dev.user_id}`}
+              className="btn-ghost px-4 py-2 text-sm"
+            >
+              Voir le profil
+            </a>
+            {showActions && (
+              <>
+                <button
+                  onClick={onAccept}
+                  disabled={acting === c.id}
+                  className="btn-pink px-5 py-2 text-sm"
+                >
+                  {acting === c.id ? "..." : "✓ Accepter"}
+                </button>
+                <button
+                  onClick={onRefuse}
+                  disabled={acting === c.id}
+                  className="btn-ghost px-5 py-2 text-sm"
+                >
+                  Refuser
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

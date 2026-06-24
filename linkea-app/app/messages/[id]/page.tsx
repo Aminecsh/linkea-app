@@ -37,6 +37,9 @@ export default function ChatPage() {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [contractId, setContractId] = useState<string | null>(null);
+  const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
+  const [otherAvatarUrl, setOtherAvatarUrl] = useState<string | null>(null);
+  const [myNom, setMyNom] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaInputRef = useRef<HTMLInputElement>(null);
@@ -60,15 +63,30 @@ export default function ChatPage() {
         .maybeSingle();
 
       if (!conv) { router.push("/messages"); return; }
-      setConversation(conv as Conversation);
+      setConversation(conv as unknown as Conversation);
 
       // Charger le contrat lié à ce projet
       const { data: contract } = await supabase
-        .from("contracts")
-        .select("id")
-        .eq("project_id", conv.project_id)
-        .maybeSingle();
+        .from("contracts").select("id").eq("project_id", conv.project_id).maybeSingle();
       if (contract) setContractId(contract.id);
+
+      // Avatars
+      const convTyped = conv as unknown as typeof conv & {
+        profiles_founder: { user_id: string }; profiles_developer: { user_id: string };
+      };
+      const myTable = roleData?.role === "founder" ? "profiles_founder" : "profiles_developer";
+      const otherTable = roleData?.role === "founder" ? "profiles_developer" : "profiles_founder";
+      const otherUserId = roleData?.role === "founder"
+        ? convTyped.profiles_developer?.user_id
+        : convTyped.profiles_founder?.user_id;
+
+      const [{ data: myProf }, { data: otherProf }] = await Promise.all([
+        supabase.from(myTable).select("avatar_url, nom").eq("user_id", user.id).maybeSingle(),
+        otherUserId ? supabase.from(otherTable).select("avatar_url").eq("user_id", otherUserId).maybeSingle() : Promise.resolve({ data: null }),
+      ]);
+      setMyAvatarUrl((myProf as { avatar_url?: string } | null)?.avatar_url ?? null);
+      setOtherAvatarUrl((otherProf as { avatar_url?: string } | null)?.avatar_url ?? null);
+      setMyNom((myProf as { nom?: string } | null)?.nom ?? "");
 
       const { data: msgs } = await supabase
         .from("messages")
@@ -223,12 +241,30 @@ export default function ChatPage() {
       <div className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <button onClick={() => router.push("/messages")} className="text-slate-400 hover:text-slate-600 text-sm font-medium shrink-0">←</button>
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white font-black shrink-0">
-            {otherNom?.[0]?.toUpperCase() ?? "?"}
-          </div>
+          {(() => {
+            const otherUserId = role === "founder"
+              ? conversation?.profiles_developer?.user_id
+              : conversation?.profiles_founder?.user_id;
+            return (
+              <button onClick={() => otherUserId && router.push(`/profil/${otherUserId}`)}
+                className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white font-black shrink-0 hover:opacity-80 transition-opacity">
+                {otherNom?.[0]?.toUpperCase() ?? "?"}
+              </button>
+            );
+          })()}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <p className="font-bold text-slate-900 text-sm leading-none">{otherNom}</p>
+              {(() => {
+                const otherUserId = role === "founder"
+                  ? conversation?.profiles_developer?.user_id
+                  : conversation?.profiles_founder?.user_id;
+                return (
+                  <button onClick={() => otherUserId && router.push(`/profil/${otherUserId}`)}
+                    className="font-bold text-slate-900 text-sm leading-none hover:text-pink-500 transition-colors">
+                    {otherNom}
+                  </button>
+                );
+              })()}
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${role === "founder" ? "bg-blue-50 text-blue-500" : "bg-pink-50 text-pink-500"}`}>
                 {role === "founder" ? "Dev" : "Founder"}
               </span>
@@ -261,28 +297,49 @@ export default function ChatPage() {
             Début de la conversation — dites bonjour 👋
           </div>
         )}
-        <div className="flex flex-col gap-2">
-          {messages.map((m) => {
+        <div className="flex flex-col gap-1">
+          {messages.map((m, index) => {
             const isMe = m.sender_id === userId;
             const isImage = m.file_type?.startsWith("image/");
             const isPdf = m.file_type === "application/pdf";
             const isFile = !!m.file_url;
+            const nextMsg = messages[index + 1];
+            const prevMsg = messages[index - 1];
+            const isLastInGroup = !nextMsg || nextMsg.sender_id !== m.sender_id;
+            const isFirstInGroup = !prevMsg || prevMsg.sender_id !== m.sender_id;
+
+            const otherUserId = role === "founder"
+              ? conversation?.profiles_developer?.user_id
+              : conversation?.profiles_founder?.user_id;
 
             return (
-              <div key={m.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+              <div key={m.id} className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"} ${isFirstInGroup ? "mt-2" : "mt-0.5"}`}>
+                {/* Avatar de l'autre (gauche) */}
+                {!isMe && (
+                  <div className="w-7 shrink-0 self-end mb-0.5">
+                    {isLastInGroup && (
+                      <button onClick={() => otherUserId && router.push(`/profil/${otherUserId}`)}>
+                        {otherAvatarUrl ? (
+                          <img src={otherAvatarUrl} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-200 hover:opacity-80 transition-opacity" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-xs font-black hover:opacity-80 transition-opacity">
+                            {otherNom?.[0]?.toUpperCase() ?? "?"}
+                          </div>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {isFile ? (
-                  <div className={`max-w-[75%] rounded-2xl overflow-hidden ${isMe ? "rounded-br-sm" : "rounded-bl-sm"}`}>
+                  <div className={`max-w-[72%] rounded-2xl overflow-hidden ${isMe ? "rounded-br-sm" : "rounded-bl-sm"}`}>
                     {isImage ? (
                       <a href={m.file_url} target="_blank" rel="noreferrer">
                         <img src={m.file_url} alt="image" className="max-w-[260px] rounded-2xl object-cover cursor-pointer hover:opacity-90 transition-opacity" />
                       </a>
                     ) : (
-                      <a
-                        href={m.file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold ${isMe ? "bg-gradient-to-br from-pink-500 to-pink-600 text-white" : "bg-white border border-slate-200 text-slate-700"}`}
-                      >
+                      <a href={m.file_url} target="_blank" rel="noreferrer"
+                        className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold ${isMe ? "bg-gradient-to-br from-pink-500 to-pink-600 text-white" : "bg-white border border-slate-200 text-slate-700"}`}>
                         <span className="text-xl">{isPdf ? "📄" : "📎"}</span>
                         <span className="truncate max-w-[160px]">{m.file_url?.split("/").pop()}</span>
                         <span className="text-xs opacity-70 shrink-0">↗</span>
@@ -290,12 +347,27 @@ export default function ChatPage() {
                     )}
                   </div>
                 ) : (
-                  <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                  <div className={`max-w-[72%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                     isMe
                       ? "bg-gradient-to-br from-pink-500 to-pink-600 text-white rounded-br-sm"
                       : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
                   }`}>
                     {m.content}
+                  </div>
+                )}
+
+                {/* Avatar de moi (droite) */}
+                {isMe && (
+                  <div className="w-7 shrink-0 self-end mb-0.5">
+                    {isLastInGroup && (
+                      myAvatarUrl ? (
+                        <img src={myAvatarUrl} alt="" className="w-7 h-7 rounded-full object-cover border border-slate-200" />
+                      ) : (
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xs font-black">
+                          {myNom?.[0]?.toUpperCase() ?? "?"}
+                        </div>
+                      )
+                    )}
                   </div>
                 )}
               </div>

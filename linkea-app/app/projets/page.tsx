@@ -19,6 +19,7 @@ type Project = {
     ecole: string;
     email: string;
     user_id: string;
+    avatar_url?: string;
   };
 };
 
@@ -65,7 +66,7 @@ export default function ProjetsPage() {
 
       const { data: projs } = await supabase
         .from("projects")
-        .select("*, profiles_founder(nom, ecole, email, user_id)")
+        .select("*, profiles_founder(nom, ecole, email, user_id, avatar_url)")
         .eq("statut", "pending")
         .order("created_at", { ascending: false });
 
@@ -246,15 +247,22 @@ export default function ProjetsPage() {
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-sm font-black shrink-0">
-                        {p.profiles_founder?.nom?.[0]?.toUpperCase() ?? "?"}
-                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); router.push(`/profil/${p.profiles_founder?.user_id}`); }} className="shrink-0 hover:opacity-80 transition-opacity">
+                        {p.profiles_founder?.avatar_url ? (
+                          <img src={p.profiles_founder.avatar_url} alt={p.profiles_founder.nom} className="w-10 h-10 rounded-full object-cover border border-slate-200" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-sm font-black">
+                            {p.profiles_founder?.nom?.[0]?.toUpperCase() ?? "?"}
+                          </div>
+                        )}
+                      </button>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-slate-900 text-sm leading-snug mb-0.5">{p.titre}</h3>
-                        <p className="text-xs text-slate-400">
+                        <button onClick={(e) => { e.stopPropagation(); router.push(`/profil/${p.profiles_founder?.user_id}`); }}
+                          className="text-xs text-slate-400 hover:text-pink-500 transition-colors text-left">
                           {p.profiles_founder?.nom ?? "Founder"}
                           {p.profiles_founder?.ecole ? ` · ${p.profiles_founder.ecole}` : ""}
-                        </p>
+                        </button>
                       </div>
                       {hasApplied && (
                         <span className="text-xs font-bold text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full shrink-0">✓</span>
@@ -277,15 +285,22 @@ export default function ProjetsPage() {
             {selected && (
               <div className="hidden lg:block flex-1 bg-white rounded-2xl border border-slate-200 p-8 sticky top-6">
                 <div className="flex items-start gap-4 mb-6">
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-xl font-black shrink-0">
-                    {selected.profiles_founder?.nom?.[0]?.toUpperCase() ?? "?"}
-                  </div>
+                  <button onClick={() => router.push(`/profil/${selected.profiles_founder?.user_id}`)} className="shrink-0 hover:opacity-80 transition-opacity">
+                    {selected.profiles_founder?.avatar_url ? (
+                      <img src={selected.profiles_founder.avatar_url} alt={selected.profiles_founder.nom} className="w-14 h-14 rounded-full object-cover border border-slate-200" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-xl font-black">
+                        {selected.profiles_founder?.nom?.[0]?.toUpperCase() ?? "?"}
+                      </div>
+                    )}
+                  </button>
                   <div>
                     <h2 className="text-xl font-black text-slate-900 leading-tight">{selected.titre}</h2>
-                    <p className="text-slate-400 text-sm mt-1">
+                    <button onClick={() => router.push(`/profil/${selected.profiles_founder?.user_id}`)}
+                      className="text-slate-400 text-sm mt-1 hover:text-pink-500 transition-colors text-left">
                       {selected.profiles_founder?.nom ?? "Founder"}
                       {selected.profiles_founder?.ecole ? ` · ${selected.profiles_founder.ecole}` : ""}
-                    </p>
+                    </button>
                   </div>
                 </div>
 

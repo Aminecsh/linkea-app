@@ -280,17 +280,19 @@ export default function DevsPage() {
           return (
             <div key={dev.id} className="bg-white rounded-2xl border border-slate-200 p-5">
               <div className="flex items-start gap-4">
-                {dev.avatar_url ? (
-                  <img src={dev.avatar_url} alt={dev.nom} className="w-11 h-11 rounded-full object-cover shrink-0 border border-slate-200" />
-                ) : (
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-black shrink-0">
-                    {dev.nom?.[0]?.toUpperCase() ?? "?"}
-                  </div>
-                )}
+                <button onClick={() => router.push(`/profil/${dev.user_id}`)} className="shrink-0 hover:opacity-80 transition-opacity">
+                  {dev.avatar_url ? (
+                    <img src={dev.avatar_url} alt={dev.nom} className="w-11 h-11 rounded-full object-cover border border-slate-200" />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-black">
+                      {dev.nom?.[0]?.toUpperCase() ?? "?"}
+                    </div>
+                  )}
+                </button>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="font-bold text-slate-900">{dev.nom}</h3>
+                      <button onClick={() => router.push(`/profil/${dev.user_id}`)} className="font-bold text-slate-900 hover:text-blue-600 transition-colors text-left">{dev.nom}</button>
                       {dev.ecole && <p className="text-xs text-slate-400">{dev.ecole}</p>}
                     </div>
                     {dev.score !== undefined && (
@@ -327,19 +329,27 @@ export default function DevsPage() {
                       )}
                     </div>
 
-                    <button
-                      onClick={() => canPin && handlePin(dev)}
-                      disabled={!canPin || pinning === dev.id}
-                      className={`text-xs font-bold px-4 py-2 rounded-xl border transition-all shrink-0 ${
-                        isPinned
-                          ? "bg-pink-50 text-pink-500 border-pink-200 cursor-default"
-                          : canPin
-                          ? "bg-white text-slate-600 border-slate-200 hover:border-pink-300 hover:text-pink-500"
-                          : "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed"
-                      }`}
-                    >
-                      {pinning === dev.id ? "..." : isPinned ? "📌 Pinné" : "📌 Pinner"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => router.push(`/profil/${dev.user_id}`)}
+                        className="text-xs font-semibold text-slate-500 hover:text-blue-500 border border-slate-200 hover:border-blue-300 px-3 py-2 rounded-xl transition-all shrink-0"
+                      >
+                        Voir profil →
+                      </button>
+                      <button
+                        onClick={() => canPin && handlePin(dev)}
+                        disabled={!canPin || pinning === dev.id}
+                        className={`text-xs font-bold px-4 py-2 rounded-xl border transition-all shrink-0 ${
+                          isPinned
+                            ? "bg-pink-50 text-pink-500 border-pink-200 cursor-default"
+                            : canPin
+                            ? "bg-white text-slate-600 border-slate-200 hover:border-pink-300 hover:text-pink-500"
+                            : "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed"
+                        }`}
+                      >
+                        {pinning === dev.id ? "..." : isPinned ? "📌 Pinné" : "📌 Pinner"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
