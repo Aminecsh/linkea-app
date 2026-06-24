@@ -80,6 +80,16 @@ const RAISON_LABELS: Record<string, string> = {
   autre: "Autre",
 };
 
+type SupportConv = {
+  id: string;
+  user_id: string;
+  created_at: string;
+  nom?: string;
+  role?: string;
+  lastMessage?: string;
+  unreadCount: number;
+};
+
 type ActiveBan = {
   id: string;
   user_id: string;
@@ -91,7 +101,7 @@ type ActiveBan = {
   role?: string;
 };
 
-type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans";
+type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -108,6 +118,7 @@ export default function AdminDashboard() {
   const [banTarget, setBanTarget] = useState<{ userId: string; nom: string } | null>(null);
   const [activeBans, setActiveBans] = useState<ActiveBan[]>([]);
   const [liftingBan, setLiftingBan] = useState<string | null>(null);
+  const [supportConvs, setSupportConvs] = useState<SupportConv[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -150,6 +161,27 @@ export default function AdminDashboard() {
         (dP ?? []).forEach((p) => { nameMap[p.user_id] = { nom: p.nom, role: "developer" }; });
         setActiveBans(rawBans.map((b) => ({ ...b, nom: nameMap[b.user_id]?.nom, role: nameMap[b.user_id]?.role })));
       }
+      // Support conversations
+      const { data: sConvs } = await supabase
+        .from("support_conversations").select("id, user_id, created_at").order("created_at", { ascending: false });
+      if (sConvs && sConvs.length > 0) {
+        const sUserIds = sConvs.map((c: { user_id: string }) => c.user_id);
+        const [{ data: sfP }, { data: sdP }] = await Promise.all([
+          supabase.from("profiles_founder").select("user_id, nom").in("user_id", sUserIds),
+          supabase.from("profiles_developer").select("user_id, nom").in("user_id", sUserIds),
+        ]);
+        const sNameMap: Record<string, { nom: string; role: string }> = {};
+        (sfP ?? []).forEach((p: { user_id: string; nom: string }) => { sNameMap[p.user_id] = { nom: p.nom, role: "founder" }; });
+        (sdP ?? []).forEach((p: { user_id: string; nom: string }) => { sNameMap[p.user_id] = { nom: p.nom, role: "developer" }; });
+        const enriched = await Promise.all(sConvs.map(async (c: { id: string; user_id: string; created_at: string }) => {
+          const { data: last } = await supabase.from("support_messages").select("content, sender_id").eq("conversation_id", c.id).order("created_at", { ascending: false }).limit(1);
+          const lastRead = `lastRead_support_${c.id}`;
+          const { count: unread } = await supabase.from("support_messages").select("*", { count: "exact", head: true }).eq("conversation_id", c.id).neq("sender_id", user.id).gt("created_at", "1970-01-01");
+          return { ...c, nom: sNameMap[c.user_id]?.nom, role: sNameMap[c.user_id]?.role, lastMessage: last?.[0]?.content, unreadCount: unread ?? 0, _lastRead: lastRead };
+        }));
+        setSupportConvs(enriched as SupportConv[]);
+      }
+
       setLoading(false);
     }
     load();
@@ -202,6 +234,7 @@ export default function AdminDashboard() {
     { key: "matchings",     label: "Matchings",     count: matches.length },
     { key: "signalements",  label: "Signalements",  count: pendingReports.length, urgent: pendingReports.length > 0 },
     { key: "bans",          label: "Bans actifs",   count: activeBans.length, urgent: activeBans.length > 0 },
+    { key: "support",       label: "Support",       count: supportConvs.length, urgent: supportConvs.some((c) => c.unreadCount > 0) },
   ];
 
   return (
@@ -214,7 +247,10 @@ export default function AdminDashboard() {
             <p className="text-xs font-bold uppercase tracking-widest text-indigo-500 mb-0.5">Linkea · Admin</p>
             <h1 className="text-xl font-black text-slate-900">Dashboard</h1>
           </div>
-          <button onClick={handleLogout} className="btn-ghost text-sm px-4 py-2">Déconnexion</button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => router.push("/messages")} className="btn-ghost text-sm px-4 py-2">💬 Messagerie</button>
+            <button onClick={handleLogout} className="btn-ghost text-sm px-4 py-2">Déconnexion</button>
+          </div>
         </div>
       </div>
 
@@ -414,7 +450,7 @@ export default function AdminDashboard() {
                         {r.description && <p className="text-sm text-slate-500 mt-1 italic">&ldquo;{r.description}&rdquo;</p>}
                         <p className="text-xs text-slate-400 mt-1">{new Date(r.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
                       </div>
-                      <button onClick={() => window.open(`/profil/${r.target_id}`, "_blank")} className="text-xs text-indigo-500 hover:underline shrink-0">
+                      <button onClick={() => router.push(`/profil/${r.target_id}`)} className="text-xs text-indigo-500 hover:underline shrink-0">
                         Voir →
                       </button>
                     </div>
@@ -441,6 +477,41 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Support */}
+        {tab === "support" && (
+          <div className="flex flex-col gap-3">
+            {supportConvs.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
+                <p className="text-2xl mb-2">💬</p>
+                <p className="text-slate-400 text-sm">Aucune conversation support pour l&apos;instant.</p>
+              </div>
+            ) : supportConvs.map((c) => (
+              <div key={c.id} onClick={() => router.push(`/support/${c.id}`)}
+                className={`bg-white rounded-2xl border-2 p-4 flex items-center gap-4 cursor-pointer transition-all ${c.unreadCount > 0 ? "border-red-200 shadow-sm" : "border-slate-200 hover:border-slate-300"}`}>
+                <div className="relative shrink-0">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-lg ${c.role === "founder" ? "bg-gradient-to-br from-pink-400 to-purple-500" : "bg-gradient-to-br from-blue-400 to-indigo-500"}`}>
+                    {c.nom?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                  {c.unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">{c.unreadCount}</span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className={`font-bold text-slate-900 ${c.unreadCount > 0 ? "text-red-600" : ""}`}>{c.nom ?? "—"}</p>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c.role === "founder" ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}>
+                      {c.role === "founder" ? "Founder" : "Developer"}
+                    </span>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500">Banni</span>
+                  </div>
+                  {c.lastMessage && <p className="text-xs text-slate-400 truncate mt-0.5">{c.lastMessage}</p>}
+                </div>
+                <span className="text-slate-300 text-lg shrink-0">›</span>
+              </div>
+            ))}
           </div>
         )}
 
@@ -477,7 +548,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0 items-end">
-                    <button onClick={() => window.open(`/profil/${b.user_id}`, "_blank")} className="text-xs text-indigo-500 hover:underline">Voir →</button>
+                    <button onClick={() => router.push(`/profil/${b.user_id}`)} className="text-xs text-indigo-500 hover:underline">Voir →</button>
                     <button onClick={() => liftBan(b.id, b.user_id)} disabled={liftingBan === b.id}
                       className="text-xs font-bold px-4 py-2 rounded-xl bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-50">
                       {liftingBan === b.id ? "..." : "✅ Lever le ban"}

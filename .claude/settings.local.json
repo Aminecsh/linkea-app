@@ -11,7 +11,22 @@
       "Bash(git checkout *)",
       "Bash(gh pr create --title 'feat: notifications in-app' --body ' *)",
       "Bash(winget install *)",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(git pull *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "PowerShell(Start-Sleep -Seconds 5; try { $r = Invoke-WebRequest -Uri \"http://localhost:3000\" -TimeoutSec 10 -UseBasicParsing; \"Status: $\\($r.StatusCode\\)\" } catch { \"Error: $_\" })",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\amine\\\\linkea-app\\\\linkea-app\\\\app\" -Recurse -Directory | Select-Object FullName | ForEach-Object { $_.FullName.Replace\\(\"c:\\\\Users\\\\amine\\\\linkea-app\\\\linkea-app\\\\app\\\\\", \"\"\\) })",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\amine\\\\linkea-app\\\\linkea-app\\\\app\\\\api\" -Recurse -File | Select-Object Name, DirectoryName | ForEach-Object { \"$\\($_.DirectoryName.Replace\\('c:\\\\Users\\\\amine\\\\linkea-app\\\\linkea-app\\\\app\\\\api\\\\',''\\)\\)\\\\$\\($_.Name\\)\" })",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\amine\\\\linkea-app\\\\linkea-app\\\\app\\\\mot-de-passe-oublie\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\amine\\\\linkea-app\\\\linkea-app\\\\app\\\\reset-password\")",
+      "Bash(cd c:/Users/amine/linkea-app/linkea-app && git show 512e47c:app/profil/page.tsx > /tmp/profil_old.tsx && echo \"OK\")",
+      "Bash(cd c:/Users/amine/linkea-app/linkea-app && git show 512e47c:linkea-app/app/profil/page.tsx > C:/Users/amine/AppData/Local/Temp/profil_old.tsx && echo \"OK\")"
+    ],
+    "additionalDirectories": [
+      "\\tmp",
+      "C:\\Users\\amine\\AppData\\Local\\Temp"
     ]
   }
 }

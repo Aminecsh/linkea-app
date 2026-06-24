@@ -64,19 +64,37 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
       is_active: true,
     });
 
-    // Notification à l'utilisateur
-    const notifBody = message.trim()
-      ? message.trim()
-      : type === "permanent"
-        ? "Ton compte a été banni définitivement de Linkea."
-        : `Ton compte a été suspendu pour ${dureeJours} jour${dureeJours > 1 ? "s" : ""}.`;
+    // Créer ou récupérer la conversation support
+    const { data: existingConv } = await supabase
+      .from("support_conversations").select("id").eq("user_id", targetUserId).maybeSingle();
 
+    let convId = existingConv?.id;
+    if (!convId) {
+      const { data: newConv } = await supabase
+        .from("support_conversations").insert({ user_id: targetUserId }).select("id").single();
+      convId = newConv?.id;
+    }
+
+    // Premier message d'explication
+    if (convId) {
+      const msgContent = message.trim()
+        || (type === "permanent"
+          ? `Bonjour, ton compte Linkea a été banni définitivement pour la raison suivante : "${raison}". Si tu penses qu'il s'agit d'une erreur, réponds à ce message.`
+          : `Bonjour, ton compte Linkea a été suspendu pour ${dureeJours} jour${dureeJours > 1 ? "s" : ""} pour la raison suivante : "${raison}". Si tu penses qu'il s'agit d'une erreur, réponds à ce message.`);
+      await supabase.from("support_messages").insert({
+        conversation_id: convId,
+        sender_id: adminId,
+        content: msgContent,
+      });
+    }
+
+    // Notification
     await supabase.from("notifications").insert({
       user_id: targetUserId,
       type: "admin_ban",
       title: type === "permanent" ? "🚫 Compte banni" : "⏸ Compte suspendu",
-      body: notifBody,
-      link: "/banni",
+      body: "Tu as reçu un message de l'équipe Linkea concernant ton compte.",
+      link: "/messages",
     });
 
     setSaving(false);

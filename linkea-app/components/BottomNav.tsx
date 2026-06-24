@@ -9,6 +9,7 @@ export default function BottomNav() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [role, setRole] = useState<string | null>(null);
+  const [isBanned, setIsBanned] = useState(false);
 
   useEffect(() => {
     async function checkUnread() {
@@ -25,7 +26,13 @@ export default function BottomNav() {
         .or(`expires_at.is.null,expires_at.gt.${now}`)
         .limit(1)
         .maybeSingle();
-      if (ban && !pathname.startsWith("/banni")) { router.push("/banni"); return; }
+      if (ban) {
+        setIsBanned(true);
+        if (!pathname.startsWith("/messages") && !pathname.startsWith("/support")) {
+          router.push("/messages");
+        }
+        return;
+      }
 
       const { data: roleData } = await supabase
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
@@ -64,6 +71,19 @@ export default function BottomNav() {
 
     checkUnread();
   }, [pathname]);
+
+  if (isBanned) {
+    return (
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50">
+        <div className="max-w-3xl mx-auto flex">
+          <button onClick={() => router.push("/messages")} className="flex-1 flex flex-col items-center gap-1 py-3 transition-colors" style={{ color: "#ec4899" }}>
+            <span className="text-xl">💬</span>
+            <span className="text-xs font-semibold">Support</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const tabs = role === "founder"
     ? [
