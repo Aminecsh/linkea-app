@@ -6,8 +6,9 @@ import { supabase } from "@/lib/supabase";
 import {
   ArrowLeft, Star, Clock, GitBranch, Link2, ExternalLink,
   MessageCircle, Pencil, Briefcase, GraduationCap, Check,
-  Award, Zap, Pin, X, ChevronRight,
+  Award, Zap, Pin, X, ChevronRight, Flag,
 } from "lucide-react";
+import ReportModal from "@/components/ReportModal";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Experience     = { id: string; titre: string; entreprise: string; date_debut: string; date_fin?: string; description?: string; };
@@ -73,6 +74,8 @@ export default function PublicProfilePage() {
   const [convId, setConvId]                 = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [showMiniHeader, setShowMiniHeader] = useState(false);
+  const [currentUserId, setCurrentUserId]   = useState<string | null>(null);
+  const [showReport, setShowReport]         = useState(false);
 
   // Pin flow (founder → dev)
   const [myFounderId, setMyFounderId]     = useState<string | null>(null);
@@ -97,6 +100,7 @@ export default function PublicProfilePage() {
 
       if (user) {
         currentUserId = user.id;
+        setCurrentUserId(user.id);
         if (user.id === userId) setIsMe(true);
         const { data: myRole } = await supabase
           .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
@@ -492,6 +496,16 @@ export default function PublicProfilePage() {
                 style={{ background: "var(--rose-soft)", color: "var(--rose-hover)", border: "1px solid var(--rose-border)" }}
               >
                 <Pin size={11} strokeWidth={2} /> Pinner
+              </button>
+            )}
+            {!isMe && currentUserId && (
+              <button
+                onClick={() => setShowReport(true)}
+                className="btn-icon shrink-0"
+                style={{ width: 32, height: 32, color: "var(--subtle)" }}
+                title="Signaler ce profil"
+              >
+                <Flag size={13} strokeWidth={2} />
               </button>
             )}
           </div>
@@ -899,6 +913,17 @@ export default function PublicProfilePage() {
             )}
           </div>
         </div>
+      )}
+
+      {currentUserId && (
+        <ReportModal
+          isOpen={showReport}
+          onClose={() => setShowReport(false)}
+          targetType="profile"
+          targetId={userId}
+          targetNom={(devProfile?.nom ?? founderProfile?.nom) ?? ""}
+          reporterId={currentUserId}
+        />
       )}
     </div>
   );

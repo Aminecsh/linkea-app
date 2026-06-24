@@ -21,6 +21,13 @@ type Conversation = {
   otherAvatarUrl?: string | null;
 };
 
+type SupportConv = {
+  id: string;
+  created_at: string;
+  lastMessage?: string;
+  unreadCount: number;
+};
+
 function formatTime(iso?: string): string {
   if (!iso) return "";
   const date = new Date(iso);
@@ -43,6 +50,9 @@ function formatTime(iso?: string): string {
 export default function MessagesPage() {
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [supportConv, setSupportConv] = useState<SupportConv | null>(null);
+  const [adminSupportConvs, setAdminSupportConvs] = useState<{ id: string; userId: string; nom: string; lastMessage?: string; unreadCount: number }[]>([]);
+  const [isBanned, setIsBanned] = useState(false);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -54,10 +64,61 @@ export default function MessagesPage() {
       if (!user) { router.push("/connexion"); return; }
       setUserId(user.id);
 
+      // Vérifier ban
+      const now = new Date().toISOString();
+      const { data: ban } = await supabase
+        .from("bans").select("id").eq("user_id", user.id).eq("is_active", true)
+        .or(`expires_at.is.null,expires_at.gt.${now}`).limit(1).maybeSingle();
+
+      if (ban) {
+        setIsBanned(true);
+        const { data: sc } = await supabase
+          .from("support_conversations").select("id, created_at").eq("user_id", user.id).maybeSingle();
+        if (sc) {
+          const lastRead = localStorage.getItem(`lastRead_support_${sc.id}`) ?? "1970-01-01";
+          const [{ data: lastMsgs }, { count: unread }] = await Promise.all([
+            supabase.from("support_messages").select("content, created_at, sender_id")
+              .eq("conversation_id", sc.id).order("created_at", { ascending: false }).limit(1),
+            supabase.from("support_messages").select("*", { count: "exact", head: true })
+              .eq("conversation_id", sc.id).neq("sender_id", user.id).gt("created_at", lastRead),
+          ]);
+          setSupportConv({ id: sc.id, created_at: sc.created_at, lastMessage: lastMsgs?.[0]?.content, unreadCount: unread ?? 0 });
+        }
+        setLoading(false);
+        return;
+      }
+
       const { data: roleData } = await supabase
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       const r = roleData?.role ?? null;
       setRole(r);
+
+      // Admin → charger les conversations support
+      if (r === "admin") {
+        const { data: sConvs } = await supabase
+          .from("support_conversations").select("id, user_id, created_at").order("created_at", { ascending: false });
+        if (sConvs && sConvs.length > 0) {
+          const userIds = sConvs.map((c: { user_id: string }) => c.user_id);
+          const [{ data: fP }, { data: dP }] = await Promise.all([
+            supabase.from("profiles_founder").select("user_id, nom").in("user_id", userIds),
+            supabase.from("profiles_developer").select("user_id, nom").in("user_id", userIds),
+          ]);
+          const nameMap: Record<string, string> = {};
+          (fP ?? []).forEach((p: { user_id: string; nom: string }) => { nameMap[p.user_id] = p.nom; });
+          (dP ?? []).forEach((p: { user_id: string; nom: string }) => { nameMap[p.user_id] = p.nom; });
+          const enriched = await Promise.all(sConvs.map(async (c: { id: string; user_id: string }) => {
+            const lastRead = localStorage.getItem(`lastRead_support_${c.id}`) ?? "1970-01-01";
+            const [{ data: lastMsgs }, { count: unread }] = await Promise.all([
+              supabase.from("support_messages").select("content").eq("conversation_id", c.id).order("created_at", { ascending: false }).limit(1),
+              supabase.from("support_messages").select("*", { count: "exact", head: true }).eq("conversation_id", c.id).neq("sender_id", user.id).gt("created_at", lastRead),
+            ]);
+            return { id: c.id, userId: c.user_id, nom: nameMap[c.user_id] ?? "Utilisateur", lastMessage: lastMsgs?.[0]?.content, unreadCount: unread ?? 0 };
+          }));
+          setAdminSupportConvs(enriched as { id: string; userId: string; nom: string; lastMessage?: string; unreadCount: number }[]);
+        }
+        setLoading(false);
+        return;
+      }
 
       let convData: Conversation[] = [];
 
@@ -151,6 +212,150 @@ export default function MessagesPage() {
             </div>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  // ── Vue banni ────────────────────────────────────────────────────────────────
+  if (isBanned) {
+    return (
+      <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+        <div className="page-header px-4 py-4">
+          <div className="max-w-2xl mx-auto">
+            <p className="label mb-1" style={{ color: "var(--rose)" }}>Compte suspendu</p>
+            <h1 className="text-xl font-bold" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>Support Linkea</h1>
+          </div>
+        </div>
+        <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-3">
+          <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
+            style={{ background: "var(--rose-soft)", border: "1px solid var(--rose-border)" }}>
+            <span className="text-lg shrink-0">🚫</span>
+            <p className="text-sm font-medium" style={{ color: "var(--rose)" }}>
+              Ton compte est suspendu. Tu peux contacter le support ci-dessous.
+            </p>
+          </div>
+          {supportConv ? (
+            <div onClick={() => router.push(`/support/${supportConv.id}`)}
+              className="cursor-pointer active:scale-[0.99] transition-transform"
+              style={{ WebkitTapHighlightColor: "transparent" }}>
+              <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
+                style={{
+                  background: "linear-gradient(180deg, #ffffff 0%, #fdfcfc 100%)",
+                  border: "1px solid var(--rose-border)",
+                  boxShadow: "0 2px 12px rgba(244,63,94,0.08), 0 1px 3px rgba(0,0,0,0.04)",
+                }}>
+                <div className="relative shrink-0">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base"
+                    style={{ background: "linear-gradient(135deg, #f43f5e, #e8304f)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}>
+                    L
+                  </div>
+                  {supportConv.unreadCount > 0 && (
+                    <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-white rounded-full px-1"
+                      style={{ background: "var(--rose)", fontSize: 10, fontWeight: 800 }}>
+                      {supportConv.unreadCount > 9 ? "9+" : supportConv.unreadCount}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-bold" style={{ color: "var(--text)" }}>Support Linkea</span>
+                  <p className="text-xs" style={{ color: "var(--subtle)" }}>Équipe Linkea</p>
+                  {supportConv.lastMessage && (
+                    <p className="text-xs truncate mt-0.5" style={{ color: "var(--muted)" }}>{supportConv.lastMessage}</p>
+                  )}
+                </div>
+                <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: "var(--border-2)", flexShrink: 0 }}>
+                  <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-10 rounded-2xl"
+              style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)" }}>
+              <p className="text-sm" style={{ color: "var(--muted)" }}>Conversation en cours de création...</p>
+            </div>
+          )}
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  // ── Vue admin ────────────────────────────────────────────────────────────────
+  if (role === "admin") {
+    const totalUnreadAdmin = adminSupportConvs.reduce((s, c) => s + c.unreadCount, 0);
+    return (
+      <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+        <div className="page-header px-4 py-4">
+          <div className="max-w-2xl mx-auto flex items-center justify-between">
+            <div>
+              <p className="label mb-1">Admin</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>Support</h1>
+                {totalUnreadAdmin > 0 && (
+                  <div className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-white"
+                    style={{ background: "var(--rose)", fontSize: 11, fontWeight: 800 }}>
+                    {totalUnreadAdmin}
+                  </div>
+                )}
+              </div>
+            </div>
+            <NotificationBell />
+          </div>
+        </div>
+        <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-2">
+          {adminSupportConvs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 rounded-2xl mt-4"
+              style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)" }}>
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+                style={{ background: "var(--rose-soft)", border: "1px solid var(--rose-border)" }}>
+                <MessageCircle size={28} style={{ color: "var(--rose)" }} />
+              </div>
+              <p className="font-bold text-base mb-1" style={{ color: "var(--text)" }}>Aucune conversation support</p>
+            </div>
+          ) : adminSupportConvs.map((c) => (
+            <div key={c.id} onClick={() => router.push(`/support/${c.id}`)}
+              className="cursor-pointer active:scale-[0.99] transition-transform"
+              style={{ WebkitTapHighlightColor: "transparent" }}>
+              <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
+                style={{
+                  background: c.unreadCount > 0
+                    ? "linear-gradient(135deg, rgba(244,63,94,0.04) 0%, #ffffff 60%)"
+                    : "linear-gradient(180deg, #ffffff 0%, #fdfcfc 100%)",
+                  border: c.unreadCount > 0 ? "1px solid rgba(244,63,94,0.16)" : "1px solid rgba(0,0,0,0.075)",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)",
+                }}>
+                <div className="relative shrink-0">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base"
+                    style={{ background: "linear-gradient(135deg, #f43f5e, #8b5cf6)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}>
+                    {c.nom[0]?.toUpperCase() ?? "?"}
+                  </div>
+                  {c.unreadCount > 0 && (
+                    <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-white rounded-full px-1"
+                      style={{ background: "var(--rose)", fontSize: 10, fontWeight: 800 }}>
+                      {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-sm font-bold" style={{ color: "var(--text)" }}>{c.nom}</span>
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
+                      style={{ background: "var(--rose-soft)", color: "var(--rose)", fontSize: 10 }}>
+                      Banni
+                    </span>
+                  </div>
+                  {c.lastMessage && (
+                    <p className="text-xs truncate" style={{ color: "var(--muted)" }}>{c.lastMessage}</p>
+                  )}
+                </div>
+                <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: "var(--border-2)", flexShrink: 0 }}>
+                  <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+          ))}
+        </div>
+        <BottomNav />
       </div>
     );
   }

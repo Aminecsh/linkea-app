@@ -23,11 +23,24 @@ export default function BottomNav() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [role, setRole] = useState<string | null>(null);
+  const [isBanned, setIsBanned] = useState(false);
 
   useEffect(() => {
     async function checkUnread() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      const now = new Date().toISOString();
+      const { data: ban } = await supabase
+        .from("bans").select("id").eq("user_id", user.id).eq("is_active", true)
+        .or(`expires_at.is.null,expires_at.gt.${now}`).limit(1).maybeSingle();
+      if (ban) {
+        setIsBanned(true);
+        if (!pathname.startsWith("/messages") && !pathname.startsWith("/support")) {
+          router.push("/messages");
+        }
+        return;
+      }
 
       const { data: roleData } = await supabase
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
@@ -65,6 +78,34 @@ export default function BottomNav() {
 
     checkUnread();
   }, [pathname]);
+
+  if (isBanned) {
+    return (
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50"
+        style={{
+          background: "rgba(242,242,247,0.85)",
+          backdropFilter: "blur(32px) saturate(200%)",
+          WebkitBackdropFilter: "blur(32px) saturate(200%)",
+          borderTop: "1px solid rgba(244,63,94,0.15)",
+          boxShadow: "0 -4px 24px rgba(244,63,94,0.08)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
+      >
+        <div className="max-w-lg mx-auto flex items-stretch h-[60px]">
+          <button
+            onClick={() => router.push("/messages")}
+            className="flex-1 flex flex-col items-center justify-center gap-[3px] transition-all duration-200"
+          >
+            <MessageCircle size={22} strokeWidth={2.2} style={{ color: "var(--rose)" }} />
+            <span className="text-[10px] font-semibold tracking-tight" style={{ color: "var(--rose)" }}>
+              Support
+            </span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const tabs: Tab[] = role === "founder"
     ? [
