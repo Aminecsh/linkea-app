@@ -41,26 +41,25 @@ export default function MessagesPage() {
       if (r === "founder") {
         const { data: profile } = await supabase
           .from("profiles_founder").select("id").eq("user_id", user.id).maybeSingle();
-        if (!profile) { router.push("/onboarding"); return; }
-        const { data } = await supabase
-          .from("conversations")
-          .select("id, created_at, project_id, projects(titre), profiles_founder(nom), profiles_developer(nom)")
-          .eq("founder_id", profile.id)
-          .order("created_at", { ascending: false });
-        convData = (data as Conversation[]) ?? [];
+        if (profile) {
+          const { data } = await supabase
+            .from("conversations")
+            .select("id, created_at, project_id, projects(titre), profiles_founder(nom), profiles_developer(nom)")
+            .eq("founder_id", profile.id)
+            .order("created_at", { ascending: false });
+          convData = (data as unknown as Conversation[]) ?? [];
+        }
       } else if (r === "developer") {
         const { data: profile } = await supabase
           .from("profiles_developer").select("id").eq("user_id", user.id).maybeSingle();
-        if (!profile) { router.push("/onboarding"); return; }
-        const { data } = await supabase
-          .from("conversations")
-          .select("id, created_at, project_id, projects(titre), profiles_founder(nom), profiles_developer(nom)")
-          .eq("developer_id", profile.id)
-          .order("created_at", { ascending: false });
-        convData = (data as Conversation[]) ?? [];
-      } else {
-        router.push("/projets");
-        return;
+        if (profile) {
+          const { data } = await supabase
+            .from("conversations")
+            .select("id, created_at, project_id, projects(titre), profiles_founder(nom), profiles_developer(nom)")
+            .eq("developer_id", profile.id)
+            .order("created_at", { ascending: false });
+          convData = (data as unknown as Conversation[]) ?? [];
+        }
       }
 
       // Pour chaque conversation : dernier message + nb non lus

@@ -80,7 +80,7 @@ export default function ProfilPage() {
           .eq("user_id", user.id)
           .maybeSingle();
 
-        if (!profile) { router.push("/onboarding"); return; }
+        if (!profile) { setLoading(false); return; }
         setNom(profile.nom ?? "");
         setEcole(profile.ecole ?? "");
         setAvatarUrl(profile.avatar_url ?? null);
@@ -111,7 +111,7 @@ export default function ProfilPage() {
           .eq("user_id", user.id)
           .maybeSingle();
 
-        if (!profile) { router.push("/onboarding"); return; }
+        if (!profile) { setLoading(false); return; }
         setNom(profile.nom ?? "");
         setEcole(profile.ecole ?? "");
         setCompetences(profile.competences ?? []);
@@ -124,7 +124,7 @@ export default function ProfilPage() {
           .eq("developer_id", profile.id)
           .order("created_at", { ascending: false });
 
-        setCandidatures((cands as Candidature[]) ?? []);
+        setCandidatures((cands as unknown as Candidature[]) ?? []);
 
         // Contrats du dev
         const { data: devContracts } = await supabase
@@ -190,6 +190,24 @@ export default function ProfilPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-6 h-6 rounded-full border-2 border-pink-400 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  // Profil introuvable — ne pas rediriger vers onboarding, montrer un état d'erreur
+  if (!profileId) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 bg-slate-50">
+        <p className="text-2xl">⚠️</p>
+        <h1 className="text-lg font-black text-slate-900">Profil introuvable</h1>
+        <p className="text-slate-500 text-sm text-center">Ton profil n'a pas pu être chargé. Essaie de te reconnecter.</p>
+        <button onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }}
+          className="btn-pink px-6 py-3">
+          Se reconnecter
+        </button>
+        <button onClick={() => router.push("/onboarding")} className="text-sm text-slate-400 hover:text-slate-600">
+          Compléter mon profil →
+        </button>
       </div>
     );
   }

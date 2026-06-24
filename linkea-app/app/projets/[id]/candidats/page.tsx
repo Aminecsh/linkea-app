@@ -54,7 +54,7 @@ export default function CandidatsPage() {
 
       const { data: profile } = await supabase
         .from("profiles_founder").select("id").eq("user_id", user.id).maybeSingle();
-      if (!profile) { router.push("/onboarding"); return; }
+      if (!profile) { router.push("/profil"); return; }
       setFounderId(profile.id);
 
       const { data: proj } = await supabase
@@ -65,7 +65,7 @@ export default function CandidatsPage() {
         .maybeSingle();
 
       if (!proj) { router.push("/profil"); return; }
-      setProject(proj);
+      setProject(proj as unknown as Project);
 
       const { data: cands } = await supabase
         .from("candidatures")
@@ -73,7 +73,7 @@ export default function CandidatsPage() {
         .eq("project_id", id)
         .order("created_at", { ascending: true });
 
-      setCandidatures((cands as Candidature[]) ?? []);
+      setCandidatures((cands as unknown as Candidature[]) ?? []);
       setLoading(false);
     }
     load();
@@ -198,7 +198,7 @@ export default function CandidatsPage() {
       .eq("project_id", id)
       .order("created_at", { ascending: true });
 
-    setCandidatures((cands as Candidature[]) ?? []);
+    setCandidatures((cands as unknown as Candidature[]) ?? []);
     setProject((prev) => prev ? { ...prev, statut: "matched" } : prev);
     setActing(null);
   }

@@ -59,7 +59,7 @@ export default function DevsPage() {
 
       const { data: profile } = await supabase
         .from("profiles_founder").select("id").eq("user_id", user.id).maybeSingle();
-      if (!profile) { router.push("/onboarding"); return; }
+      if (!profile) { setLoading(false); return; }
       setFounderId(profile.id);
 
       // Projets du founder (pending ou matched — pas livré)
