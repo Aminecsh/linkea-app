@@ -57,7 +57,27 @@ const statutLabels: Record<string, string> = {
   pending: "En attente", matched: "Matchée", en_cours: "En cours", livre: "Livré", suspendu: "Suspendu",
 };
 
-type Tab = "projets" | "founders" | "developers" | "matchings";
+type Report = {
+  id: string;
+  reporter_id: string;
+  target_type: string;
+  target_id: string;
+  target_nom?: string;
+  raison: string;
+  description?: string;
+  statut: "pending" | "resolu" | "ignore";
+  created_at: string;
+};
+
+const RAISON_LABELS: Record<string, string> = {
+  spam: "Spam",
+  faux_profil: "Faux profil",
+  contenu_inapproprie: "Contenu inapproprié",
+  arnaque: "Arnaque",
+  autre: "Autre",
+};
+
+type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -66,8 +86,10 @@ export default function AdminDashboard() {
   const [founders, setFounders] = useState<Founder[]>([]);
   const [developers, setDevelopers] = useState<Developer[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [filterReport, setFilterReport] = useState<"all" | "pending" | "resolu" | "ignore">("pending");
 
   useEffect(() => {
     async function load() {
@@ -78,21 +100,28 @@ export default function AdminDashboard() {
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       if (roleData?.role !== "admin") { router.push("/projets"); return; }
 
-      const [{ data: projs }, { data: founds }, { data: devs }, { data: matchData }] = await Promise.all([
+      const [{ data: projs }, { data: founds }, { data: devs }, { data: matchData }, { data: reportsData }] = await Promise.all([
         supabase.from("projects").select("*, profiles_founder(nom, ecole)").order("created_at", { ascending: false }),
         supabase.from("profiles_founder").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles_developer").select("*").order("created_at", { ascending: false }),
         supabase.from("candidatures").select("id, statut, created_at, projects(titre, statut), profiles_developer(nom, ecole)").eq("statut", "accepted").order("created_at", { ascending: false }),
+        supabase.from("reports").select("*").order("created_at", { ascending: false }),
       ]);
 
       setProjects((projs as Project[]) ?? []);
       setFounders((founds as Founder[]) ?? []);
       setDevelopers((devs as Developer[]) ?? []);
       setMatches((matchData as Match[]) ?? []);
+      setReports((reportsData as Report[]) ?? []);
       setLoading(false);
     }
     load();
   }, [router]);
+
+  async function updateReportStatut(reportId: string, statut: "resolu" | "ignore") {
+    await supabase.from("reports").update({ statut }).eq("id", reportId);
+    setReports((prev) => prev.map((r) => r.id === reportId ? { ...r, statut } : r));
+  }
 
   async function updateProjectStatut(projectId: string, statut: string) {
     setUpdatingId(projectId);
@@ -114,11 +143,14 @@ export default function AdminDashboard() {
     );
   }
 
-  const tabs: { key: Tab; label: string; count: number }[] = [
-    { key: "projets",    label: "Projets",     count: projects.length },
-    { key: "founders",   label: "Founders",    count: founders.length },
-    { key: "developers", label: "Developers",  count: developers.length },
-    { key: "matchings",  label: "Matchings",   count: matches.length },
+  const pendingReports = reports.filter((r) => r.statut === "pending");
+
+  const tabs: { key: Tab; label: string; count: number; urgent?: boolean }[] = [
+    { key: "projets",       label: "Projets",       count: projects.length },
+    { key: "founders",      label: "Founders",      count: founders.length },
+    { key: "developers",    label: "Developers",    count: developers.length },
+    { key: "matchings",     label: "Matchings",     count: matches.length },
+    { key: "signalements",  label: "Signalements",  count: pendingReports.length, urgent: pendingReports.length > 0 },
   ];
 
   return (
@@ -138,12 +170,13 @@ export default function AdminDashboard() {
       <div className="max-w-5xl mx-auto px-4 py-6">
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-5 gap-3 mb-6">
           {[
             { label: "Projets", val: projects.length, color: "text-pink-500" },
             { label: "Founders", val: founders.length, color: "text-purple-500" },
             { label: "Developers", val: developers.length, color: "text-blue-500" },
             { label: "Matchings", val: matches.length, color: "text-green-500" },
+            { label: "Signalements", val: pendingReports.length, color: pendingReports.length > 0 ? "text-red-500" : "text-slate-400" },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
               <p className={`text-3xl font-black ${s.color}`}>{s.val}</p>
@@ -158,12 +191,12 @@ export default function AdminDashboard() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all relative ${
                 tab === t.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
               }`}
             >
               {t.label}
-              <span className={`ml-1.5 text-xs font-bold ${tab === t.key ? "text-indigo-500" : "text-slate-400"}`}>
+              <span className={`ml-1.5 text-xs font-bold ${t.urgent ? "text-red-500" : tab === t.key ? "text-indigo-500" : "text-slate-400"}`}>
                 {t.count}
               </span>
             </button>
@@ -276,6 +309,78 @@ export default function AdminDashboard() {
                 </span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Signalements */}
+        {tab === "signalements" && (
+          <div>
+            {/* Filtres */}
+            <div className="flex gap-2 mb-4">
+              {(["all", "pending", "resolu", "ignore"] as const).map((f) => (
+                <button key={f} onClick={() => setFilterReport(f)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
+                    filterReport === f
+                      ? f === "pending" ? "bg-red-500 text-white border-red-500"
+                        : f === "resolu" ? "bg-green-500 text-white border-green-500"
+                        : f === "ignore" ? "bg-slate-400 text-white border-slate-400"
+                        : "bg-slate-900 text-white border-slate-900"
+                      : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+                  }`}>
+                  { f === "all" ? "Tous" : f === "pending" ? "En attente" : f === "resolu" ? "Résolus" : "Ignorés" }
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {reports
+                .filter((r) => filterReport === "all" || r.statut === filterReport)
+                .map((r) => (
+                  <div key={r.id} className={`bg-white rounded-2xl border-2 p-5 ${r.statut === "pending" ? "border-red-100" : "border-slate-100"}`}>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${r.target_type === "profile" ? "bg-purple-50 text-purple-600" : "bg-pink-50 text-pink-600"}`}>
+                            {r.target_type === "profile" ? "Profil" : "Projet"}
+                          </span>
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+                            {RAISON_LABELS[r.raison] ?? r.raison}
+                          </span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            r.statut === "pending" ? "bg-amber-50 text-amber-600" :
+                            r.statut === "resolu" ? "bg-green-50 text-green-600" : "bg-slate-100 text-slate-400"
+                          }`}>
+                            {r.statut === "pending" ? "En attente" : r.statut === "resolu" ? "Résolu" : "Ignoré"}
+                          </span>
+                        </div>
+                        <p className="font-bold text-slate-900 text-sm">{r.target_nom ?? r.target_id}</p>
+                        {r.description && <p className="text-sm text-slate-500 mt-1 italic">&ldquo;{r.description}&rdquo;</p>}
+                        <p className="text-xs text-slate-400 mt-1">{new Date(r.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                      </div>
+                      <button onClick={() => window.open(`/profil/${r.target_id}`, "_blank")} className="text-xs text-indigo-500 hover:underline shrink-0">
+                        Voir →
+                      </button>
+                    </div>
+
+                    {r.statut === "pending" && (
+                      <div className="flex gap-2 pt-3 border-t border-slate-100">
+                        <button onClick={() => updateReportStatut(r.id, "resolu")} className="flex-1 text-sm font-semibold py-2 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
+                          ✓ Résolu
+                        </button>
+                        <button onClick={() => updateReportStatut(r.id, "ignore")} className="flex-1 text-sm font-semibold py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
+                          Ignorer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              {reports.filter((r) => filterReport === "all" || r.statut === filterReport).length === 0 && (
+                <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
+                  <p className="text-2xl mb-2">🚩</p>
+                  <p className="text-slate-400 text-sm">Aucun signalement{filterReport !== "all" ? " dans cette catégorie" : ""}.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

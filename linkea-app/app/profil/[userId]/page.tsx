@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import ReportModal from "@/components/ReportModal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ export default function PublicProfilePage() {
   const [convId, setConvId]                   = useState<string | null>(null);
   const [currentUserId, setCurrentUserId]     = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   // ── Mode édition ────────────────────────────────────────────────────────────
   const [editing, setEditing]   = useState(false);
@@ -441,6 +443,11 @@ export default function PublicProfilePage() {
               ✏️ Modifier
             </button>
           )}
+          {!isMe && currentUserId && (
+            <button onClick={() => setShowReport(true)} className="text-xs font-semibold text-slate-400 hover:text-red-500 transition-colors px-2 py-1.5" title="Signaler ce profil">
+              🚩
+            </button>
+          )}
         </div>
       </div>
 
@@ -648,6 +655,18 @@ export default function PublicProfilePage() {
           )}
         </div>
       </div>
+
+      {/* Modal signalement */}
+      {currentUserId && (
+        <ReportModal
+          isOpen={showReport}
+          onClose={() => setShowReport(false)}
+          targetType="profile"
+          targetId={userId}
+          targetNom={profile.nom}
+          reporterId={currentUserId}
+        />
+      )}
     </div>
   );
 }
