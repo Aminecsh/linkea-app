@@ -101,7 +101,7 @@ type ActiveBan = {
   role?: string;
 };
 
-type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support";
+type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support" | "analytics";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -145,7 +145,7 @@ export default function AdminDashboard() {
       setProjects((projs as Project[]) ?? []);
       setFounders((founds as Founder[]) ?? []);
       setDevelopers((devs as Developer[]) ?? []);
-      setMatches((matchData as Match[]) ?? []);
+      setMatches((matchData as unknown as Match[]) ?? []);
       setReports((reportsData as Report[]) ?? []);
 
       // Enrichir les bans avec le nom de l'utilisateur
@@ -227,7 +227,41 @@ export default function AdminDashboard() {
 
   const pendingReports = reports.filter((r) => r.statut === "pending");
 
-  const tabs: { key: Tab; label: string; count: number; urgent?: boolean }[] = [
+  // ── Analytics ────────────────────────────────────────────────────────────────
+  const totalUsers = founders.length + developers.length;
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const newUsersWeek = [...founders, ...developers].filter((u) => u.created_at > oneWeekAgo).length;
+
+  const projectsMatched = projects.filter((p) => ["matched", "en_cours", "livre"].includes(p.statut)).length;
+  const projectsLivre   = projects.filter((p) => p.statut === "livre").length;
+  const tauxMatch       = projects.length > 0 ? Math.round((projectsMatched / projects.length) * 100) : 0;
+  const tauxCompletion  = projectsMatched > 0 ? Math.round((projectsLivre / projectsMatched) * 100) : 0;
+
+  // Croissance : 8 dernières semaines
+  function weekLabel(weeksAgo: number) {
+    const d = new Date(Date.now() - weeksAgo * 7 * 24 * 60 * 60 * 1000);
+    return `S${d.getMonth() + 1}/${String(d.getDate()).padStart(2, "0")}`;
+  }
+  const growthWeeks = Array.from({ length: 8 }, (_, i) => {
+    const weeksAgo = 7 - i;
+    const from = new Date(Date.now() - weeksAgo * 7 * 24 * 60 * 60 * 1000).toISOString();
+    const to   = new Date(Date.now() - (weeksAgo - 1) * 7 * 24 * 60 * 60 * 1000).toISOString();
+    const count = [...founders, ...developers].filter((u) => u.created_at >= from && u.created_at < to).length;
+    return { label: weekLabel(weeksAgo), count };
+  });
+  const maxGrowth = Math.max(...growthWeeks.map((w) => w.count), 1);
+
+  // Funnel
+  const funnel = [
+    { label: "Inscrits",       val: totalUsers,       color: "bg-indigo-500" },
+    { label: "Projets publiés", val: projects.length,  color: "bg-purple-500" },
+    { label: "Matchés",         val: projectsMatched,  color: "bg-blue-500"   },
+    { label: "Livrés",          val: projectsLivre,    color: "bg-green-500"  },
+  ];
+  const maxFunnel = Math.max(totalUsers, 1);
+
+  const tabs: { key: Tab; label: string; count?: number; urgent?: boolean }[] = [
+    { key: "analytics",     label: "📊 Analytics" },
     { key: "projets",       label: "Projets",       count: projects.length },
     { key: "founders",      label: "Founders",      count: founders.length },
     { key: "developers",    label: "Developers",    count: developers.length },
@@ -283,12 +317,104 @@ export default function AdminDashboard() {
               }`}
             >
               {t.label}
-              <span className={`ml-1.5 text-xs font-bold ${t.urgent ? "text-red-500" : tab === t.key ? "text-indigo-500" : "text-slate-400"}`}>
-                {t.count}
-              </span>
+              {t.count !== undefined && (
+                <span className={`ml-1.5 text-xs font-bold ${t.urgent ? "text-red-500" : tab === t.key ? "text-indigo-500" : "text-slate-400"}`}>
+                  {t.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
+
+        {/* ── Analytics ─────────────────────────────────────────────────────── */}
+        {tab === "analytics" && (
+          <div className="flex flex-col gap-6">
+
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Utilisateurs total", val: totalUsers, sub: `+${newUsersWeek} cette semaine`, color: "text-indigo-600", bg: "bg-indigo-50 border-indigo-100" },
+                { label: "Taux de match",       val: `${tauxMatch}%`,     sub: `${projectsMatched} projets matchés`, color: "text-blue-600",   bg: "bg-blue-50 border-blue-100" },
+                { label: "Taux de complétion",  val: `${tauxCompletion}%`, sub: `${projectsLivre} projets livrés`,  color: "text-green-600",  bg: "bg-green-50 border-green-100" },
+                { label: "Projets actifs",      val: projects.filter((p) => p.statut === "en_cours").length, sub: `${projects.filter((p) => p.statut === "matched").length} en attente de démarrage`, color: "text-purple-600", bg: "bg-purple-50 border-purple-100" },
+              ].map((k) => (
+                <div key={k.label} className={`rounded-2xl border p-5 ${k.bg}`}>
+                  <p className={`text-3xl font-black ${k.color}`}>{k.val}</p>
+                  <p className="text-xs font-bold text-slate-700 mt-1">{k.label}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{k.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Funnel */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <h2 className="font-bold text-slate-900 mb-5">Funnel de conversion</h2>
+              <div className="flex flex-col gap-3">
+                {funnel.map((f, i) => (
+                  <div key={f.label}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-slate-700">{f.label}</span>
+                      <span className="text-sm font-black text-slate-900">{f.val}</span>
+                    </div>
+                    <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-3 rounded-full transition-all ${f.color}`}
+                        style={{ width: `${Math.round((f.val / maxFunnel) * 100)}%` }}
+                      />
+                    </div>
+                    {i < funnel.length - 1 && funnel[i].val > 0 && (
+                      <p className="text-xs text-slate-400 mt-1 text-right">
+                        {Math.round((funnel[i + 1].val / funnel[i].val) * 100)}% conversion →
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Courbe de croissance */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <h2 className="font-bold text-slate-900 mb-5">Nouveaux utilisateurs (8 dernières semaines)</h2>
+              <div className="flex items-end gap-2 h-32">
+                {growthWeeks.map((w) => (
+                  <div key={w.label} className="flex-1 flex flex-col items-center gap-1">
+                    <span className="text-xs font-bold text-slate-600">{w.count > 0 ? w.count : ""}</span>
+                    <div className="w-full rounded-t-lg bg-indigo-500 transition-all" style={{ height: `${Math.round((w.count / maxGrowth) * 96)}px`, minHeight: w.count > 0 ? "4px" : "0" }} />
+                    <span className="text-[10px] text-slate-400 truncate w-full text-center">{w.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Répartition projets par statut */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <h2 className="font-bold text-slate-900 mb-5">Répartition des projets par statut</h2>
+              <div className="flex flex-col gap-3">
+                {[
+                  { label: "En attente",  statut: "pending",  color: "bg-amber-400" },
+                  { label: "Matchés",     statut: "matched",  color: "bg-blue-500" },
+                  { label: "En cours",    statut: "en_cours", color: "bg-purple-500" },
+                  { label: "Livrés",      statut: "livre",    color: "bg-green-500" },
+                  { label: "Suspendus",   statut: "suspendu", color: "bg-red-400" },
+                ].map((s) => {
+                  const count = projects.filter((p) => p.statut === s.statut).length;
+                  return (
+                    <div key={s.statut}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-slate-700">{s.label}</span>
+                        <span className="text-sm font-black text-slate-900">{count}</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-2 rounded-full ${s.color}`} style={{ width: projects.length > 0 ? `${Math.round((count / projects.length) * 100)}%` : "0%" }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
+        )}
 
         {/* Projets */}
         {tab === "projets" && (

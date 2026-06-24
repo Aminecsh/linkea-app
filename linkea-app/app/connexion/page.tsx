@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { logAudit } from "@/lib/audit";
 import { Eye, EyeOff, ArrowLeft, AlertCircle, ArrowRight } from "lucide-react";
 
 export default function Connexion() {
@@ -26,6 +27,8 @@ export default function Connexion() {
       setLoading(false);
       return;
     }
+
+    logAudit(data.user.id, "login", { email });
 
     const { data: roleData } = await supabase
       .from("user_roles").select("role").eq("user_id", data.user.id).single();

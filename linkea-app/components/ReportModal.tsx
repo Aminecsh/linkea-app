@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { logAudit } from "@/lib/audit";
 
 type Props = {
   isOpen: boolean;
@@ -40,6 +41,7 @@ export default function ReportModal({ isOpen, onClose, targetType, targetId, tar
       description: description.trim() || null,
       statut: "pending",
     });
+    logAudit(reporterId, "report_submitted", { target_type: targetType, target_id: targetId, raison });
     setSending(false);
     setDone(true);
   }
