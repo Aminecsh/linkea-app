@@ -15,6 +15,18 @@ export default function BottomNav() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Vérification ban actif
+      const now = new Date().toISOString();
+      const { data: ban } = await supabase
+        .from("bans")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .or(`expires_at.is.null,expires_at.gt.${now}`)
+        .limit(1)
+        .maybeSingle();
+      if (ban && !pathname.startsWith("/banni")) { router.push("/banni"); return; }
+
       const { data: roleData } = await supabase
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       const role = roleData?.role;

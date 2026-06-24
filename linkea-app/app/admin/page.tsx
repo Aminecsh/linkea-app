@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import BanModal from "@/components/BanModal";
 
 type Project = {
   id: string;
@@ -17,6 +18,7 @@ type Project = {
 
 type Founder = {
   id: string;
+  user_id: string;
   nom: string;
   email: string;
   ecole: string;
@@ -27,6 +29,7 @@ type Founder = {
 
 type Developer = {
   id: string;
+  user_id: string;
   nom: string;
   email: string;
   ecole: string;
@@ -90,12 +93,15 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filterReport, setFilterReport] = useState<"all" | "pending" | "resolu" | "ignore">("pending");
+  const [adminId, setAdminId] = useState<string | null>(null);
+  const [banTarget, setBanTarget] = useState<{ userId: string; nom: string } | null>(null);
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/connexion"); return; }
 
+      setAdminId(user.id);
       const { data: roleData } = await supabase
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       if (roleData?.role !== "admin") { router.push("/projets"); return; }
@@ -253,11 +259,12 @@ export default function AdminDashboard() {
                   <p className="text-xs text-slate-400">{f.email} · {f.ecole}</p>
                   {f.budget && <p className="text-xs text-slate-400 mt-0.5">Budget : {f.budget}</p>}
                 </div>
-                {f.linkedin && (
-                  <a href={f.linkedin} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline shrink-0">
-                    LinkedIn ↗
-                  </a>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {f.linkedin && <a href={f.linkedin} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">LinkedIn ↗</a>}
+                  <button onClick={() => setBanTarget({ userId: f.user_id, nom: f.nom })} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 transition-colors">
+                    🚫 Bannir
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -282,9 +289,14 @@ export default function AdminDashboard() {
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  {d.github && <a href={d.github} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">GitHub ↗</a>}
-                  {d.linkedin && <a href={d.linkedin} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">LinkedIn ↗</a>}
+                <div className="flex gap-2 shrink-0 flex-col items-end">
+                  <div className="flex gap-2">
+                    {d.github && <a href={d.github} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">GitHub ↗</a>}
+                    {d.linkedin && <a href={d.linkedin} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">LinkedIn ↗</a>}
+                  </div>
+                  <button onClick={() => setBanTarget({ userId: d.user_id, nom: d.nom })} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 transition-colors">
+                    🚫 Bannir
+                  </button>
                 </div>
               </div>
             ))}
@@ -370,6 +382,9 @@ export default function AdminDashboard() {
                         <button onClick={() => updateReportStatut(r.id, "ignore")} className="flex-1 text-sm font-semibold py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
                           Ignorer
                         </button>
+                        <button onClick={() => { updateReportStatut(r.id, "resolu"); setBanTarget({ userId: r.target_id, nom: r.target_nom ?? r.target_id }); }} className="flex-1 text-sm font-semibold py-2 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                          🚫 Bannir
+                        </button>
                       </div>
                     )}
                   </div>
@@ -385,6 +400,18 @@ export default function AdminDashboard() {
         )}
 
       </div>
+
+      {/* Modal ban */}
+      {banTarget && adminId && (
+        <BanModal
+          isOpen={!!banTarget}
+          onClose={() => setBanTarget(null)}
+          targetUserId={banTarget.userId}
+          targetNom={banTarget.nom}
+          adminId={adminId}
+          onBanned={() => setBanTarget(null)}
+        />
+      )}
     </div>
   );
 }
