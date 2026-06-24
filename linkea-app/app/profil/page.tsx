@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
 import {
-  Camera, LogOut, Plus, ArrowRight, Star,
+  Camera, LogOut, Plus, ArrowRight, Star, Settings,
   Calendar, Wrench, FileText, Trash2, CheckCircle, FolderOpen,
   AlertTriangle, Layers, Users, MoreHorizontal, TrendingUp,
 } from "lucide-react";
@@ -275,6 +275,9 @@ export default function ProfilPage() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <NotificationBell />
+              <button onClick={() => router.push("/parametres")} className="btn-icon" aria-label="Paramètres">
+                <Settings size={14} strokeWidth={1.8} />
+              </button>
               <button onClick={handleLogout} className="btn-icon" aria-label="Déconnexion">
                 <LogOut size={14} strokeWidth={1.8} />
               </button>
