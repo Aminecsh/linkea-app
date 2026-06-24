@@ -265,10 +265,13 @@ export default function ProfilPage() {
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
               </div>
-              <div>
+              <button
+                onClick={() => userId && router.push(`/profil/${userId}`)}
+                className="text-left"
+              >
                 <h1 className="font-black text-base leading-tight" style={{ color: "var(--text)" }}>{nom}</h1>
                 <p className="text-xs" style={{ color: "var(--muted)" }}>{ecole}</p>
-              </div>
+              </button>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <NotificationBell />

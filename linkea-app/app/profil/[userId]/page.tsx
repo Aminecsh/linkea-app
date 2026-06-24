@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import {
   ArrowLeft, Star, Clock, GitBranch, Link2, ExternalLink,
   MessageCircle, Pencil, Briefcase, GraduationCap, Check,
-  Award, Zap, Pin, X, ChevronRight, Flag,
+  Award, Zap, Pin, X, ChevronRight, Flag, Camera, Save,
 } from "lucide-react";
 import ReportModal from "@/components/ReportModal";
 
@@ -77,6 +77,29 @@ export default function PublicProfilePage() {
   const [currentUserId, setCurrentUserId]   = useState<string | null>(null);
   const [showReport, setShowReport]         = useState(false);
 
+  // Edit mode
+  const [editing, setEditing]       = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [profileId, setProfileId]   = useState<string | null>(null);
+  const [editNom, setEditNom]       = useState("");
+  const [editEcole, setEditEcole]   = useState("");
+  const [editBio, setEditBio]       = useState("");
+  const [editGithub, setEditGithub]       = useState("");
+  const [editLinkedin, setEditLinkedin]   = useState("");
+  const [editDispo, setEditDispo]         = useState<number | "">(0);
+  const [editComp, setEditComp]           = useState<string[]>([]);
+  const [editExps, setEditExps]           = useState<Experience[]>([]);
+  const [editForms, setEditForms]         = useState<Formation[]>([]);
+  const [newComp, setNewComp]             = useState("");
+  const [editingExp, setEditingExp]       = useState<Experience | null>(null);
+  const [editingForm, setEditingForm]     = useState<Formation | null>(null);
+  const [showExpModal, setShowExpModal]   = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [expF, setExpF]   = useState({ titre: "", entreprise: "", date_debut: "", date_fin: "", description: "" });
+  const [formF, setFormF] = useState({ diplome: "", etablissement: "", annee: "", description: "" });
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Pin flow (founder → dev)
   const [myFounderId, setMyFounderId]     = useState<string | null>(null);
   const [pinProjects, setPinProjects]     = useState<PinProject[]>([]);
@@ -125,6 +148,7 @@ export default function PublicProfilePage() {
           .eq("user_id", userId).maybeSingle();
         if (!prof) { router.push("/"); return; }
         setDevProfile(prof as DevProfile);
+        setProfileId(prof.id);
 
         const { data: cands } = await supabase
           .from("candidatures")
@@ -152,6 +176,7 @@ export default function PublicProfilePage() {
           .eq("user_id", userId).maybeSingle();
         if (!prof) { router.push("/"); return; }
         setFounderProfile(prof as FounderProfile);
+        setProfileId(prof.id);
 
         const { data: projs } = await supabase
           .from("projects").select("id, titre, statut, stack_souhaitee, deadline")
@@ -261,6 +286,82 @@ export default function PublicProfilePage() {
     setShowPinModal(false);
   }
 
+  // ── Fonctions édition ────────────────────────────────────────────────────────
+  function openEdit() {
+    const p = devProfile ?? founderProfile;
+    if (!p) return;
+    setEditNom(p.nom ?? "");
+    setEditEcole(p.ecole ?? "");
+    setEditBio(p.bio ?? "");
+    setEditGithub(devProfile?.github ?? "");
+    setEditLinkedin(devProfile?.linkedin ?? "");
+    setEditDispo(devProfile?.dispo_heures_semaine ?? "");
+    setEditComp([...(devProfile?.competences ?? [])]);
+    setEditExps([...(p.experiences ?? [])]);
+    setEditForms([...(p.formation ?? [])]);
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!profileId || !targetRole) return;
+    setSaving(true);
+    const table = targetRole === "founder" ? "profiles_founder" : "profiles_developer";
+    const base: Record<string, unknown> = { nom: editNom, ecole: editEcole, bio: editBio, experiences: editExps, formation: editForms };
+    if (targetRole === "developer") {
+      base.github = editGithub; base.linkedin = editLinkedin;
+      base.dispo_heures_semaine = editDispo || null; base.competences = editComp;
+    }
+    await supabase.from(table).update(base).eq("id", profileId);
+    if (targetRole === "developer") {
+      setDevProfile((prev) => prev ? { ...prev, nom: editNom, ecole: editEcole, bio: editBio, github: editGithub, linkedin: editLinkedin, dispo_heures_semaine: Number(editDispo) || undefined, competences: editComp, experiences: editExps, formation: editForms } : prev);
+    } else {
+      setFounderProfile((prev) => prev ? { ...prev, nom: editNom, ecole: editEcole, bio: editBio, experiences: editExps, formation: editForms } : prev);
+    }
+    setSaving(false);
+    setEditing(false);
+  }
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !currentUserId || !profileId || !targetRole) return;
+    setUploadingAvatar(true);
+    const ext = file.name.split(".").pop();
+    const path = `${currentUserId}/avatar.${ext}`;
+    const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (!error) {
+      const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
+      const table = targetRole === "founder" ? "profiles_founder" : "profiles_developer";
+      await supabase.from(table).update({ avatar_url: publicUrl }).eq("id", profileId);
+      if (targetRole === "developer") setDevProfile((p) => p ? { ...p, avatar_url: publicUrl } : p);
+      else setFounderProfile((p) => p ? { ...p, avatar_url: publicUrl } : p);
+    }
+    setUploadingAvatar(false);
+  }
+
+  function openExpModal(exp?: Experience) {
+    setEditingExp(exp ?? null);
+    setExpF({ titre: exp?.titre ?? "", entreprise: exp?.entreprise ?? "", date_debut: exp?.date_debut ?? "", date_fin: exp?.date_fin ?? "", description: exp?.description ?? "" });
+    setShowExpModal(true);
+  }
+
+  function saveExp() {
+    const entry: Experience = { id: editingExp?.id ?? crypto.randomUUID(), titre: expF.titre, entreprise: expF.entreprise, date_debut: expF.date_debut, date_fin: expF.date_fin || undefined, description: expF.description || undefined };
+    setEditExps(editingExp ? editExps.map((e) => e.id === editingExp.id ? entry : e) : [...editExps, entry]);
+    setShowExpModal(false);
+  }
+
+  function openFormModal(f?: Formation) {
+    setEditingForm(f ?? null);
+    setFormF({ diplome: f?.diplome ?? "", etablissement: f?.etablissement ?? "", annee: f?.annee ?? "", description: f?.description ?? "" });
+    setShowFormModal(true);
+  }
+
+  function saveForm() {
+    const entry: Formation = { id: editingForm?.id ?? crypto.randomUUID(), diplome: formF.diplome, etablissement: formF.etablissement, annee: formF.annee || undefined, description: formF.description || undefined };
+    setEditForms(editingForm ? editForms.map((f) => f.id === editingForm.id ? entry : f) : [...editForms, entry]);
+    setShowFormModal(false);
+  }
+
   const profile      = devProfile ?? founderProfile;
   const keywords     = useMemo(() => extractKeywords(reviews), [reviews]);
   const isFounder    = targetRole === "founder";
@@ -268,6 +369,197 @@ export default function PublicProfilePage() {
   const canPin       = currentUserRole === "founder" && isDevProfile && !isMe;
   const alreadyPinned = pinProjects.some((p) => p.alreadyPinned);
   const selectedPinProj = pinProjects.find((p) => p.id === pinProjectId);
+
+  // ── Mode édition ─────────────────────────────────────────────────────────────
+  if (editing && isMe) {
+    const isFounder = targetRole === "founder";
+    const prof = devProfile ?? founderProfile;
+    return (
+      <div className="min-h-screen pb-10" style={{ background: "var(--bg)" }}>
+        {/* Header édition */}
+        <div className="page-header px-4 py-3" style={{ position: "sticky", top: 0, zIndex: 10 }}>
+          <div className="max-w-2xl mx-auto flex items-center justify-between">
+            <button onClick={() => setEditing(false)} className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
+              ← Annuler
+            </button>
+            <h1 className="text-base font-bold" style={{ color: "var(--text)", letterSpacing: "-0.02em" }}>Modifier le profil</h1>
+            <button onClick={saveEdit} disabled={saving} className="btn-primary text-sm" style={{ padding: "8px 16px" }}>
+              {saving ? "..." : <><Save size={13} strokeWidth={2} style={{ display: "inline", marginRight: 4 }} />Enregistrer</>}
+            </button>
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-3">
+
+          {/* Photo */}
+          <div className="card p-5">
+            <p className="label mb-3">Photo de profil</p>
+            <div className="flex items-center gap-4">
+              <div className="relative group shrink-0 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                {prof?.avatar_url ? (
+                  <img src={prof.avatar_url} alt={prof.nom} className="avatar w-20 h-20" />
+                ) : (
+                  <div className="avatar-placeholder w-20 h-20 text-2xl" style={{ background: isFounder ? "linear-gradient(135deg, #f43f5e, #8b5cf6)" : "linear-gradient(135deg, #3b82f6, #6366f1)" }}>
+                    {prof?.nom?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
+                <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Camera size={18} color="white" strokeWidth={2} />
+                </div>
+              </div>
+              <button onClick={() => fileInputRef.current?.click()} className="btn-ghost text-sm px-4 py-2">
+                {uploadingAvatar ? "Envoi..." : "Changer la photo"}
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+            </div>
+          </div>
+
+          {/* Infos de base */}
+          <div className="card p-5 flex flex-col gap-3">
+            <p className="label">Informations</p>
+            <div>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--muted)" }}>Nom complet</label>
+              <input value={editNom} onChange={(e) => setEditNom(e.target.value)} className="input" placeholder="Ton nom" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--muted)" }}>École / Université</label>
+              <input value={editEcole} onChange={(e) => setEditEcole(e.target.value)} className="input" placeholder="HEC, 42, EPITECH..." />
+            </div>
+            <div>
+              <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--muted)" }}>Bio</label>
+              <textarea value={editBio} onChange={(e) => setEditBio(e.target.value)} rows={3} maxLength={300} className="input resize-none" placeholder="Présente-toi..." />
+            </div>
+          </div>
+
+          {/* Liens & dispo (dev only) */}
+          {!isFounder && (
+            <div className="card p-5 flex flex-col gap-3">
+              <p className="label">Liens & disponibilité</p>
+              <input value={editGithub} onChange={(e) => setEditGithub(e.target.value)} className="input" placeholder="GitHub URL" />
+              <input value={editLinkedin} onChange={(e) => setEditLinkedin(e.target.value)} className="input" placeholder="LinkedIn URL" />
+              <div>
+                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--muted)" }}>Heures disponibles / semaine</label>
+                <input type="number" value={editDispo} onChange={(e) => setEditDispo(Number(e.target.value))} className="input w-32" placeholder="h/sem" />
+              </div>
+            </div>
+          )}
+
+          {/* Compétences (dev only) */}
+          {!isFounder && (
+            <div className="card p-5 flex flex-col gap-3">
+              <p className="label">Compétences</p>
+              <div className="flex flex-wrap gap-1.5">
+                {editComp.map((c) => (
+                  <div key={c} className="flex items-center gap-1 tag tag-blue">
+                    {c}
+                    <button onClick={() => setEditComp(editComp.filter((x) => x !== c))} className="ml-1 opacity-60 hover:opacity-100">
+                      <X size={10} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input value={newComp} onChange={(e) => setNewComp(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && newComp.trim()) { setEditComp([...editComp, newComp.trim()]); setNewComp(""); } }}
+                  placeholder="React, Node.js..." className="input flex-1 text-sm" />
+                <button onClick={() => { if (newComp.trim()) { setEditComp([...editComp, newComp.trim()]); setNewComp(""); } }} className="btn-primary text-sm px-4 py-2">+</button>
+              </div>
+            </div>
+          )}
+
+          {/* Expériences */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="label">Expériences</p>
+              <button onClick={() => openExpModal()} className="text-sm font-semibold" style={{ color: "var(--rose)" }}>+ Ajouter</button>
+            </div>
+            {editExps.length === 0 ? (
+              <p className="text-sm italic" style={{ color: "var(--muted)" }}>Aucune expérience</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {editExps.map((exp) => (
+                  <div key={exp.id} className="flex items-start gap-3 rounded-xl p-3" style={{ background: "var(--bg)" }}>
+                    <div className="flex-1">
+                      <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{exp.titre}</p>
+                      <p className="text-xs" style={{ color: "var(--muted)" }}>{exp.entreprise} · {exp.date_debut}{exp.date_fin ? ` → ${exp.date_fin}` : " → Présent"}</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => openExpModal(exp)} className="btn-icon" style={{ width: 28, height: 28 }}><Pencil size={11} strokeWidth={2} /></button>
+                      <button onClick={() => setEditExps(editExps.filter((e) => e.id !== exp.id))} className="btn-icon" style={{ width: 28, height: 28, color: "var(--rose)" }}><X size={11} strokeWidth={2.5} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Formation */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="label">Formation</p>
+              <button onClick={() => openFormModal()} className="text-sm font-semibold" style={{ color: "var(--rose)" }}>+ Ajouter</button>
+            </div>
+            {editForms.length === 0 ? (
+              <p className="text-sm italic" style={{ color: "var(--muted)" }}>Aucune formation</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {editForms.map((f) => (
+                  <div key={f.id} className="flex items-start gap-3 rounded-xl p-3" style={{ background: "var(--bg)" }}>
+                    <div className="flex-1">
+                      <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{f.diplome}</p>
+                      <p className="text-xs" style={{ color: "var(--muted)" }}>{f.etablissement}{f.annee ? ` · ${f.annee}` : ""}</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => openFormModal(f)} className="btn-icon" style={{ width: 28, height: 28 }}><Pencil size={11} strokeWidth={2} /></button>
+                      <button onClick={() => setEditForms(editForms.filter((x) => x.id !== f.id))} className="btn-icon" style={{ width: 28, height: 28, color: "var(--rose)" }}><X size={11} strokeWidth={2.5} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button onClick={saveEdit} disabled={saving} className="btn-primary w-full py-4">
+            {saving ? "Enregistrement..." : "Enregistrer les modifications"}
+          </button>
+          <button onClick={() => setEditing(false)} className="btn-ghost w-full py-3">Annuler</button>
+        </div>
+
+        {/* Modal expérience */}
+        {showExpModal && (
+          <div className="fixed inset-0 z-[60] flex items-end justify-center p-4" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}>
+            <div className="card w-full max-w-sm p-6 flex flex-col gap-3">
+              <h2 className="text-base font-bold" style={{ color: "var(--text)" }}>{editingExp ? "Modifier" : "Ajouter"} une expérience</h2>
+              <input value={expF.titre} onChange={(e) => setExpF({ ...expF, titre: e.target.value })} placeholder="Titre du poste" className="input" />
+              <input value={expF.entreprise} onChange={(e) => setExpF({ ...expF, entreprise: e.target.value })} placeholder="Entreprise" className="input" />
+              <div className="grid grid-cols-2 gap-2">
+                <input value={expF.date_debut} onChange={(e) => setExpF({ ...expF, date_debut: e.target.value })} placeholder="Début" className="input text-sm" />
+                <input value={expF.date_fin} onChange={(e) => setExpF({ ...expF, date_fin: e.target.value })} placeholder="Fin (vide = présent)" className="input text-sm" />
+              </div>
+              <textarea value={expF.description} onChange={(e) => setExpF({ ...expF, description: e.target.value })} rows={2} placeholder="Description" className="input resize-none" />
+              <button onClick={saveExp} className="btn-primary w-full py-3">Valider</button>
+              <button onClick={() => setShowExpModal(false)} className="btn-ghost w-full py-2">Annuler</button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal formation */}
+        {showFormModal && (
+          <div className="fixed inset-0 z-[60] flex items-end justify-center p-4" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}>
+            <div className="card w-full max-w-sm p-6 flex flex-col gap-3">
+              <h2 className="text-base font-bold" style={{ color: "var(--text)" }}>{editingForm ? "Modifier" : "Ajouter"} une formation</h2>
+              <input value={formF.diplome} onChange={(e) => setFormF({ ...formF, diplome: e.target.value })} placeholder="Diplôme" className="input" />
+              <input value={formF.etablissement} onChange={(e) => setFormF({ ...formF, etablissement: e.target.value })} placeholder="École" className="input" />
+              <input value={formF.annee} onChange={(e) => setFormF({ ...formF, annee: e.target.value })} placeholder="Année" className="input" />
+              <textarea value={formF.description} onChange={(e) => setFormF({ ...formF, description: e.target.value })} rows={2} placeholder="Description" className="input resize-none" />
+              <button onClick={saveForm} className="btn-primary w-full py-3">Valider</button>
+              <button onClick={() => setShowFormModal(false)} className="btn-ghost w-full py-2">Annuler</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -443,7 +735,7 @@ export default function PublicProfilePage() {
           </button>
           {isMe && (
             <button
-              onClick={() => router.push("/profil")}
+              onClick={openEdit}
               className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl pointer-events-auto"
               style={{ background: "rgba(255,255,255,0.90)", backdropFilter: "blur(12px)", color: "var(--text)", border: "1px solid rgba(0,0,0,0.08)", boxShadow: "var(--shadow-xs)" }}
             >
