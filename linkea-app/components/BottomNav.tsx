@@ -80,6 +80,8 @@ export default function BottomNav() {
     checkUnread();
   }, [pathname]);
 
+  if (role === "admin") return null;
+
   if (isBanned) {
     return (
       <div
