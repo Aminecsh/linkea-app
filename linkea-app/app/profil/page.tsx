@@ -238,8 +238,13 @@ export default function ProfilPage() {
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
               </div>
               <div>
-                <h1 className="text-xl font-black text-slate-900">{nom}</h1>
-                <p className="text-sm text-slate-400">{ecole}</p>
+                <button
+                  onClick={() => userId && router.push(`/profil/${userId}`)}
+                  className="text-left group"
+                >
+                  <h1 className="text-xl font-black text-slate-900 group-hover:text-pink-500 transition-colors">{nom}</h1>
+                  <p className="text-sm text-slate-400">{ecole}</p>
+                </button>
                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full mt-1 inline-block ${
                   role === "founder"
                     ? "bg-pink-50 text-pink-600"
