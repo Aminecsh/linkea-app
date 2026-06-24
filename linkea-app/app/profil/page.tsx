@@ -134,19 +134,26 @@ export default function ProfilPage() {
       setRole(r);
 
       if (r === "founder") {
-        const { data: p, error: pErr } = await supabase
+        // Colonnes stables — toujours présentes
+        const { data: profile } = await supabase
           .from("profiles_founder")
-          .select("id, nom, ecole, bio, experiences, formation, avatar_url")
+          .select("id, nom, ecole, avatar_url")
           .eq("user_id", user.id).maybeSingle();
-
-        // Fallback sans les nouvelles colonnes si SQL pas encore exécuté
-        const profile = p ?? (pErr ? (await supabase.from("profiles_founder")
-          .select("id, nom, ecole, avatar_url").eq("user_id", user.id).maybeSingle()).data : null);
         if (!profile) { router.push("/onboarding"); return; }
 
-        setNom(profile.nom ?? ""); setEcole(profile.ecole ?? ""); setBio((profile as typeof p)?.bio ?? "");
-        setExperiences((profile as typeof p)?.experiences ?? []); setFormation((profile as typeof p)?.formation ?? []);
+        setNom(profile.nom ?? ""); setEcole(profile.ecole ?? "");
         setAvatarUrl(profile.avatar_url ?? null); setProfileId(profile.id);
+
+        // Nouvelles colonnes — optionnelles (SQL migration)
+        const { data: extra } = await supabase
+          .from("profiles_founder")
+          .select("bio, experiences, formation")
+          .eq("user_id", user.id).maybeSingle();
+        if (extra) {
+          setBio((extra as { bio?: string }).bio ?? "");
+          setExperiences((extra as { experiences?: Experience[] }).experiences ?? []);
+          setFormation((extra as { formation?: Formation[] }).formation ?? []);
+        }
 
         const { data: projs } = await supabase.from("projects").select("*")
           .eq("founder_id", profile.id).order("created_at", { ascending: false });
@@ -169,20 +176,28 @@ export default function ProfilPage() {
       }
 
       if (r === "developer") {
-        const { data: p, error: pDevErr } = await supabase
+        // Colonnes stables — toujours présentes
+        const { data: devProfile } = await supabase
           .from("profiles_developer")
-          .select("id, nom, ecole, bio, competences, github, linkedin, dispo_heures_semaine, experiences, formation, avatar_url")
+          .select("id, nom, ecole, competences, github, linkedin, dispo_heures_semaine, avatar_url")
           .eq("user_id", user.id).maybeSingle();
-
-        const devProfile = p ?? (pDevErr ? (await supabase.from("profiles_developer")
-          .select("id, nom, ecole, competences, github, linkedin, dispo_heures_semaine, avatar_url").eq("user_id", user.id).maybeSingle()).data : null);
         if (!devProfile) { router.push("/onboarding"); return; }
 
-        setNom(devProfile.nom ?? ""); setEcole(devProfile.ecole ?? ""); setBio((devProfile as typeof p)?.bio ?? "");
+        setNom(devProfile.nom ?? ""); setEcole(devProfile.ecole ?? "");
         setCompetences(devProfile.competences ?? []); setGithub(devProfile.github ?? "");
         setLinkedin(devProfile.linkedin ?? ""); setDispo(devProfile.dispo_heures_semaine ?? "");
-        setExperiences((devProfile as typeof p)?.experiences ?? []); setFormation((devProfile as typeof p)?.formation ?? []);
         setAvatarUrl(devProfile.avatar_url ?? null); setProfileId(devProfile.id);
+
+        // Nouvelles colonnes — optionnelles (SQL migration)
+        const { data: extra } = await supabase
+          .from("profiles_developer")
+          .select("bio, experiences, formation")
+          .eq("user_id", user.id).maybeSingle();
+        if (extra) {
+          setBio((extra as { bio?: string }).bio ?? "");
+          setExperiences((extra as { experiences?: Experience[] }).experiences ?? []);
+          setFormation((extra as { formation?: Formation[] }).formation ?? []);
+        }
 
         const { data: cands } = await supabase.from("candidatures")
           .select("id, statut, project_id, projects(titre, description, stack_souhaitee, deadline, statut)")
