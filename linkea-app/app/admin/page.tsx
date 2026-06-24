@@ -80,7 +80,18 @@ const RAISON_LABELS: Record<string, string> = {
   autre: "Autre",
 };
 
-type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements";
+type ActiveBan = {
+  id: string;
+  user_id: string;
+  type: "temp" | "permanent";
+  raison: string;
+  expires_at: string | null;
+  created_at: string;
+  nom?: string;
+  role?: string;
+};
+
+type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -95,6 +106,8 @@ export default function AdminDashboard() {
   const [filterReport, setFilterReport] = useState<"all" | "pending" | "resolu" | "ignore">("pending");
   const [adminId, setAdminId] = useState<string | null>(null);
   const [banTarget, setBanTarget] = useState<{ userId: string; nom: string } | null>(null);
+  const [activeBans, setActiveBans] = useState<ActiveBan[]>([]);
+  const [liftingBan, setLiftingBan] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -106,12 +119,16 @@ export default function AdminDashboard() {
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       if (roleData?.role !== "admin") { router.push("/projets"); return; }
 
-      const [{ data: projs }, { data: founds }, { data: devs }, { data: matchData }, { data: reportsData }] = await Promise.all([
+      const [{ data: projs }, { data: founds }, { data: devs }, { data: matchData }, { data: reportsData }, { data: bansData }] = await Promise.all([
         supabase.from("projects").select("*, profiles_founder(nom, ecole)").order("created_at", { ascending: false }),
         supabase.from("profiles_founder").select("*").order("created_at", { ascending: false }),
         supabase.from("profiles_developer").select("*").order("created_at", { ascending: false }),
         supabase.from("candidatures").select("id, statut, created_at, projects(titre, statut), profiles_developer(nom, ecole)").eq("statut", "accepted").order("created_at", { ascending: false }),
         supabase.from("reports").select("*").order("created_at", { ascending: false }),
+        supabase.from("bans").select("id, user_id, type, raison, expires_at, created_at")
+          .eq("is_active", true)
+          .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+          .order("created_at", { ascending: false }),
       ]);
 
       setProjects((projs as Project[]) ?? []);
@@ -119,10 +136,37 @@ export default function AdminDashboard() {
       setDevelopers((devs as Developer[]) ?? []);
       setMatches((matchData as Match[]) ?? []);
       setReports((reportsData as Report[]) ?? []);
+
+      // Enrichir les bans avec le nom de l'utilisateur
+      const rawBans = (bansData as ActiveBan[]) ?? [];
+      if (rawBans.length > 0) {
+        const userIds = rawBans.map((b) => b.user_id);
+        const [{ data: fP }, { data: dP }] = await Promise.all([
+          supabase.from("profiles_founder").select("user_id, nom").in("user_id", userIds),
+          supabase.from("profiles_developer").select("user_id, nom").in("user_id", userIds),
+        ]);
+        const nameMap: Record<string, { nom: string; role: string }> = {};
+        (fP ?? []).forEach((p) => { nameMap[p.user_id] = { nom: p.nom, role: "founder" }; });
+        (dP ?? []).forEach((p) => { nameMap[p.user_id] = { nom: p.nom, role: "developer" }; });
+        setActiveBans(rawBans.map((b) => ({ ...b, nom: nameMap[b.user_id]?.nom, role: nameMap[b.user_id]?.role })));
+      }
       setLoading(false);
     }
     load();
   }, [router]);
+
+  async function liftBan(banId: string, userId: string) {
+    setLiftingBan(banId);
+    await supabase.from("bans").update({ is_active: false }).eq("id", banId);
+    await supabase.from("notifications").insert({
+      user_id: userId,
+      type: "admin_unban",
+      title: "✅ Sanction levée",
+      body: "Ton compte Linkea a été réactivé. Bienvenue de retour !",
+    });
+    setActiveBans((prev) => prev.filter((b) => b.id !== banId));
+    setLiftingBan(null);
+  }
 
   async function updateReportStatut(reportId: string, statut: "resolu" | "ignore") {
     await supabase.from("reports").update({ statut }).eq("id", reportId);
@@ -157,6 +201,7 @@ export default function AdminDashboard() {
     { key: "developers",    label: "Developers",    count: developers.length },
     { key: "matchings",     label: "Matchings",     count: matches.length },
     { key: "signalements",  label: "Signalements",  count: pendingReports.length, urgent: pendingReports.length > 0 },
+    { key: "bans",          label: "Bans actifs",   count: activeBans.length, urgent: activeBans.length > 0 },
   ];
 
   return (
@@ -396,6 +441,53 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+      </div>
+
+        {/* Bans actifs */}
+        {tab === "bans" && (
+          <div className="flex flex-col gap-3">
+            {activeBans.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
+                <p className="text-2xl mb-2">✅</p>
+                <p className="text-slate-400 text-sm">Aucun utilisateur banni actuellement.</p>
+              </div>
+            ) : activeBans.map((b) => (
+              <div key={b.id} className="bg-white rounded-2xl border-2 border-red-100 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-black shrink-0 ${b.role === "founder" ? "bg-gradient-to-br from-pink-400 to-purple-500" : "bg-gradient-to-br from-blue-400 to-indigo-500"}`}>
+                      {b.nom?.[0]?.toUpperCase() ?? "?"}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-bold text-slate-900">{b.nom ?? b.user_id}</p>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${b.role === "founder" ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}>
+                          {b.role === "founder" ? "Founder" : "Developer"}
+                        </span>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${b.type === "permanent" ? "bg-red-100 text-red-600" : "bg-amber-50 text-amber-600"}`}>
+                          {b.type === "permanent" ? "🚫 Définitif" : "⏸ Temporaire"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{b.raison}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Banni le {new Date(b.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                        {b.expires_at && ` · Jusqu'au ${new Date(b.expires_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 shrink-0 items-end">
+                    <button onClick={() => window.open(`/profil/${b.user_id}`, "_blank")} className="text-xs text-indigo-500 hover:underline">Voir →</button>
+                    <button onClick={() => liftBan(b.id, b.user_id)} disabled={liftingBan === b.id}
+                      className="text-xs font-bold px-4 py-2 rounded-xl bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-50">
+                      {liftingBan === b.id ? "..." : "✅ Lever le ban"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
