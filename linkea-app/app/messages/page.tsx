@@ -53,10 +53,31 @@ export default function MessagesPage() {
   const [supportConv, setSupportConv] = useState<SupportConv | null>(null);
   const [adminSupportConvs, setAdminSupportConvs] = useState<{ id: string; userId: string; nom: string; lastMessage?: string; unreadCount: number }[]>([]);
   const [isBanned, setIsBanned] = useState(false);
+  const [banInfo, setBanInfo] = useState<{ type: string; raison: string; expires_at: string | null } | null>(null);
+  const [countdown, setCountdown] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [archivesOpen, setArchivesOpen] = useState(false);
+
+  // Compte à rebours du ban
+  useEffect(() => {
+    if (!banInfo?.expires_at) return;
+    function tick() {
+      const diff = new Date(banInfo!.expires_at!).getTime() - Date.now();
+      if (diff <= 0) { setCountdown("Expiration en cours..."); return; }
+      const j = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      if (j > 0) setCountdown(`${j}j ${h}h ${m}m ${s}s`);
+      else if (h > 0) setCountdown(`${h}h ${m}m ${s}s`);
+      else setCountdown(`${m}m ${s}s`);
+    }
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [banInfo]);
 
   useEffect(() => {
     async function load() {
@@ -67,11 +88,12 @@ export default function MessagesPage() {
       // Vérifier ban
       const now = new Date().toISOString();
       const { data: ban } = await supabase
-        .from("bans").select("id").eq("user_id", user.id).eq("is_active", true)
+        .from("bans").select("id, type, raison, expires_at").eq("user_id", user.id).eq("is_active", true)
         .or(`expires_at.is.null,expires_at.gt.${now}`).limit(1).maybeSingle();
 
       if (ban) {
         setIsBanned(true);
+        setBanInfo({ type: ban.type, raison: ban.raison, expires_at: ban.expires_at });
         const { data: sc } = await supabase
           .from("support_conversations").select("id, created_at").eq("user_id", user.id).maybeSingle();
         if (sc) {
@@ -227,12 +249,30 @@ export default function MessagesPage() {
           </div>
         </div>
         <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-3">
-          <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
-            style={{ background: "var(--rose-soft)", border: "1px solid var(--rose-border)" }}>
-            <span className="text-lg shrink-0">🚫</span>
-            <p className="text-sm font-medium" style={{ color: "var(--rose)" }}>
-              Ton compte est suspendu. Tu peux contacter le support ci-dessous.
-            </p>
+          {/* Infos ban */}
+          <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid var(--rose-border)" }}>
+            <div className="px-4 py-3 flex items-center gap-3" style={{ background: "var(--rose-soft)" }}>
+              <span className="text-lg shrink-0">🚫</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold" style={{ color: "var(--rose)" }}>
+                  Compte {banInfo?.type === "permanent" ? "banni définitivement" : "suspendu"}
+                </p>
+                {banInfo?.raison && (
+                  <p className="text-xs mt-0.5" style={{ color: "var(--rose)" }}>Motif : {banInfo.raison}</p>
+                )}
+              </div>
+            </div>
+            {banInfo?.type === "temp" && banInfo.expires_at && countdown && (
+              <div className="px-4 py-3 flex items-center justify-between" style={{ background: "#fff7f7", borderTop: "1px solid var(--rose-border)" }}>
+                <span className="text-xs font-semibold text-slate-500">Levée du ban dans</span>
+                <span className="text-sm font-black tabular-nums" style={{ color: "var(--rose)" }}>{countdown}</span>
+              </div>
+            )}
+            {banInfo?.type === "permanent" && (
+              <div className="px-4 py-3" style={{ background: "#fff7f7", borderTop: "1px solid var(--rose-border)" }}>
+                <p className="text-xs text-slate-500">Cette suspension est définitive. Contacte le support pour contester.</p>
+              </div>
+            )}
           </div>
           {supportConv ? (
             <div onClick={() => router.push(`/support/${supportConv.id}`)}
@@ -274,6 +314,15 @@ export default function MessagesPage() {
               <p className="text-sm" style={{ color: "var(--muted)" }}>Conversation en cours de création...</p>
             </div>
           )}
+
+          {/* Déconnexion */}
+          <button
+            onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }}
+            className="w-full py-3 rounded-2xl text-sm font-semibold transition-colors"
+            style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", color: "var(--muted)" }}
+          >
+            Se déconnecter
+          </button>
         </div>
         <BottomNav />
       </div>
