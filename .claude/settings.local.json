@@ -22,7 +22,8 @@
       "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\amine\\\\linkea-app\\\\linkea-app\\\\app\\\\mot-de-passe-oublie\")",
       "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\amine\\\\linkea-app\\\\linkea-app\\\\app\\\\reset-password\")",
       "Bash(cd c:/Users/amine/linkea-app/linkea-app && git show 512e47c:app/profil/page.tsx > /tmp/profil_old.tsx && echo \"OK\")",
-      "Bash(cd c:/Users/amine/linkea-app/linkea-app && git show 512e47c:linkea-app/app/profil/page.tsx > C:/Users/amine/AppData/Local/Temp/profil_old.tsx && echo \"OK\")"
+      "Bash(cd c:/Users/amine/linkea-app/linkea-app && git show 512e47c:linkea-app/app/profil/page.tsx > C:/Users/amine/AppData/Local/Temp/profil_old.tsx && echo \"OK\")",
+      "Bash(npx tsc *)"
     ],
     "additionalDirectories": [
       "\\tmp",

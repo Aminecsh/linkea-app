@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
-import { MessageCircle, Briefcase, ChevronDown, ChevronUp, Send } from "lucide-react";
+import { MessageCircle, Briefcase, ChevronDown, ChevronUp, Send, Users, Plus, X } from "lucide-react";
 
 type Conversation = {
   id: string;
@@ -59,6 +59,14 @@ export default function MessagesPage() {
   const [role, setRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [archivesOpen, setArchivesOpen] = useState(false);
+
+  // Groups
+  const [groups, setGroups] = useState<{ id: string; group_name: string; project_id: string; lastMessage?: string; lastMessageTime?: string; unreadCount: number }[]>([]);
+  const [showNewGroup, setShowNewGroup] = useState(false);
+  const [groupProjects, setGroupProjects] = useState<{ id: string; titre: string }[]>([]);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupProjectId, setNewGroupProjectId] = useState("");
+  const [creatingGroup, setCreatingGroup] = useState(false);
 
   // Compte à rebours du ban
   useEffect(() => {
@@ -206,6 +214,36 @@ export default function MessagesPage() {
       );
 
       setConversations(enriched);
+
+      // Load group conversations
+      const { data: gpData } = await supabase
+        .from("conversation_participants")
+        .select("conversation_id, conversations(id, group_name, project_id, is_group)")
+        .eq("user_id", user.id);
+
+      if (gpData && gpData.length > 0) {
+        const groupConvs = (gpData as unknown as { conversation_id: string; conversations: { id: string; group_name: string; project_id: string; is_group: boolean } | null }[])
+          .filter((g) => g.conversations?.is_group)
+          .map((g) => g.conversations!);
+
+        const enrichedGroups = await Promise.all(groupConvs.map(async (g) => {
+          const lastRead = localStorage.getItem(`lastRead_${g.id}`) ?? "1970-01-01";
+          const [{ data: lastMsgs }, { count: unread }] = await Promise.all([
+            supabase.from("messages").select("content, created_at").eq("conversation_id", g.id).order("created_at", { ascending: false }).limit(1),
+            supabase.from("messages").select("*", { count: "exact", head: true }).eq("conversation_id", g.id).neq("sender_id", user.id).gt("created_at", lastRead),
+          ]);
+          return { id: g.id, group_name: g.group_name, project_id: g.project_id, lastMessage: lastMsgs?.[0]?.content ?? undefined, lastMessageTime: lastMsgs?.[0]?.created_at ?? undefined, unreadCount: unread ?? 0 };
+        }));
+        setGroups(enrichedGroups);
+      }
+
+      // Projects disponibles pour créer un groupe
+      const projectIds = convData.map((c) => c.project_id).filter(Boolean);
+      if (projectIds.length > 0) {
+        const { data: projs } = await supabase.from("projects").select("id, titre").in("id", projectIds);
+        setGroupProjects((projs ?? []) as { id: string; titre: string }[]);
+      }
+
       setLoading(false);
     }
     load();
@@ -559,7 +597,19 @@ export default function MessagesPage() {
               )}
             </div>
           </div>
-          <NotificationBell />
+          <div className="flex items-center gap-2">
+            {groupProjects.length > 0 && (
+              <button
+                onClick={() => setShowNewGroup(true)}
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
+                style={{ background: "rgba(99,102,241,0.10)", border: "1px solid rgba(99,102,241,0.20)" }}
+                title="Créer un groupe"
+              >
+                <Plus size={16} style={{ color: "#6366f1" }} />
+              </button>
+            )}
+            <NotificationBell />
+          </div>
         </div>
       </div>
 
@@ -595,6 +645,56 @@ export default function MessagesPage() {
               </div>
             )}
 
+            {/* Groupes */}
+            {groups.length > 0 && (
+              <div className="mt-2">
+                <div className="flex items-center gap-2 py-2 px-1 mb-1">
+                  <span className="label">Groupes</span>
+                  <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+                  <span className="label">{groups.length}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {groups.map((g) => (
+                    <div key={g.id} onClick={() => router.push(`/messages/${g.id}`)}
+                      className="cursor-pointer active:scale-[0.99] transition-transform"
+                      style={{ WebkitTapHighlightColor: "transparent" }}>
+                      <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
+                        style={{
+                          background: g.unreadCount > 0 ? "linear-gradient(135deg,rgba(99,102,241,0.06) 0%,#fff 60%)" : "linear-gradient(180deg,#fff 0%,#fdfcfc 100%)",
+                          border: g.unreadCount > 0 ? "1px solid rgba(99,102,241,0.20)" : "1px solid rgba(0,0,0,0.075)",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                        }}>
+                        <div className="relative shrink-0">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold"
+                            style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}>
+                            <Users size={18} />
+                          </div>
+                          {g.unreadCount > 0 && (
+                            <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-white rounded-full px-1"
+                              style={{ background: "#6366f1", fontSize: 10, fontWeight: 800 }}>
+                              {g.unreadCount > 9 ? "9+" : g.unreadCount}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-0.5">
+                            <span className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>{g.group_name || "Groupe"}</span>
+                            <span className="shrink-0 text-xs tabular-nums" style={{ color: "var(--subtle)" }}>{formatTime(g.lastMessageTime)}</span>
+                          </div>
+                          <p className="text-xs truncate" style={{ color: "var(--muted)", fontStyle: !g.lastMessage ? "italic" : "normal" }}>
+                            {g.lastMessage ?? "Démarrer la discussion..."}
+                          </p>
+                        </div>
+                        <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: "var(--border-2)", flexShrink: 0 }}>
+                          <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Archives collapsibles */}
             {archived.length > 0 && (
               <div className="mt-2">
@@ -623,6 +723,106 @@ export default function MessagesPage() {
       </div>
 
       <BottomNav />
+
+      {/* ── Modal nouveau groupe ── */}
+      {showNewGroup && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 px-4 pb-6"
+          onClick={() => setShowNewGroup(false)}>
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: "rgba(99,102,241,0.10)" }}>
+                  <Users size={18} style={{ color: "#6366f1" }} />
+                </div>
+                <p className="font-bold text-slate-900">Nouveau groupe</p>
+              </div>
+              <button onClick={() => setShowNewGroup(false)} className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-lg">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Nom du groupe</label>
+              <input
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-indigo-400 transition-colors"
+                placeholder="Ex: Cybercamp — Équipe dev"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Projet associé</label>
+              <select
+                value={newGroupProjectId}
+                onChange={(e) => setNewGroupProjectId(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-indigo-400 transition-colors"
+              >
+                <option value="">Choisir un projet...</option>
+                {groupProjects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.titre}</option>
+                ))}
+              </select>
+            </div>
+
+            <p className="text-xs text-slate-400">Tous les membres du projet sélectionné seront ajoutés automatiquement.</p>
+
+            <button
+              onClick={async () => {
+                if (!newGroupProjectId || creatingGroup) return;
+                setCreatingGroup(true);
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) { setCreatingGroup(false); return; }
+
+                // Créer la conversation groupe
+                const { data: conv } = await supabase.from("conversations").insert({
+                  project_id: newGroupProjectId,
+                  is_group: true,
+                  group_name: newGroupName.trim() || groupProjects.find((p) => p.id === newGroupProjectId)?.titre + " — Groupe",
+                }).select().maybeSingle();
+
+                if (conv) {
+                  // Ajouter le créateur comme participant
+                  await supabase.from("conversation_participants").insert({ conversation_id: conv.id, user_id: user.id });
+
+                  // Trouver les membres du projet via les conversations existantes
+                  const { data: convMembers } = await supabase
+                    .from("conversations")
+                    .select("profiles_founder(user_id), profiles_developer(user_id)")
+                    .eq("project_id", newGroupProjectId)
+                    .neq("is_group", true);
+
+                  const memberIds = new Set<string>([user.id]);
+                  (convMembers ?? []).forEach((c: { profiles_founder?: { user_id: string } | null; profiles_developer?: { user_id: string } | null }) => {
+                    if (c.profiles_founder?.user_id) memberIds.add(c.profiles_founder.user_id);
+                    if (c.profiles_developer?.user_id) memberIds.add(c.profiles_developer.user_id);
+                  });
+
+                  const otherMembers = [...memberIds].filter((uid) => uid !== user.id);
+                  if (otherMembers.length > 0) {
+                    await supabase.from("conversation_participants").insert(
+                      otherMembers.map((uid) => ({ conversation_id: conv.id, user_id: uid }))
+                    );
+                  }
+
+                  setShowNewGroup(false);
+                  setNewGroupName("");
+                  setNewGroupProjectId("");
+                  router.push(`/messages/${conv.id}`);
+                }
+                setCreatingGroup(false);
+              }}
+              disabled={creatingGroup || !newGroupProjectId}
+              className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
+              style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
+            >
+              {creatingGroup
+                ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                : <><Users size={15} /> Créer le groupe</>}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

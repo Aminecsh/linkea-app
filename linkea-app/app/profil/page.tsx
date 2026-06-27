@@ -69,6 +69,14 @@ export default function ProfilPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
 
+  // Edit project modal
+  const [editProject, setEditProject] = useState<Project | null>(null);
+  const [editTitre, setEditTitre] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editStack, setEditStack] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -163,6 +171,34 @@ export default function ProfilPage() {
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/connexion");
+  }
+
+  function openEditProject(p: Project) {
+    setEditTitre(p.titre ?? "");
+    setEditDesc(p.description ?? "");
+    setEditStack(p.stack_souhaitee ?? "");
+    setEditDeadline(p.deadline ?? "");
+    setEditProject(p);
+    setMenuOpenId(null);
+  }
+
+  async function saveEditProject() {
+    if (!editProject || editSaving || !editTitre.trim()) return;
+    setEditSaving(true);
+    const { error } = await supabase.from("projects").update({
+      titre: editTitre.trim(),
+      description: editDesc.trim() || null,
+      stack_souhaitee: editStack.trim() || null,
+      deadline: editDeadline.trim() || null,
+    }).eq("id", editProject.id);
+    if (!error) {
+      setProjects((prev) => prev.map((p) => p.id === editProject.id
+        ? { ...p, titre: editTitre.trim(), description: editDesc.trim(), stack_souhaitee: editStack.trim(), deadline: editDeadline.trim() }
+        : p
+      ));
+      setEditProject(null);
+    }
+    setEditSaving(false);
   }
 
   async function handleDeleteProject(projectId: string) {
@@ -507,7 +543,16 @@ export default function ProfilPage() {
                                   boxShadow: "0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
                                 }}
                               >
-                                {isActive && (
+                                {p.statut === "pending" && (
+                                  <button
+                                    onClick={() => openEditProject(p)}
+                                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-left transition-colors hover:bg-[rgba(0,0,0,0.03)]"
+                                    style={{ color: "var(--text-2)" }}
+                                  >
+                                    <Wrench size={14} strokeWidth={1.8} /> Modifier
+                                  </button>
+                                )}
+                              {isActive && (
                                   <button
                                     onClick={() => { setMenuOpenId(null); router.push(`/projets/${p.id}/gestion`); }}
                                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-left transition-colors hover:bg-[rgba(0,0,0,0.03)]"
@@ -657,6 +702,83 @@ export default function ProfilPage() {
       )}
 
       <BottomNav />
+
+      {/* ── Modal édition projet pending ── */}
+      {editProject && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center bg-black/50">
+          <div className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-6 flex flex-col gap-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <p className="text-base font-bold text-slate-900">Modifier le projet</p>
+              <button
+                onClick={() => setEditProject(null)}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 text-lg transition-colors"
+              >
+                ×
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Titre *</label>
+              <input
+                value={editTitre}
+                onChange={(e) => setEditTitre(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-pink-400 transition-colors"
+                placeholder="Titre du projet"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Description</label>
+              <textarea
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                rows={3}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-pink-400 transition-colors resize-none"
+                placeholder="Décris ton projet..."
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Stack souhaitée</label>
+              <input
+                value={editStack}
+                onChange={(e) => setEditStack(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-pink-400 transition-colors"
+                placeholder="ex: React, Node.js, PostgreSQL"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Sépare les technologies par des virgules</p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Deadline</label>
+              <input
+                type="date"
+                value={editDeadline}
+                onChange={(e) => setEditDeadline(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-pink-400 transition-colors"
+              />
+            </div>
+
+            <div className="flex gap-3 mt-1">
+              <button
+                onClick={() => setEditProject(null)}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={saveEditProject}
+                disabled={editSaving || !editTitre.trim()}
+                className="flex-1 py-3 rounded-xl text-sm font-bold text-white bg-pink-500 hover:bg-pink-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+              >
+                {editSaving
+                  ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

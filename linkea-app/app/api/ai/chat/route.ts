@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { checkUsage, trackUsage, MONTHLY_TOKEN_LIMIT } from "@/lib/ai-usage";
 
 const STATUT_LABELS: Record<string, string> = {
   a_venir: "À venir", en_cours: "En cours", termine: "Terminé",
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
   if (!authHeader?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 });
   }
+  const token = authHeader.slice(7);
 
   const { messages, projectId } = await req.json();
   if (!messages?.length) return new Response(JSON.stringify({ error: "Messages manquants" }), { status: 400 });
@@ -25,6 +27,16 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
+
+  const { data: { user } } = await supabase.auth.getUser(token);
+  if (user) {
+    const { ok, used } = await checkUsage(supabase, user.id);
+    if (!ok) {
+      return new Response(JSON.stringify({
+        error: `Limite mensuelle atteinte (${used.toLocaleString()} / ${MONTHLY_TOKEN_LIMIT.toLocaleString()} tokens). Reviens le mois prochain !`,
+      }), { status: 429 });
+    }
+  }
 
   let projectContext = "";
   if (projectId) {
@@ -153,6 +165,12 @@ Agile/Scrum avec sprints de 1-2 semaines, sauf si le founder précise une autre 
             }
           }
           controller.enqueue(encode("data: [DONE]\n\n"));
+          // Track token usage after stream
+          if (user) {
+            const final = await response.finalMessage();
+            const total = (final.usage?.input_tokens ?? 0) + (final.usage?.output_tokens ?? 0);
+            if (total > 0) await trackUsage(supabase, user.id, total);
+          }
         } catch (e) {
           controller.enqueue(encode(`data: ${JSON.stringify({ error: (e as Error).message })}\n\n`));
         } finally {

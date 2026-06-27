@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { trackUsage } from "@/lib/ai-usage";
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -10,6 +11,7 @@ export async function POST(req: NextRequest) {
   if (!authHeader?.startsWith("Bearer ")) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
+  const token = authHeader.slice(7);
 
   const { projectId } = await req.json();
   if (!projectId) return NextResponse.json({ error: "projectId manquant" }, { status: 400 });
@@ -19,6 +21,8 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
+
+  const { data: { user } } = await supabase.auth.getUser(token);
 
   const { data: project } = await supabase
     .from("projects")
@@ -58,6 +62,11 @@ Génère exactement 3 à 5 sprints. Réponds UNIQUEMENT en JSON valide avec ce f
 
     const content = response.content[0];
     if (content.type !== "text") return NextResponse.json({ error: "Réponse invalide" }, { status: 500 });
+
+    if (user) {
+      const total = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
+      if (total > 0) await trackUsage(supabase, user.id, total);
+    }
 
     try {
       return NextResponse.json(JSON.parse(content.text.trim()));

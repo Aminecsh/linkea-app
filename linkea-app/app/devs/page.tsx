@@ -89,6 +89,8 @@ export default function DevsPage() {
   const [confirmDev, setConfirmDev]   = useState<Dev | null>(null);
   const [modalProjectId, setModalProjectId] = useState<string | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [aiScores, setAiScores]       = useState<Record<string, { score: number; reason: string; strengths: string[]; concern: string | null }>>({});
+  const [aiLoading, setAiLoading]     = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -236,6 +238,41 @@ export default function DevsPage() {
       });
     }
     setPinning(false);
+  }
+
+  async function runAiMatching() {
+    if (!selectedProjectId || aiLoading || sortedDevs.length === 0) return;
+    setAiLoading(true);
+    setAiScores({});
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      const res = await fetch("/api/ai/matching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({
+          projectId: selectedProjectId,
+          devs: sortedDevs.slice(0, 15).map((d) => ({
+            id: d.id,
+            nom: d.nom,
+            competences: d.competences,
+            ecole: d.ecole,
+            dispo_heures_semaine: d.dispo_heures_semaine,
+            score: d.score,
+            reviewCount: d.reviewCount,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { console.error("[AI Matching]", data.error); return; }
+      const map: typeof aiScores = {};
+      for (const s of data.scores ?? []) map[s.devId] = s;
+      setAiScores(map);
+    } catch (e) {
+      console.error("[AI Matching]", e);
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   const currentPins = pinsMap[selectedProjectId ?? ""] ?? new Set<string>();
@@ -478,16 +515,31 @@ export default function DevsPage() {
                   );
                 })}
               </div>
-              <div
-                className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold"
-                style={pinsLeft === 0 ? {
-                  background: "rgba(0,0,0,0.04)", color: "var(--subtle)", border: "1px solid rgba(0,0,0,0.06)",
-                } : {
-                  background: "var(--rose-soft)", color: "var(--rose-hover)", border: "1px solid var(--rose-border)",
-                }}
-              >
-                <Pin size={11} strokeWidth={2} />
-                <span>{pinsLeft} restant{pinsLeft > 1 ? "s" : ""}</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={runAiMatching}
+                  disabled={aiLoading || !selectedProjectId}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
+                  style={{ background: "linear-gradient(135deg,#7c3aed,#4f46e5)", color: "#fff", boxShadow: "0 2px 8px rgba(124,58,237,0.3)" }}
+                  title="Scorer les devs avec l'IA"
+                >
+                  {aiLoading
+                    ? <span className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    : <span className="text-sm leading-none">✦</span>
+                  }
+                  {Object.keys(aiScores).length > 0 ? "Rescorer" : "IA"}
+                </button>
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold"
+                  style={pinsLeft === 0 ? {
+                    background: "rgba(0,0,0,0.04)", color: "var(--subtle)", border: "1px solid rgba(0,0,0,0.06)",
+                  } : {
+                    background: "var(--rose-soft)", color: "var(--rose-hover)", border: "1px solid var(--rose-border)",
+                  }}
+                >
+                  <Pin size={11} strokeWidth={2} />
+                  <span>{pinsLeft} restant{pinsLeft > 1 ? "s" : ""}</span>
+                </div>
               </div>
             </div>
           )}
@@ -611,13 +663,29 @@ export default function DevsPage() {
                             </p>
                           )}
                         </div>
-                        {dev.score !== undefined && (
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Star size={12} strokeWidth={1.5} fill="var(--amber)" style={{ color: "var(--amber)" }} />
-                            <span className="text-xs font-bold" style={{ color: "var(--text)" }}>{dev.score}</span>
-                            <span className="text-xs" style={{ color: "var(--subtle)" }}>({dev.reviewCount})</span>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {aiScores[dev.id] && (
+                            <div
+                              className="flex items-center gap-1 px-2 py-1 rounded-lg"
+                              style={{
+                                background: aiScores[dev.id].score >= 75 ? "rgba(16,185,129,0.1)" : aiScores[dev.id].score >= 50 ? "rgba(245,158,11,0.1)" : "rgba(0,0,0,0.05)",
+                                border: `1px solid ${aiScores[dev.id].score >= 75 ? "rgba(16,185,129,0.2)" : aiScores[dev.id].score >= 50 ? "rgba(245,158,11,0.2)" : "rgba(0,0,0,0.08)"}`,
+                              }}
+                              title={aiScores[dev.id].reason}
+                            >
+                              <span className="text-xs font-black" style={{ color: aiScores[dev.id].score >= 75 ? "var(--green)" : aiScores[dev.id].score >= 50 ? "var(--amber)" : "var(--subtle)" }}>
+                                ✦ {aiScores[dev.id].score}%
+                              </span>
+                            </div>
+                          )}
+                          {dev.score !== undefined && (
+                            <div className="flex items-center gap-1">
+                              <Star size={12} strokeWidth={1.5} fill="var(--amber)" style={{ color: "var(--amber)" }} />
+                              <span className="text-xs font-bold" style={{ color: "var(--text)" }}>{dev.score}</span>
+                              <span className="text-xs" style={{ color: "var(--subtle)" }}>({dev.reviewCount})</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {dispo && ds && (
