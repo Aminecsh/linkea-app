@@ -9,6 +9,7 @@ import {
   MessageCircle,
   Search,
   User,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -79,6 +80,8 @@ export default function BottomNav() {
     checkUnread();
   }, [pathname]);
 
+  if (role === "admin") return null;
+
   if (isBanned) {
     return (
       <div
@@ -100,6 +103,15 @@ export default function BottomNav() {
             <MessageCircle size={22} strokeWidth={2.2} style={{ color: "var(--rose)" }} />
             <span className="text-[10px] font-semibold tracking-tight" style={{ color: "var(--rose)" }}>
               Support
+            </span>
+          </button>
+          <button
+            onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }}
+            className="flex-1 flex flex-col items-center justify-center gap-[3px] transition-all duration-200 opacity-50 hover:opacity-80"
+          >
+            <LogOut size={20} strokeWidth={2} style={{ color: "var(--text)" }} />
+            <span className="text-[10px] font-semibold tracking-tight" style={{ color: "var(--muted)" }}>
+              Déconnexion
             </span>
           </button>
         </div>

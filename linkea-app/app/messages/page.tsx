@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
-import { MessageCircle, Briefcase, ChevronDown, ChevronUp, Send } from "lucide-react";
 
 type Conversation = {
   id: string;
@@ -21,42 +20,56 @@ type Conversation = {
   otherAvatarUrl?: string | null;
 };
 
-type SupportConv = {
-  id: string;
-  created_at: string;
-  lastMessage?: string;
-  unreadCount: number;
-};
+type SupportConv = { id: string; created_at: string; lastMessage?: string; unreadCount: number; };
+
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" };
 
 function formatTime(iso?: string): string {
   if (!iso) return "";
   const date = new Date(iso);
   const now  = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs  = now.getTime() - date.getTime();
   const diffMin = Math.floor(diffMs / 60000);
   const diffH   = Math.floor(diffMs / 3600000);
   const diffD   = Math.floor(diffMs / 86400000);
-
   if (diffMin < 1)  return "à l'instant";
   if (diffMin < 60) return `${diffMin} min`;
   if (diffH   < 24) return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-  if (diffD   < 7)  {
-    const days = ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."];
-    return days[date.getDay()];
-  }
+  if (diffD   < 7)  return ["Dim.", "Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam."][date.getDay()];
   return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
 export default function MessagesPage() {
   const router = useRouter();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [supportConv, setSupportConv] = useState<SupportConv | null>(null);
+  const [conversations,     setConversations]     = useState<Conversation[]>([]);
+  const [supportConv,       setSupportConv]       = useState<SupportConv | null>(null);
   const [adminSupportConvs, setAdminSupportConvs] = useState<{ id: string; userId: string; nom: string; lastMessage?: string; unreadCount: number }[]>([]);
-  const [isBanned, setIsBanned] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [archivesOpen, setArchivesOpen] = useState(false);
+  const [isBanned,          setIsBanned]          = useState(false);
+  const [banInfo,           setBanInfo]           = useState<{ type: string; raison: string; expires_at: string | null } | null>(null);
+  const [countdown,         setCountdown]         = useState<string | null>(null);
+  const [loading,           setLoading]           = useState(true);
+  const [role,              setRole]              = useState<string | null>(null);
+  const [userId,            setUserId]            = useState<string | null>(null);
+  const [archivesOpen,      setArchivesOpen]      = useState(false);
+
+  // Compte à rebours ban
+  useEffect(() => {
+    if (!banInfo?.expires_at) return;
+    function tick() {
+      const diff = new Date(banInfo!.expires_at!).getTime() - Date.now();
+      if (diff <= 0) { setCountdown("Expiration en cours…"); return; }
+      const j = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      if (j > 0) setCountdown(`${j}j ${h}h ${m}m ${s}s`);
+      else if (h > 0) setCountdown(`${h}h ${m}m ${s}s`);
+      else setCountdown(`${m}m ${s}s`);
+    }
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [banInfo]);
 
   useEffect(() => {
     async function load() {
@@ -64,23 +77,20 @@ export default function MessagesPage() {
       if (!user) { router.push("/connexion"); return; }
       setUserId(user.id);
 
-      // Vérifier ban
       const now = new Date().toISOString();
       const { data: ban } = await supabase
-        .from("bans").select("id").eq("user_id", user.id).eq("is_active", true)
+        .from("bans").select("id, type, raison, expires_at").eq("user_id", user.id).eq("is_active", true)
         .or(`expires_at.is.null,expires_at.gt.${now}`).limit(1).maybeSingle();
 
       if (ban) {
         setIsBanned(true);
-        const { data: sc } = await supabase
-          .from("support_conversations").select("id, created_at").eq("user_id", user.id).maybeSingle();
+        setBanInfo({ type: ban.type, raison: ban.raison, expires_at: ban.expires_at });
+        const { data: sc } = await supabase.from("support_conversations").select("id, created_at").eq("user_id", user.id).maybeSingle();
         if (sc) {
           const lastRead = localStorage.getItem(`lastRead_support_${sc.id}`) ?? "1970-01-01";
           const [{ data: lastMsgs }, { count: unread }] = await Promise.all([
-            supabase.from("support_messages").select("content, created_at, sender_id")
-              .eq("conversation_id", sc.id).order("created_at", { ascending: false }).limit(1),
-            supabase.from("support_messages").select("*", { count: "exact", head: true })
-              .eq("conversation_id", sc.id).neq("sender_id", user.id).gt("created_at", lastRead),
+            supabase.from("support_messages").select("content, created_at, sender_id").eq("conversation_id", sc.id).order("created_at", { ascending: false }).limit(1),
+            supabase.from("support_messages").select("*", { count: "exact", head: true }).eq("conversation_id", sc.id).neq("sender_id", user.id).gt("created_at", lastRead),
           ]);
           setSupportConv({ id: sc.id, created_at: sc.created_at, lastMessage: lastMsgs?.[0]?.content, unreadCount: unread ?? 0 });
         }
@@ -88,16 +98,13 @@ export default function MessagesPage() {
         return;
       }
 
-      const { data: roleData } = await supabase
-        .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+      const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       const r = roleData?.role ?? null;
       setRole(r);
 
-      // Admin → charger les conversations support
       if (r === "admin") {
-        const { data: sConvs } = await supabase
-          .from("support_conversations").select("id, user_id, created_at").order("created_at", { ascending: false });
-        if (sConvs && sConvs.length > 0) {
+        const { data: sConvs } = await supabase.from("support_conversations").select("id, user_id, created_at").order("created_at", { ascending: false });
+        if (sConvs?.length) {
           const userIds = sConvs.map((c: { user_id: string }) => c.user_id);
           const [{ data: fP }, { data: dP }] = await Promise.all([
             supabase.from("profiles_founder").select("user_id, nom").in("user_id", userIds),
@@ -121,23 +128,18 @@ export default function MessagesPage() {
       }
 
       let convData: Conversation[] = [];
-
       if (r === "founder") {
-        const { data: profile } = await supabase
-          .from("profiles_founder").select("id").eq("user_id", user.id).maybeSingle();
+        const { data: profile } = await supabase.from("profiles_founder").select("id").eq("user_id", user.id).maybeSingle();
         if (profile) {
-          const { data } = await supabase
-            .from("conversations")
+          const { data } = await supabase.from("conversations")
             .select("id, created_at, project_id, projects(titre, statut), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
             .eq("founder_id", profile.id);
           convData = (data as unknown as Conversation[]) ?? [];
         }
       } else if (r === "developer") {
-        const { data: profile } = await supabase
-          .from("profiles_developer").select("id").eq("user_id", user.id).maybeSingle();
+        const { data: profile } = await supabase.from("profiles_developer").select("id").eq("user_id", user.id).maybeSingle();
         if (profile) {
-          const { data } = await supabase
-            .from("conversations")
+          const { data } = await supabase.from("conversations")
             .select("id, created_at, project_id, projects(titre, statut), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
             .eq("developer_id", profile.id);
           convData = (data as unknown as Conversation[]) ?? [];
@@ -145,420 +147,250 @@ export default function MessagesPage() {
       }
 
       const enriched = await Promise.all(convData.map(async (c) => {
-        const lastRead = localStorage.getItem(`lastRead_${c.id}`) ?? "1970-01-01";
-
-        const otherUserId = r === "founder"
-          ? c.profiles_developer?.user_id
-          : c.profiles_founder?.user_id;
-
-        const otherTable = r === "founder" ? "profiles_developer" : "profiles_founder";
-
+        const lastRead    = localStorage.getItem(`lastRead_${c.id}`) ?? "1970-01-01";
+        const otherUserId = r === "founder" ? c.profiles_developer?.user_id : c.profiles_founder?.user_id;
+        const otherTable  = r === "founder" ? "profiles_developer" : "profiles_founder";
         const [{ data: lastMsgs }, { count: unread }, { data: otherProf }] = await Promise.all([
-          supabase.from("messages").select("content, created_at, sender_id")
-            .eq("conversation_id", c.id)
-            .order("created_at", { ascending: false })
-            .limit(1),
-          supabase.from("messages").select("*", { count: "exact", head: true })
-            .eq("conversation_id", c.id)
-            .neq("sender_id", user.id)
-            .gt("created_at", lastRead),
-          otherUserId
-            ? supabase.from(otherTable).select("avatar_url").eq("user_id", otherUserId).maybeSingle()
-            : Promise.resolve({ data: null }),
+          supabase.from("messages").select("content, created_at, sender_id").eq("conversation_id", c.id).order("created_at", { ascending: false }).limit(1),
+          supabase.from("messages").select("*", { count: "exact", head: true }).eq("conversation_id", c.id).neq("sender_id", user.id).gt("created_at", lastRead),
+          otherUserId ? supabase.from(otherTable).select("avatar_url").eq("user_id", otherUserId).maybeSingle() : Promise.resolve({ data: null }),
         ]);
-
-        return {
-          ...c,
-          lastMessage:     lastMsgs?.[0]?.content ?? null,
-          lastMessageTime: lastMsgs?.[0]?.created_at ?? c.created_at,
-          lastSenderId:    lastMsgs?.[0]?.sender_id ?? null,
-          unreadCount:     unread ?? 0,
-          otherAvatarUrl:  (otherProf as { avatar_url?: string } | null)?.avatar_url ?? null,
-        };
+        return { ...c, lastMessage: lastMsgs?.[0]?.content ?? null, lastMessageTime: lastMsgs?.[0]?.created_at ?? c.created_at, lastSenderId: lastMsgs?.[0]?.sender_id ?? null, unreadCount: unread ?? 0, otherAvatarUrl: (otherProf as { avatar_url?: string } | null)?.avatar_url ?? null };
       }));
-
-      // Trier par dernière activité
-      enriched.sort((a, b) =>
-        new Date(b.lastMessageTime ?? b.created_at).getTime() -
-        new Date(a.lastMessageTime ?? a.created_at).getTime()
-      );
-
+      enriched.sort((a, b) => new Date(b.lastMessageTime ?? b.created_at).getTime() - new Date(a.lastMessageTime ?? a.created_at).getTime());
       setConversations(enriched);
       setLoading(false);
     }
     load();
   }, [router]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)" }}>
-        <div className="page-header px-4 py-4">
-          <div className="max-w-2xl mx-auto flex items-center justify-between">
-            <div>
-              <div className="skeleton h-3 w-14 mb-2 rounded" />
-              <div className="skeleton h-7 w-32 rounded" />
-            </div>
-            <div className="skeleton w-9 h-9 rounded-full" />
-          </div>
-        </div>
-        <div className="max-w-2xl mx-auto w-full px-4 py-4 flex flex-col gap-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="card p-4 flex gap-3 items-center">
-              <div className="skeleton w-12 h-12 rounded-full shrink-0" />
-              <div className="flex-1 flex flex-col gap-2">
-                <div className="skeleton h-4 w-32 rounded" />
-                <div className="skeleton h-3 w-48 rounded" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  // ── Loading ──────────────────────────────────────────────────────────────────
+  if (loading) return (
+    <div style={{ minHeight: "100vh", background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${C.ink}`, borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 
   // ── Vue banni ────────────────────────────────────────────────────────────────
-  if (isBanned) {
-    return (
-      <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
-        <div className="page-header px-4 py-4">
-          <div className="max-w-2xl mx-auto">
-            <p className="label mb-1" style={{ color: "var(--rose)" }}>Compte suspendu</p>
-            <h1 className="text-xl font-bold" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>Support Linkea</h1>
-          </div>
+  if (isBanned) return (
+    <div style={{ minHeight: "100vh", background: C.canvas, paddingBottom: 80, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <style>{`.lk-conv:hover { background: ${C.canvas}; }`}</style>
+
+      <div style={{ background: C.surface, borderBottom: `1.5px solid ${C.hairline}`, padding: "18px 24px" }}>
+        <div style={{ maxWidth: 560, margin: "0 auto" }}>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.rose, margin: "0 0 4px" }}>Compte suspendu</p>
+          <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", color: C.ink, margin: 0 }}>Support Linkea</h1>
         </div>
-        <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-3">
-          <div className="rounded-2xl px-4 py-3 flex items-center gap-3"
-            style={{ background: "var(--rose-soft)", border: "1px solid var(--rose-border)" }}>
-            <span className="text-lg shrink-0">🚫</span>
-            <p className="text-sm font-medium" style={{ color: "var(--rose)" }}>
-              Ton compte est suspendu. Tu peux contacter le support ci-dessous.
+      </div>
+
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ background: C.surface, border: `1.5px solid ${C.rose}`, borderRadius: 16 }}>
+          <div style={{ padding: "16px 20px", borderBottom: banInfo?.type === "temp" || banInfo?.type === "permanent" ? `1px solid ${C.hairline}` : "none" }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: C.rose, margin: "0 0 4px" }}>
+              Compte {banInfo?.type === "permanent" ? "banni définitivement" : "suspendu temporairement"}
             </p>
+            {banInfo?.raison && <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>Motif : {banInfo.raison}</p>}
           </div>
-          {supportConv ? (
-            <div onClick={() => router.push(`/support/${supportConv.id}`)}
-              className="cursor-pointer active:scale-[0.99] transition-transform"
-              style={{ WebkitTapHighlightColor: "transparent" }}>
-              <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-                style={{
-                  background: "linear-gradient(180deg, #ffffff 0%, #fdfcfc 100%)",
-                  border: "1px solid var(--rose-border)",
-                  boxShadow: "0 2px 12px rgba(244,63,94,0.08), 0 1px 3px rgba(0,0,0,0.04)",
-                }}>
-                <div className="relative shrink-0">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base"
-                    style={{ background: "linear-gradient(135deg, #f43f5e, #e8304f)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}>
-                    L
-                  </div>
-                  {supportConv.unreadCount > 0 && (
-                    <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-white rounded-full px-1"
-                      style={{ background: "var(--rose)", fontSize: 10, fontWeight: 800 }}>
-                      {supportConv.unreadCount > 9 ? "9+" : supportConv.unreadCount}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-bold" style={{ color: "var(--text)" }}>Support Linkea</span>
-                  <p className="text-xs" style={{ color: "var(--subtle)" }}>Équipe Linkea</p>
-                  {supportConv.lastMessage && (
-                    <p className="text-xs truncate mt-0.5" style={{ color: "var(--muted)" }}>{supportConv.lastMessage}</p>
-                  )}
-                </div>
-                <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: "var(--border-2)", flexShrink: 0 }}>
-                  <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
+          {banInfo?.type === "temp" && banInfo.expires_at && countdown && (
+            <div style={{ padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: C.muted }}>Levée du ban dans</span>
+              <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 600, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{countdown}</span>
             </div>
-          ) : (
-            <div className="flex items-center justify-center py-10 rounded-2xl"
-              style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)" }}>
-              <p className="text-sm" style={{ color: "var(--muted)" }}>Conversation en cours de création...</p>
+          )}
+          {banInfo?.type === "permanent" && (
+            <div style={{ padding: "12px 20px" }}>
+              <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Cette suspension est définitive. Contacte le support pour contester.</p>
             </div>
           )}
         </div>
-        <BottomNav />
+
+        {supportConv ? (
+          <div onClick={() => router.push(`/support/${supportConv.id}`)} className="lk-conv"
+            style={{ background: C.surface, border: `1.5px solid ${supportConv.unreadCount > 0 ? C.rose : C.hairline}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "background 0.1s" }}>
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <div style={{ width: 42, height: 42, borderRadius: "50%", background: C.ink, color: "#fff", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>L</div>
+              {supportConv.unreadCount > 0 && (
+                <span style={{ position: "absolute", top: -2, right: -2, minWidth: 16, height: 16, borderRadius: "50%", background: C.rose, color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{supportConv.unreadCount}</span>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 2px" }}>Support Linkea</p>
+              {supportConv.lastMessage
+                ? <p style={{ fontSize: 12, color: C.muted, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{supportConv.lastMessage}</p>
+                : <p style={{ fontSize: 12, color: C.muted, margin: 0, fontStyle: "italic" }}>Démarrer la conversation…</p>
+              }
+            </div>
+            <span style={{ color: C.muted, fontSize: 18 }}>›</span>
+          </div>
+        ) : (
+          <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "32px", textAlign: "center" }}>
+            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>Conversation en cours de création…</p>
+          </div>
+        )}
+
+        <button onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }}
+          style={{ padding: "13px", borderRadius: 12, background: "none", border: `1.5px solid ${C.hairline}`, fontSize: 13, fontWeight: 600, color: C.muted, cursor: "pointer" }}>
+          Se déconnecter
+        </button>
       </div>
-    );
-  }
+      <BottomNav />
+    </div>
+  );
 
   // ── Vue admin ────────────────────────────────────────────────────────────────
   if (role === "admin") {
-    const totalUnreadAdmin = adminSupportConvs.reduce((s, c) => s + c.unreadCount, 0);
+    const totalUnread = adminSupportConvs.reduce((s, c) => s + c.unreadCount, 0);
     return (
-      <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
-        <div className="page-header px-4 py-4">
-          <div className="max-w-2xl mx-auto flex items-center justify-between">
-            <div>
-              <p className="label mb-1">Admin</p>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>Support</h1>
-                {totalUnreadAdmin > 0 && (
-                  <div className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-white"
-                    style={{ background: "var(--rose)", fontSize: 11, fontWeight: 800 }}>
-                    {totalUnreadAdmin}
-                  </div>
+      <div style={{ minHeight: "100vh", background: C.canvas, paddingBottom: 80, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+        <style>{`.lk-conv:hover { background: ${C.canvas}; }`}</style>
+
+        <header style={{ background: C.surface, borderBottom: `1.5px solid ${C.hairline}` }}>
+          <div style={{ maxWidth: 560, margin: "0 auto", padding: "16px 24px", display: "flex", alignItems: "center", gap: 12 }}>
+            <button onClick={() => router.push("/admin")}
+              style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 18, padding: "4px 6px" }}>←</button>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted, margin: "0 0 3px" }}>Admin</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, fontWeight: 600, letterSpacing: "-0.03em", color: C.ink, margin: 0 }}>Support</h1>
+                {totalUnread > 0 && (
+                  <span style={{ minWidth: 18, height: 18, borderRadius: "50%", background: C.rose, color: "#fff", fontSize: 10, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{totalUnread}</span>
                 )}
               </div>
             </div>
-            <NotificationBell />
           </div>
-        </div>
-        <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-2">
+        </header>
+
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
           {adminSupportConvs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 rounded-2xl mt-4"
-              style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)" }}>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-                style={{ background: "var(--rose-soft)", border: "1px solid var(--rose-border)" }}>
-                <MessageCircle size={28} style={{ color: "var(--rose)" }} />
-              </div>
-              <p className="font-bold text-base mb-1" style={{ color: "var(--text)" }}>Aucune conversation support</p>
+            <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "48px 32px", textAlign: "center", marginTop: 8 }}>
+              <p style={{ fontSize: 13, color: C.muted }}>Aucune conversation support pour l&apos;instant.</p>
             </div>
           ) : adminSupportConvs.map((c) => (
-            <div key={c.id} onClick={() => router.push(`/support/${c.id}`)}
-              className="cursor-pointer active:scale-[0.99] transition-transform"
-              style={{ WebkitTapHighlightColor: "transparent" }}>
-              <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-                style={{
-                  background: c.unreadCount > 0
-                    ? "linear-gradient(135deg, rgba(244,63,94,0.04) 0%, #ffffff 60%)"
-                    : "linear-gradient(180deg, #ffffff 0%, #fdfcfc 100%)",
-                  border: c.unreadCount > 0 ? "1px solid rgba(244,63,94,0.16)" : "1px solid rgba(0,0,0,0.075)",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)",
-                }}>
-                <div className="relative shrink-0">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base"
-                    style={{ background: "linear-gradient(135deg, #f43f5e, #8b5cf6)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}>
-                    {c.nom[0]?.toUpperCase() ?? "?"}
-                  </div>
-                  {c.unreadCount > 0 && (
-                    <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-white rounded-full px-1"
-                      style={{ background: "var(--rose)", fontSize: 10, fontWeight: 800 }}>
-                      {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                    </div>
-                  )}
+            <div key={c.id} onClick={() => router.push(`/support/${c.id}`)} className="lk-conv"
+              style={{ background: C.surface, border: `1.5px solid ${c.unreadCount > 0 ? C.rose : C.hairline}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "background 0.1s" }}>
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <div style={{ width: 42, height: 42, borderRadius: "50%", background: C.ink, color: "#fff", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {c.nom[0]?.toUpperCase() ?? "?"}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-sm font-bold" style={{ color: "var(--text)" }}>{c.nom}</span>
-                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
-                      style={{ background: "var(--rose-soft)", color: "var(--rose)", fontSize: 10 }}>
-                      Banni
-                    </span>
-                  </div>
-                  {c.lastMessage && (
-                    <p className="text-xs truncate" style={{ color: "var(--muted)" }}>{c.lastMessage}</p>
-                  )}
-                </div>
-                <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: "var(--border-2)", flexShrink: 0 }}>
-                  <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                {c.unreadCount > 0 && (
+                  <span style={{ position: "absolute", top: -2, right: -2, minWidth: 16, height: 16, borderRadius: "50%", background: C.rose, color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{c.unreadCount > 9 ? "9+" : c.unreadCount}</span>
+                )}
               </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                  <p style={{ fontSize: 14, fontWeight: c.unreadCount > 0 ? 700 : 600, color: c.unreadCount > 0 ? C.rose : C.ink, margin: 0 }}>{c.nom}</p>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 5, border: `1px solid ${C.hairline}`, color: C.muted }}>Suspendu</span>
+                </div>
+                {c.lastMessage && <p style={{ fontSize: 12, color: C.muted, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.lastMessage}</p>}
+              </div>
+              <span style={{ color: C.muted, fontSize: 18, flexShrink: 0 }}>›</span>
             </div>
           ))}
         </div>
-        <BottomNav />
       </div>
     );
   }
 
-  const ARCHIVED = ["livre", "termine"];
-  const active   = conversations.filter((c) => !ARCHIVED.includes(c.projects?.statut));
-  const archived = conversations.filter((c) =>  ARCHIVED.includes(c.projects?.statut));
+  // ── Vue utilisateur ──────────────────────────────────────────────────────────
+  const ARCHIVED  = ["livre", "termine"];
+  const active    = conversations.filter((c) => !ARCHIVED.includes(c.projects?.statut));
+  const archived  = conversations.filter((c) =>  ARCHIVED.includes(c.projects?.statut));
   const totalUnread = active.reduce((sum, c) => sum + c.unreadCount, 0);
 
   function ConvCard({ c, isArchived }: { c: Conversation; isArchived?: boolean }) {
-    const otherNom = role === "founder" ? c.profiles_developer?.nom : c.profiles_founder?.nom;
-    const initial  = otherNom?.[0]?.toUpperCase() ?? "?";
+    const otherNom  = role === "founder" ? c.profiles_developer?.nom : c.profiles_founder?.nom;
+    const initial   = otherNom?.[0]?.toUpperCase() ?? "?";
     const hasUnread = c.unreadCount > 0 && !isArchived;
     const isMine    = c.lastSenderId === userId;
 
     return (
-      <div
-        onClick={() => router.push(`/messages/${c.id}`)}
-        className="cursor-pointer active:scale-[0.99] transition-transform"
-        style={{ WebkitTapHighlightColor: "transparent" }}
-      >
-        <div
-          className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-          style={{
-            background: hasUnread
-              ? "linear-gradient(135deg, rgba(244,63,94,0.04) 0%, #ffffff 60%)"
-              : "linear-gradient(180deg, #ffffff 0%, #fdfcfc 100%)",
-            border: hasUnread
-              ? "1px solid rgba(244,63,94,0.16)"
-              : "1px solid rgba(0,0,0,0.075)",
-            boxShadow: hasUnread
-              ? "0 2px 12px rgba(244,63,94,0.08), 0 1px 3px rgba(0,0,0,0.04)"
-              : "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)",
-          }}
-        >
-          {/* Avatar */}
-          <div className="relative shrink-0">
-            {c.otherAvatarUrl ? (
-              <img
-                src={c.otherAvatarUrl}
-                alt={otherNom}
-                className="w-12 h-12 rounded-full object-cover"
-                style={{ border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}
-              />
-            ) : (
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base"
-                style={{
-                  background: isArchived
-                    ? "linear-gradient(135deg, #b0b0b8, #8a8a92)"
-                    : "linear-gradient(135deg, #f43f5e, #8b5cf6)",
-                  border: "2px solid rgba(255,255,255,0.9)",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-                }}
-              >
-                {initial}
-              </div>
-            )}
-            {/* Badge non-lu */}
-            {hasUnread && (
-              <div
-                className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-white rounded-full px-1"
-                style={{ background: "var(--rose)", fontSize: 10, fontWeight: 800, boxShadow: "0 1px 4px rgba(244,63,94,0.40)" }}
-              >
-                {c.unreadCount > 9 ? "9+" : c.unreadCount}
-              </div>
-            )}
+      <div onClick={() => router.push(`/messages/${c.id}`)} className="lk-conv"
+        style={{ background: C.surface, border: `1.5px solid ${hasUnread ? C.rose : C.hairline}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "background 0.1s" }}>
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          {c.otherAvatarUrl ? (
+            <img src={c.otherAvatarUrl} alt={otherNom} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: `1.5px solid ${C.hairline}` }} />
+          ) : (
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: isArchived ? C.muted : C.ink, color: "#fff", fontSize: 15, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {initial}
+            </div>
+          )}
+          {hasUnread && (
+            <span style={{ position: "absolute", top: -2, right: -2, minWidth: 16, height: 16, borderRadius: "50%", background: C.rose, color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>
+              {c.unreadCount > 9 ? "9+" : c.unreadCount}
+            </span>
+          )}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 3 }}>
+            <span style={{ fontSize: 14, fontWeight: hasUnread ? 700 : 600, color: isArchived ? C.muted : C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {otherNom ?? "—"}
+            </span>
+            <span style={{ fontSize: 11, color: hasUnread ? C.rose : C.muted, fontVariantNumeric: "tabular-nums", flexShrink: 0, fontWeight: hasUnread ? 700 : 400 }}>
+              {formatTime(c.lastMessageTime)}
+            </span>
           </div>
 
-          {/* Contenu */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2 mb-0.5">
-              <span
-                className="truncate text-sm"
-                style={{
-                  color: hasUnread ? "var(--text)" : isArchived ? "var(--muted)" : "var(--text)",
-                  fontWeight: hasUnread ? 700 : 600,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {otherNom ?? "—"}
-              </span>
-              <span
-                className="shrink-0 text-xs tabular-nums"
-                style={{ color: hasUnread ? "var(--rose)" : "var(--subtle)", fontWeight: hasUnread ? 700 : 400 }}
-              >
-                {formatTime(c.lastMessageTime)}
-              </span>
-            </div>
+          <p style={{ fontSize: 11, color: C.muted, margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {c.projects?.titre ?? "Projet"}
+          </p>
 
-            {/* Sous-titre projet */}
-            <div className="flex items-center gap-1 mb-1">
-              <Briefcase size={10} style={{ color: "var(--subtle)", flexShrink: 0 }} />
-              <span className="text-xs truncate" style={{ color: "var(--subtle)", fontWeight: 500 }}>
-                {c.projects?.titre ?? "Projet"}
-              </span>
-            </div>
-
-            {/* Dernier message */}
-            <div className="flex items-center gap-1">
-              {isMine && !isArchived && (
-                <Send size={10} style={{ color: "var(--subtle)", flexShrink: 0, transform: "rotate(0deg)" }} />
-              )}
-              <p
-                className="text-xs truncate"
-                style={{
-                  color: hasUnread ? "var(--text-2)" : "var(--muted)",
-                  fontWeight: hasUnread ? 600 : 400,
-                  fontStyle: !c.lastMessage ? "italic" : "normal",
-                }}
-              >
-                {c.lastMessage ?? "Démarrer la conversation..."}
-              </p>
-            </div>
-          </div>
-
-          {/* Chevron */}
-          <div style={{ color: "var(--border-2)", flexShrink: 0 }}>
-            <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
-              <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            {isMine && !isArchived && <span style={{ fontSize: 11, color: C.muted }}>↑</span>}
+            <p style={{ fontSize: 12, color: hasUnread ? C.ink : C.muted, fontWeight: hasUnread ? 600 : 400, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: !c.lastMessage ? "italic" : "normal" }}>
+              {c.lastMessage ?? "Démarrer la conversation…"}
+            </p>
           </div>
         </div>
+
+        <span style={{ color: C.muted, fontSize: 18, flexShrink: 0 }}>›</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+    <div style={{ minHeight: "100vh", background: C.canvas, paddingBottom: 80, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <style>{`.lk-conv:hover { background: ${C.canvas}; }`}</style>
 
-      {/* Header */}
-      <div className="page-header px-4 py-4">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
+      <header style={{ background: C.surface, borderBottom: `1.5px solid ${C.hairline}` }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <p className="label mb-1">Linkea</p>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>
-                Messages
-              </h1>
+            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted, margin: "0 0 4px" }}>Linkea</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", color: C.ink, margin: 0 }}>Messages</h1>
               {totalUnread > 0 && (
-                <div
-                  className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full text-white"
-                  style={{ background: "var(--rose)", fontSize: 11, fontWeight: 800 }}
-                >
-                  {totalUnread}
-                </div>
+                <span style={{ minWidth: 18, height: 18, borderRadius: "50%", background: C.rose, color: "#fff", fontSize: 10, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{totalUnread}</span>
               )}
             </div>
           </div>
           <NotificationBell />
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-2">
-
-        {/* État vide */}
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: "16px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
         {active.length === 0 && archived.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center py-16 rounded-2xl mt-4"
-            style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)" }}
-          >
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-              style={{ background: "var(--rose-soft)", border: "1px solid var(--rose-border)" }}
-            >
-              <MessageCircle size={28} style={{ color: "var(--rose)" }} />
-            </div>
-            <p className="font-bold text-base mb-1" style={{ color: "var(--text)", letterSpacing: "-0.02em" }}>
-              Aucune conversation
-            </p>
-            <p className="text-sm text-center px-8" style={{ color: "var(--muted)" }}>
-              {role === "founder"
-                ? "Tes échanges avec les devs apparaîtront ici."
-                : "Tes échanges avec les founders apparaîtront ici."}
+          <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "56px 32px", textAlign: "center", marginTop: 8 }}>
+            <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 600, color: C.ink, margin: "0 0 8px", letterSpacing: "-0.02em" }}>Aucune conversation</p>
+            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>
+              {role === "founder" ? "Tes échanges avec les devs apparaîtront ici." : "Tes échanges avec les founders apparaîtront ici."}
             </p>
           </div>
         ) : (
           <>
-            {/* Convs actives */}
-            {active.length > 0 && (
-              <div className="flex flex-col gap-2">
-                {active.map((c) => <ConvCard key={c.id} c={c} />)}
-              </div>
-            )}
+            {active.length > 0 && active.map((c) => <ConvCard key={c.id} c={c} />)}
 
-            {/* Archives collapsibles */}
             {archived.length > 0 && (
-              <div className="mt-2">
-                <button
-                  onClick={() => setArchivesOpen((v) => !v)}
-                  className="w-full flex items-center gap-2 py-3 px-1"
-                >
-                  <span className="label">Archives</span>
-                  <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-                  <span className="label">{archived.length}</span>
-                  {archivesOpen
-                    ? <ChevronUp size={13} style={{ color: "var(--subtle)" }} />
-                    : <ChevronDown size={13} style={{ color: "var(--subtle)" }} />
-                  }
+              <div style={{ marginTop: 8 }}>
+                <button onClick={() => setArchivesOpen((v) => !v)}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", background: "none", border: "none", cursor: "pointer" }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted }}>Archives</span>
+                  <div style={{ flex: 1, height: 1, background: C.hairline }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, fontVariantNumeric: "tabular-nums" }}>{archived.length}</span>
+                  <span style={{ fontSize: 12, color: C.muted }}>{archivesOpen ? "↑" : "↓"}</span>
                 </button>
-
                 {archivesOpen && (
-                  <div className="flex flex-col gap-2 opacity-75">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, opacity: 0.75 }}>
                     {archived.map((c) => <ConvCard key={c.id} c={c} isArchived />)}
                   </div>
                 )}

@@ -1,10 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
-import { Eye, EyeOff, ArrowLeft, AlertCircle, ArrowRight } from "lucide-react";
+import { logAudit } from "@/lib/audit";
+import { Eye, EyeOff, AlertCircle } from "lucide-react";
+
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" };
+
+const inputStyle: React.CSSProperties = {
+  width: "100%", padding: "13px 16px", borderRadius: 10,
+  border: `1.5px solid ${C.hairline}`, background: C.surface,
+  fontSize: 14, color: C.ink, outline: "none",
+  fontFamily: "system-ui, -apple-system, sans-serif",
+  boxSizing: "border-box",
+};
 
 export default function Connexion() {
   const router = useRouter();
@@ -14,18 +26,31 @@ export default function Connexion() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Redirige silencieusement si session déjà active
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return;
+      const { data: roleData } = await supabase
+        .from("user_roles").select("role").eq("user_id", session.user.id).single();
+      const role = roleData?.role;
+      if (role === "admin") router.push("/admin");
+      else router.push("/projets");
+    });
+  }, [router]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-
     if (signInError || !data.user) {
       setError(signInError?.message || "Email ou mot de passe incorrect.");
       setLoading(false);
       return;
     }
+
+    logAudit(data.user.id, "login", { email });
 
     const { data: roleData } = await supabase
       .from("user_roles").select("role").eq("user_id", data.user.id).single();
@@ -37,110 +62,111 @@ export default function Connexion() {
   }
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
-      style={{ background: "var(--bg)" }}
-    >
-      {/* Ambient blob */}
-      <div
-        className="fixed top-0 right-0 w-80 h-80 rounded-full pointer-events-none opacity-20"
-        style={{
-          background: "radial-gradient(circle, rgba(59,130,246,0.25) 0%, transparent 70%)",
-          filter: "blur(60px)",
-        }}
-        aria-hidden
-      />
+    <>
+      <div style={{ minHeight: "100vh", display: "flex", fontFamily: "system-ui, -apple-system, sans-serif" }}>
 
-      <div className="w-full max-w-sm relative z-10">
-        {/* Back */}
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-sm font-medium mb-8 transition-opacity hover:opacity-60"
-          style={{ color: "var(--muted)" }}
-        >
-          <ArrowLeft size={14} strokeWidth={2} /> Accueil
-        </Link>
+        {/* ── Panneau gauche : navy plein ── */}
+        <div className="hidden lg:flex" style={{ width: "45%", background: C.ink, flexDirection: "column", justifyContent: "space-between", padding: "48px 56px" }}>
 
-        {/* Card */}
-        <div className="card p-8">
-          <div className="mb-7">
-            <span className="tag tag-blue mb-4 inline-flex">Connexion</span>
-            <h1 className="text-3xl font-black tracking-tight leading-tight mb-2" style={{ color: "var(--text)" }}>
-              Content de te revoir
-            </h1>
-            <p className="text-sm" style={{ color: "var(--muted)" }}>Connecte-toi à ton espace Linkea.</p>
+          <Link href="/" style={{ textDecoration: "none", display: "inline-block" }}>
+            <Image src="/logo.png" alt="Linkea" width={74} height={34}
+              style={{ objectFit: "contain", height: 34, width: "auto", filter: "brightness(0) invert(1)" }} priority />
+          </Link>
+
+          {/* Timeline Dépose → Match → Build — une seule chose */}
+          <div>
+            <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, color: "#fff", letterSpacing: "-0.03em", lineHeight: 1.15, margin: "0 0 52px" }}>
+              Des projets qui<br />prennent vie
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              {[
+                { n: "01", label: "Dépose",  desc: "Décris ton projet en 5 min" },
+                { n: "02", label: "Match",   desc: "Reçois des profils sous 48h" },
+                { n: "03", label: "Build",   desc: "Construis avec ton dev" },
+              ].map(({ n, label, desc }, i) => (
+                <div key={n} style={{ display: "flex", gap: 20, paddingBottom: i < 2 ? 32 : 0, position: "relative" }}>
+                  {i < 2 && <div style={{ position: "absolute", left: 14, top: 28, bottom: 0, width: 1, background: "rgba(255,255,255,0.12)" }} />}
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.22)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.55)" }}>{n}</span>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: "#fff", margin: "0 0 3px" }}>{label}</p>
+                    <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0 }}>{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="input-field"
-            />
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                placeholder="Mot de passe"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="input-field pr-11"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-60"
-                style={{ color: "var(--subtle)" }}
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
-              </button>
-            </div>
-
-            {error && (
-              <div
-                className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl text-sm"
-                style={{
-                  background: "var(--red-soft)",
-                  border: "1px solid var(--red-border)",
-                  color: "var(--red)",
-                }}
-              >
-                <AlertCircle size={15} strokeWidth={2} className="shrink-0 mt-0.5" />
-                {error}
-              </div>
-            )}
-
-            <div className="text-right -mt-1">
-              <Link
-                href="/mot-de-passe-oublie"
-                className="text-xs font-medium transition-opacity hover:opacity-60"
-                style={{ color: "var(--muted)" }}
-              >
-                Mot de passe oublié ?
-              </Link>
-            </div>
-
-            <button type="submit" disabled={loading} className="btn-primary w-full mt-1">
-              {loading ? (
-                <span className="spinner" style={{ width: 17, height: 17, borderWidth: 2 }} />
-              ) : (
-                <>Se connecter <ArrowRight size={15} strokeWidth={2.2} /></>
-              )}
-            </button>
-          </form>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", margin: 0 }}>© 2026 Linkea</p>
         </div>
 
-        <p className="text-center text-sm mt-5" style={{ color: "var(--muted)" }}>
-          Pas encore de compte ?{" "}
-          <Link href="/inscription" className="font-bold transition-opacity hover:opacity-70" style={{ color: "var(--rose)" }}>
-            S&apos;inscrire
+        {/* ── Panneau droit : formulaire ── */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 32px", background: C.canvas, position: "relative" }}>
+
+          {/* Retour accueil */}
+          <Link href="/" style={{ position: "absolute", top: 24, left: 28, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: C.muted, textDecoration: "none" }}>
+            ← Accueil
           </Link>
-        </p>
+
+          {/* Logo mobile */}
+          <div className="lg:hidden" style={{ marginBottom: 36 }}>
+            <Link href="/" style={{ textDecoration: "none" }}>
+              <Image src="/logo.png" alt="Linkea" width={65} height={30} style={{ objectFit: "contain", height: 30, width: "auto" }} />
+            </Link>
+          </div>
+
+          <div style={{ width: "100%", maxWidth: 360 }}>
+            <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, color: C.ink, letterSpacing: "-0.03em", margin: "0 0 8px", lineHeight: 1.1 }}>
+              Content de te revoir
+            </h1>
+            <p style={{ fontSize: 14, color: C.muted, margin: "0 0 32px" }}>
+              Connecte-toi à ton espace Linkea.
+            </p>
+
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <input type="email" placeholder="Email" value={email}
+                onChange={(e) => setEmail(e.target.value)} required style={inputStyle} />
+
+              <div style={{ position: "relative" }}>
+                <input type={showPassword ? "text" : "password"} placeholder="Mot de passe" value={password}
+                  onChange={(e) => setPassword(e.target.value)} required
+                  style={{ ...inputStyle, paddingRight: 44 }} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}
+                  style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: C.muted, padding: 0, display: "flex" }}>
+                  {showPassword ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
+                </button>
+              </div>
+
+              {error && (
+                <div style={{ display: "flex", gap: 8, padding: "10px 14px", borderRadius: 10, background: "#FEF0F0", border: "1.5px solid #FCD0D0", color: "#C0392B", fontSize: 13 }}>
+                  <AlertCircle size={15} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+                  {error}
+                </div>
+              )}
+
+              <div style={{ textAlign: "right", marginTop: -4 }}>
+                <Link href="/mot-de-passe-oublie" style={{ fontSize: 12, color: C.muted, textDecoration: "none" }}>
+                  Mot de passe oublié ?
+                </Link>
+              </div>
+
+              <button type="submit" disabled={loading}
+                style={{ padding: "14px", borderRadius: 10, background: C.ink, color: "#fff", fontSize: 14, fontWeight: 600, border: "none", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "opacity 0.2s" }}>
+                {loading ? "Connexion…" : "Se connecter →"}
+              </button>
+            </form>
+
+            <p style={{ textAlign: "center", fontSize: 14, color: C.muted, margin: "24px 0 0" }}>
+              Pas encore de compte ?{" "}
+              <Link href="/inscription" style={{ fontWeight: 700, color: C.rose, textDecoration: "none" }}>
+                S&apos;inscrire
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

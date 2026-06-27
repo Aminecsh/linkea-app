@@ -4,12 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-type Message = {
-  id: string;
-  sender_id: string;
-  content: string;
-  created_at: string;
-};
+type Message = { id: string; sender_id: string; content: string; created_at: string; };
+
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" };
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
@@ -22,13 +19,13 @@ export default function SupportChatPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const bottomRef = useRef<HTMLDivElement>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [myId, setMyId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [content, setContent] = useState("");
-  const [sending, setSending] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [userNom, setUserNom] = useState("Utilisateur");
+  const [messages,  setMessages] = useState<Message[]>([]);
+  const [myId,      setMyId]     = useState<string | null>(null);
+  const [isAdmin,   setIsAdmin]  = useState(false);
+  const [content,   setContent]  = useState("");
+  const [sending,   setSending]  = useState(false);
+  const [loading,   setLoading]  = useState(true);
+  const [userNom,   setUserNom]  = useState("Utilisateur");
 
   useEffect(() => {
     async function load() {
@@ -36,18 +33,14 @@ export default function SupportChatPage() {
       if (!user) { router.push("/connexion"); return; }
       setMyId(user.id);
 
-      const { data: roleData } = await supabase
-        .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+      const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       const admin = roleData?.role === "admin";
       setIsAdmin(admin);
 
-      // Vérifier accès : admin OU propriétaire de la conv
-      const { data: conv } = await supabase
-        .from("support_conversations").select("id, user_id").eq("id", id).maybeSingle();
+      const { data: conv } = await supabase.from("support_conversations").select("id, user_id").eq("id", id).maybeSingle();
       if (!conv) { router.push("/messages"); return; }
       if (!admin && conv.user_id !== user.id) { router.push("/messages"); return; }
 
-      // Nom de l'utilisateur (pour l'admin)
       if (admin) {
         const [{ data: fP }, { data: dP }] = await Promise.all([
           supabase.from("profiles_founder").select("nom").eq("user_id", conv.user_id).maybeSingle(),
@@ -56,12 +49,9 @@ export default function SupportChatPage() {
         setUserNom(fP?.nom ?? dP?.nom ?? "Utilisateur");
       }
 
-      const { data: msgs } = await supabase
-        .from("support_messages").select("id, sender_id, content, created_at")
+      const { data: msgs } = await supabase.from("support_messages").select("id, sender_id, content, created_at")
         .eq("conversation_id", id).order("created_at", { ascending: true });
       setMessages(msgs ?? []);
-
-      // Marquer comme lu
       localStorage.setItem(`lastRead_support_${id}`, new Date().toISOString());
       setLoading(false);
     }
@@ -90,42 +80,31 @@ export default function SupportChatPage() {
     const text = content.trim();
     setContent("");
 
-    const { error } = await supabase.from("support_messages").insert({
-      conversation_id: id,
-      sender_id: myId,
-      content: text,
-    });
+    const { error } = await supabase.from("support_messages").insert({ conversation_id: id, sender_id: myId, content: text });
+    if (error) { console.error(error); setContent(text); setSending(false); return; }
 
-    if (error) {
-      console.error("support_messages insert error:", error);
-      setContent(text); // remettre le texte si échec
-      setSending(false);
-      return;
-    }
-
-    // Notifications (fire-and-forget, non bloquant)
     if (isAdmin) {
       supabase.from("support_conversations").select("user_id").eq("id", id).maybeSingle().then(({ data: conv }) => {
-        if (conv) supabase.from("notifications").insert({ user_id: conv.user_id, type: "support_reply", title: "💬 Réponse du support", body: text.length > 60 ? text.slice(0, 60) + "…" : text, link: `/support/${id}` });
+        if (conv) supabase.from("notifications").insert({ user_id: conv.user_id, type: "support_reply", title: "Réponse du support", body: text.length > 60 ? text.slice(0, 60) + "…" : text, link: `/support/${id}` });
       });
     } else {
       supabase.from("user_roles").select("user_id").eq("role", "admin").then(({ data: admins }) => {
         for (const a of admins ?? []) {
-          supabase.from("notifications").insert({ user_id: a.user_id, type: "support_message", title: "🆘 Message support", body: text.length > 60 ? text.slice(0, 60) + "…" : text, link: `/support/${id}` });
+          supabase.from("notifications").insert({ user_id: a.user_id, type: "support_message", title: "Message support", body: text.length > 60 ? text.slice(0, 60) + "…" : text, link: `/support/${id}` });
         }
       });
     }
-
     setSending(false);
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-6 h-6 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.canvas }}>
+      <div style={{ width: 24, height: 24, borderRadius: "50%", border: `2px solid ${C.ink}`, borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 
-  // Grouper les messages par jour
+  // Grouper par jour
   const groups: { day: string; msgs: Message[] }[] = [];
   for (const msg of messages) {
     const day = fmtDay(msg.created_at);
@@ -134,62 +113,87 @@ export default function SupportChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <button onClick={() => isAdmin ? router.push("/admin") : router.push("/messages")}
-            className="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100">←</button>
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center text-white font-black text-sm shrink-0">
+    <div style={{ minHeight: "100vh", background: C.canvas, display: "flex", flexDirection: "column", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <style>{`
+        .lk-textarea { resize: none; border: 1.5px solid ${C.hairline}; border-radius: 12px; padding: 11px 16px; font-size: 14px; font-family: system-ui, -apple-system, sans-serif; color: ${C.ink}; background: ${C.surface}; outline: none; width: 100%; box-sizing: border-box; transition: border-color 0.15s; max-height: 120px; }
+        .lk-textarea:focus { border-color: ${C.ink}; }
+        .lk-textarea::placeholder { color: ${C.muted}; }
+        .lk-send:focus-visible { outline: 2px solid ${C.rose}; outline-offset: 2px; }
+        .lk-back:focus-visible { outline: 2px solid ${C.rose}; outline-offset: 2px; border-radius: 8px; }
+      `}</style>
+
+      {/* HEADER */}
+      <header style={{ background: C.surface, borderBottom: `1.5px solid ${C.hairline}`, position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ maxWidth: 680, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", gap: 12 }}>
+          <button className="lk-back" onClick={() => router.push(isAdmin ? "/admin" : "/messages")}
+            style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 18, lineHeight: 1, padding: "4px 6px", flexShrink: 0 }}>←</button>
+
+          <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.ink, color: "#fff", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             {isAdmin ? userNom[0]?.toUpperCase() : "L"}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-slate-900 text-sm leading-tight truncate">
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 1px", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {isAdmin ? userNom : "Support Linkea"}
             </p>
-            <p className="text-xs text-slate-400">{isAdmin ? "Utilisateur suspendu" : "Équipe Linkea"}</p>
+            <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
+              {isAdmin ? "Conversation support" : "Équipe Linkea"}
+            </p>
           </div>
+
           {isAdmin && (
-            <span className="text-xs font-semibold bg-red-50 text-red-500 border border-red-100 px-2 py-1 rounded-full">Banni</span>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.hairline}`, color: C.muted, flexShrink: 0 }}>
+              Support
+            </span>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* Banner banni */}
+      {/* Bandeau compte suspendu */}
       {!isAdmin && (
-        <div className="bg-red-50 border-b border-red-100 px-4 py-2.5">
-          <p className="text-xs text-red-600 font-medium text-center max-w-2xl mx-auto">
-            🚫 Ton compte est suspendu — tu peux contacter le support ici
+        <div style={{ background: C.surface, borderBottom: `1.5px solid ${C.hairline}`, padding: "10px 24px" }}>
+          <p style={{ fontSize: 12, color: C.muted, textAlign: "center", margin: 0 }}>
+            Ton compte est suspendu — contacte le support pour en savoir plus
           </p>
         </div>
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 max-w-2xl mx-auto w-full">
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", maxWidth: 680, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
         {groups.map(({ day, msgs }) => (
           <div key={day}>
-            <div className="flex items-center gap-2 my-4">
-              <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-xs text-slate-400 capitalize">{day}</span>
-              <div className="flex-1 h-px bg-slate-200" />
+            {/* Séparateur de jour */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0 16px" }}>
+              <div style={{ flex: 1, height: 1, background: C.hairline }} />
+              <span style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "capitalize", letterSpacing: "0.3px" }}>{day}</span>
+              <div style={{ flex: 1, height: 1, background: C.hairline }} />
             </div>
+
             {msgs.map((msg) => {
               const isMe = msg.sender_id === myId;
-              const isSupport = !isMe;
               return (
-                <div key={msg.id} className={`flex mb-2 ${isMe ? "justify-end" : "justify-start"}`}>
-                  {isSupport && (
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-red-400 to-rose-500 flex items-center justify-center text-white text-xs font-black shrink-0 mr-2 mt-auto">
+                <div key={msg.id} style={{ display: "flex", marginBottom: 10, justifyContent: isMe ? "flex-end" : "flex-start" }}>
+                  {/* Avatar côté récepteur */}
+                  {!isMe && (
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: C.ink, color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 8, alignSelf: "flex-end", marginBottom: 2 }}>
                       {isAdmin ? userNom[0]?.toUpperCase() : "L"}
                     </div>
                   )}
-                  <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                    isMe
-                      ? "bg-red-500 text-white rounded-br-md"
-                      : "bg-white border border-slate-200 text-slate-800 rounded-bl-md"
-                  }`}>
+
+                  <div style={{
+                    maxWidth: "72%",
+                    padding: "10px 14px",
+                    borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                    fontSize: 14,
+                    lineHeight: 1.55,
+                    background: isMe ? C.ink : C.surface,
+                    color: isMe ? "#fff" : C.ink,
+                    border: isMe ? "none" : `1.5px solid ${C.hairline}`,
+                  }}>
                     {msg.content}
-                    <p className={`text-[10px] mt-1 ${isMe ? "text-red-200" : "text-slate-400"}`}>{fmtTime(msg.created_at)}</p>
+                    <p style={{ fontSize: 10, margin: "4px 0 0", color: isMe ? "rgba(255,255,255,0.5)" : C.muted, textAlign: "right" }}>
+                      {fmtTime(msg.created_at)}
+                    </p>
                   </div>
                 </div>
               );
@@ -199,21 +203,21 @@ export default function SupportChatPage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="bg-white border-t border-slate-200 px-4 py-3 sticky bottom-0">
-        <div className="max-w-2xl mx-auto flex gap-2 items-end">
-          <textarea
+      {/* Zone de saisie */}
+      <div style={{ background: C.surface, borderTop: `1.5px solid ${C.hairline}`, padding: "14px 24px", position: "sticky", bottom: 0 }}>
+        <div style={{ maxWidth: 680, margin: "0 auto", display: "flex", gap: 10, alignItems: "flex-end" }}>
+          <textarea className="lk-textarea"
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
             rows={1}
-            placeholder={isAdmin ? `Répondre à ${userNom}...` : "Écrire au support..."}
-            className="flex-1 resize-none border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:border-red-300 transition-colors"
-            style={{ maxHeight: "120px" }}
+            placeholder={isAdmin ? `Répondre à ${userNom}…` : "Écrire au support…"}
           />
-          <button onClick={send} disabled={!content.trim() || sending}
-            className="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 disabled:opacity-40 flex items-center justify-center text-white transition-colors shrink-0">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
+          <button className="lk-send" onClick={send} disabled={!content.trim() || sending}
+            style={{ width: 40, height: 40, borderRadius: "50%", background: content.trim() ? C.ink : C.hairline, border: "none", cursor: content.trim() ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill={content.trim() ? "#fff" : C.muted}>
+              <path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
+            </svg>
           </button>
         </div>
       </div>
