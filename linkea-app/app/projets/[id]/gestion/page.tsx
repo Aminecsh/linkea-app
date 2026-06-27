@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AIPanel, { type RoadmapSprint } from "@/components/AIPanel";
+import { sendNotif } from "@/lib/notifications";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -116,6 +118,7 @@ export default function GestionPage() {
   const [editAssigne, setEditAssigne] = useState("");
 
   // Modal sprint
+  const [showAIPanel, setShowAIPanel] = useState(false);
   const [showSprintModal, setShowSprintModal] = useState(false);
   const [sprintNom, setSprintNom]     = useState("");
   const [sprintObj, setSprintObj]     = useState("");
@@ -276,6 +279,25 @@ export default function GestionPage() {
     };
     const { data } = await supabase.from("tasks").insert(payload).select().maybeSingle();
     if (data) setTasks((prev) => [...prev, data as Task]);
+
+    // Notifier tous les autres membres du projet
+    console.log("[notif] members:", members, "userId:", userId, "taskAssigne:", taskAssigne);
+    const assigneeName = taskAssigne ? members.find((m) => m.user_id === taskAssigne)?.nom : null;
+    for (const member of members.filter((m) => m.user_id !== userId)) {
+      const isAssignee = member.user_id === taskAssigne;
+      sendNotif({
+        userId: member.user_id,
+        projectId,
+        type: "task_assigned",
+        title: isAssignee
+          ? `📌 Tâche assignée : "${taskTitre.trim()}"`
+          : `📋 Nouvelle tâche : "${taskTitre.trim()}"`,
+        body: isAssignee
+          ? `${projectTitre} · Tu es assigné(e) à cette tâche${taskPrio === "haute" ? " — priorité haute 🔴" : ""}.`
+          : `${projectTitre} · Créée${assigneeName ? ` et assignée à ${assigneeName}` : ""}${taskPrio === "haute" ? " — priorité haute 🔴" : ""}.`,
+      });
+    }
+
     setTaskTitre(""); setTaskDesc(""); setTaskPrio("normale");
     setTaskSprint(""); setTaskAssigne(""); setTaskDue("");
     setShowTaskModal(false); setSavingTask(false);
@@ -290,6 +312,18 @@ export default function GestionPage() {
     await supabase.from("tasks").update({ statut: newStatut }).eq("id", task.id);
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, statut: newStatut } : t));
     if (panelTask?.id === task.id) setPanelTask((p) => p ? { ...p, statut: newStatut } : null);
+
+    const other = members.find((m) => m.user_id !== userId);
+    if (other) {
+      const labels: Record<string, string> = { todo: "À faire", en_cours: "En cours", review: "En review", done: "Terminé" };
+      sendNotif({
+        userId: other.user_id,
+        projectId,
+        type: "task_status",
+        title: `Tâche "${task.titre}" → ${labels[newStatut]}`,
+        body: `${projectTitre} · Passage de "${labels[task.statut]}" à "${labels[newStatut]}"`,
+      });
+    }
   }
 
   async function deleteTask(id: string) {
@@ -315,6 +349,37 @@ export default function GestionPage() {
   async function updateSprintStatut(sprint: Sprint, statut: Sprint["statut"]) {
     await supabase.from("sprints").update({ statut }).eq("id", sprint.id);
     setSprints((prev) => prev.map((s) => s.id === sprint.id ? { ...s, statut } : s));
+
+    const other = members.find((m) => m.user_id !== userId);
+    console.log("[notif sprint] members:", members, "other:", other);
+    if (other) {
+      const labels: Record<string, string> = { a_venir: "À venir", en_cours: "En cours", termine: "Terminé" };
+      const icons: Record<string, string> = { en_cours: "🚀", termine: "🏁", a_venir: "📅" };
+      sendNotif({
+        userId: other.user_id,
+        projectId,
+        type: "sprint_status",
+        title: `${icons[statut] ?? "🗓"} Sprint "${sprint.nom}" — ${labels[statut]}`,
+        body: `${projectTitre} · Le sprint est maintenant "${labels[statut]}".`,
+      });
+    }
+  }
+
+  // ── Roadmap IA ───────────────────────────────────────────────────────────────
+
+  async function handleRoadmapGenerated(aiSprints: RoadmapSprint[]) {
+    const today = new Date();
+    let cursor = new Date(today);
+    for (const s of aiSprints) {
+      const debut = cursor.toISOString().slice(0, 10);
+      cursor.setDate(cursor.getDate() + (s.duree_jours || 14));
+      const fin = cursor.toISOString().slice(0, 10);
+      const { data: newSprint } = await supabase.from("sprints").insert({
+        project_id: projectId, nom: s.nom, objectif: s.objectif,
+        date_debut: debut, date_fin: fin, statut: "a_venir",
+      }).select().maybeSingle();
+      if (newSprint) setSprints(prev => [...prev, newSprint as Sprint]);
+    }
   }
 
   // ── Fichiers ─────────────────────────────────────────────────────────────────
@@ -410,6 +475,14 @@ export default function GestionPage() {
             {role === "founder" && activeTab !== "fichiers" && (
               <button onClick={() => setShowSprintModal(true)} className="btn-ghost px-4 py-2 text-sm shrink-0">+ Sprint</button>
             )}
+            <button
+              onClick={() => setShowAIPanel(true)}
+              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-xl text-white text-base font-bold transition-all hover:scale-105"
+              style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}
+              title="Assistant IA"
+            >
+              ✦
+            </button>
           </div>
 
           {/* Tabs */}
@@ -909,6 +982,16 @@ export default function GestionPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ── Panel IA ────────────────────────────────────────────────────────── */}
+      {showAIPanel && (
+        <AIPanel
+          projectId={projectId}
+          projectTitre={projectTitre}
+          onClose={() => setShowAIPanel(false)}
+          onRoadmapGenerated={handleRoadmapGenerated}
+        />
       )}
 
       {/* ── Modal Upload ────────────────────────────────────────────────────── */}
