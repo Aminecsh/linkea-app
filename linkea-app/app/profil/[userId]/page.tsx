@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import {
-  ArrowLeft, Star, Clock, GitBranch, Link2, ExternalLink,
+  ArrowLeft, ArrowRight, Star, Clock, GitBranch, Link2, ExternalLink,
   MessageCircle, Pencil, Briefcase, GraduationCap, Check,
-  Award, Zap, Pin, X, ChevronRight, Flag, Camera, Save,
+  Award, Zap, Pin, X, ChevronRight, Flag, Camera, Save, FileText, LogOut,
 } from "lucide-react";
 import ReportModal from "@/components/ReportModal";
+import BottomNav from "@/components/BottomNav";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Experience     = { id: string; titre: string; entreprise: string; date_debut: string; date_fin?: string; description?: string; };
@@ -18,6 +19,8 @@ type FounderProfile = { id: string; user_id: string; nom: string; ecole?: string
 type Review         = { id: string; rating: number; comment?: string | null; created_at: string; reviewer_id: string; project_id: string; project_titre?: string; reviewer_nom?: string; reviewer_role?: string; };
 type Project        = { id: string; titre: string; statut: string; stack_souhaitee?: string; deadline?: string; };
 type PinProject     = { id: string; titre: string; pinsCount: number; alreadyPinned: boolean; };
+type MyCandidature  = { id: string; statut: string; project_id: string; projects: { titre: string; description: string; stack_souhaitee: string; deadline: string; }; };
+type MyDevFilterKey = "all" | "pending" | "accepted" | "refused";
 
 const RATING_LABEL  = ["", "Décevant", "Passable", "Bien", "Très bien", "Excellent !"];
 const FR_STOP       = new Set(["avec","pour","dans","une","des","les","pas","mais","tout","très","bien","plus","aussi","cette","donc","avoir","être","cela","fait","même","comme","nous","vous","ils","elles","leur","leurs","sont","était","quand","sans","plus","quoi","dont","cette","celui","celle"]);
@@ -54,6 +57,57 @@ function StarRating({ rating, count, size = "sm" }: { rating: number; count?: nu
         ))}
       </div>
       {count !== undefined && <span style={{ fontSize: 11, color: "var(--subtle)" }}>({count})</span>}
+    </div>
+  );
+}
+
+// ── Tokens ────────────────────────────────────────────────────────────────────
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", surface: "#FFFFFF" };
+
+const STATUT_CAND_LABEL: Record<string, string> = { pending: "En attente", accepted: "Acceptée", refused: "Refusée" };
+const MY_DEV_TABS: { key: MyDevFilterKey; label: string }[] = [
+  { key: "all",      label: "Toutes"     },
+  { key: "pending",  label: "En attente" },
+  { key: "accepted", label: "Acceptées"  },
+  { key: "refused",  label: "Refusées"   },
+];
+
+function CandPill({ children }: { children: React.ReactNode }) {
+  return <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 7, border: `1px solid ${C.hairline}`, color: C.muted }}>{children}</span>;
+}
+
+function CandStatusPill({ statut }: { statut: string }) {
+  const isGood = statut === "accepted";
+  const isBad  = statut === "refused";
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 7,
+      border: `1px solid ${isGood ? "rgba(26,33,56,0.25)" : isBad ? "rgba(212,83,126,0.25)" : C.hairline}`,
+      color: isGood ? C.ink : isBad ? C.rose : C.muted }}>
+      {STATUT_CAND_LABEL[statut] ?? statut}
+    </span>
+  );
+}
+
+function CandTimeline({ statut }: { statut: string }) {
+  const steps = ["Candidaté", "Examiné", "Décision"];
+  const idx   = statut === "pending" ? 1 : statut === "accepted" || statut === "refused" ? 2 : 0;
+  return (
+    <div style={{ display: "flex", alignItems: "center", paddingTop: 12, marginTop: 12, borderTop: `1px solid ${C.hairline}` }}>
+      {steps.map((s, i) => {
+        const done    = i < idx;
+        const current = i === idx;
+        return (
+          <div key={s} style={{ display: "flex", alignItems: "center", flex: i < steps.length - 1 ? 1 : "none" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 }}>
+              <div style={{ width: 7, height: 7, borderRadius: "50%", border: `1.5px solid ${done || current ? C.ink : C.hairline}`, background: done ? C.ink : "transparent" }} />
+              <span style={{ fontSize: 9, fontWeight: 600, color: done || current ? C.ink : C.muted, letterSpacing: "0.02em", whiteSpace: "nowrap" }}>{s}</span>
+            </div>
+            {i < steps.length - 1 && (
+              <div style={{ flex: 1, height: 1, background: done ? C.ink : C.hairline, margin: "0 4px", marginBottom: 13 }} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -98,6 +152,9 @@ export default function PublicProfilePage() {
   const [expF, setExpF]   = useState({ titre: "", entreprise: "", date_debut: "", date_fin: "", description: "" });
   const [formF, setFormF] = useState({ diplome: "", etablissement: "", annee: "", description: "" });
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [myCandidatures, setMyCandidatures]   = useState<MyCandidature[]>([]);
+  const [myDevFilter, setMyDevFilter]         = useState<MyDevFilterKey>("all");
+  const [myContractMap, setMyContractMap]     = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pin flow (founder → dev)
@@ -158,6 +215,17 @@ export default function PublicProfilePage() {
           .map((c) => c.projects as unknown as Project)
           .filter((p) => p && ["livre","termine","matched","en_cours"].includes(p.statut));
         setProjects(done);
+
+        if (user && user.id === userId) {
+          const { data: allCands } = await supabase.from("candidatures")
+            .select("id, statut, project_id, projects(titre, description, stack_souhaitee, deadline)")
+            .eq("developer_id", prof.id).order("created_at", { ascending: false });
+          setMyCandidatures((allCands as unknown as MyCandidature[]) ?? []);
+          const { data: devContracts } = await supabase.from("contracts").select("id, project_id").eq("developer_id", prof.id);
+          const cMap: Record<string, string> = {};
+          (devContracts ?? []).forEach((c) => { cMap[c.project_id] = c.id; });
+          setMyContractMap(cMap);
+        }
 
         if (currentUserId) {
           const { data: myFounder } = await supabase
@@ -369,191 +437,227 @@ export default function PublicProfilePage() {
   const canPin       = currentUserRole === "founder" && isDevProfile && !isMe;
   const alreadyPinned = pinProjects.some((p) => p.alreadyPinned);
   const selectedPinProj = pinProjects.find((p) => p.id === pinProjectId);
+  const myDevCandFiltered = myDevFilter === "all" ? myCandidatures : myCandidatures.filter((c) => c.statut === myDevFilter);
+  const myDevPending      = myCandidatures.filter((c) => c.statut === "pending").length;
+  const myDevAccepted     = myCandidatures.filter((c) => c.statut === "accepted").length;
 
   // ── Mode édition ─────────────────────────────────────────────────────────────
   if (editing && isMe) {
-    const isFounder = targetRole === "founder";
+    const isFounderEdit = targetRole === "founder";
     const prof = devProfile ?? founderProfile;
+
+    const sCard:  React.CSSProperties = { background: "#fff", border: "1px solid #ECE7DD", borderRadius: 16, padding: "20px 20px" };
+    const sEye:   React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", margin: "0 0 14px" };
+    const sLabel: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#8A8579", display: "block", marginBottom: 6 };
+    const sInput: React.CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 500, outline: "none", boxSizing: "border-box" };
+    const sNavy:  React.CSSProperties = { background: "#1A2138", color: "#fff", border: "none", borderRadius: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 };
+    const sGhost: React.CSSProperties = { background: "#fff", color: "#1A2138", border: "1px solid #ECE7DD", borderRadius: 12, fontWeight: 600, cursor: "pointer" };
+    const sIconBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 8, border: "1px solid #ECE7DD", background: "#fff", color: "#8A8579", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
+
     return (
-      <div className="min-h-screen pb-10" style={{ background: "var(--bg)" }}>
-        {/* Header édition */}
-        <div className="page-header px-4 py-3" style={{ position: "sticky", top: 0, zIndex: 10 }}>
-          <div className="max-w-2xl mx-auto flex items-center justify-between">
-            <button onClick={() => setEditing(false)} className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
-              ← Annuler
+      <div style={{ minHeight: "100vh", background: "#FAF8F4", paddingBottom: 40 }}>
+        <style>{`
+          .lk-edit-input:focus { outline: 2px solid #D4537E; outline-offset: -1px; border-color: #D4537E !important; }
+          .lk-edit-navy:hover  { background: #2A3252 !important; }
+          .lk-edit-ghost:hover { border-color: #1A2138 !important; }
+          .lk-edit-icon:hover  { background: #FAF8F4 !important; border-color: #1A2138 !important; }
+        `}</style>
+
+        {/* Header sticky */}
+        <div style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(255,255,255,0.94)", backdropFilter: "blur(20px)", borderBottom: "1px solid #ECE7DD", padding: "12px 20px" }}>
+          <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <button onClick={() => setEditing(false)} className="lk-edit-ghost" style={{ ...sGhost, padding: "8px 14px", fontSize: 13 }}>
+              Annuler
             </button>
-            <h1 className="text-base font-bold" style={{ color: "var(--text)", letterSpacing: "-0.02em" }}>Modifier le profil</h1>
-            <button onClick={saveEdit} disabled={saving} className="btn-primary text-sm" style={{ padding: "8px 16px" }}>
-              {saving ? "..." : <><Save size={13} strokeWidth={2} style={{ display: "inline", marginRight: 4 }} />Enregistrer</>}
+            <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, color: "#1A2138", margin: 0, letterSpacing: "-0.02em" }}>
+              Modifier le profil
+            </h1>
+            <button onClick={saveEdit} disabled={saving} className="lk-edit-navy" style={{ ...sNavy, padding: "8px 16px", fontSize: 13, opacity: saving ? 0.6 : 1 }}>
+              <Save size={13} strokeWidth={2} />{saving ? "..." : "Enregistrer"}
             </button>
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-3">
+        <div style={{ maxWidth: 640, margin: "0 auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
 
           {/* Photo */}
-          <div className="card p-5">
-            <p className="label mb-3">Photo de profil</p>
-            <div className="flex items-center gap-4">
-              <div className="relative group shrink-0 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                {prof?.avatar_url ? (
-                  <img src={prof.avatar_url} alt={prof.nom} className="avatar w-20 h-20" />
-                ) : (
-                  <div className="avatar-placeholder w-20 h-20 text-2xl" style={{ background: isFounder ? "linear-gradient(135deg, #f43f5e, #8b5cf6)" : "linear-gradient(135deg, #3b82f6, #6366f1)" }}>
-                    {prof?.nom?.[0]?.toUpperCase() ?? "?"}
-                  </div>
-                )}
-                <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Camera size={18} color="white" strokeWidth={2} />
+          <div style={sCard}>
+            <p style={sEye}>Photo de profil</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ position: "relative", cursor: "pointer", flexShrink: 0 }} onClick={() => fileInputRef.current?.click()}>
+                <div style={{ width: 72, height: 72, borderRadius: 12, background: "#1A2138", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {prof?.avatar_url
+                    ? <img src={prof.avatar_url} alt={prof.nom} style={{ width: 72, height: 72, objectFit: "cover" }} />
+                    : <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 28, fontWeight: 600, color: "#fff", userSelect: "none", lineHeight: 1 }}>{prof?.nom?.[0]?.toUpperCase() ?? "?"}</span>
+                  }
+                </div>
+                <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")} onMouseLeave={(e) => (e.currentTarget.style.opacity = "0")}>
+                  <Camera size={16} color="#fff" strokeWidth={2} />
                 </div>
               </div>
-              <button onClick={() => fileInputRef.current?.click()} className="btn-ghost text-sm px-4 py-2">
+              <button onClick={() => fileInputRef.current?.click()} className="lk-edit-ghost" style={{ ...sGhost, padding: "8px 16px", fontSize: 13 }}>
                 {uploadingAvatar ? "Envoi..." : "Changer la photo"}
               </button>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: "none" }} />
             </div>
           </div>
 
-          {/* Infos de base */}
-          <div className="card p-5 flex flex-col gap-3">
-            <p className="label">Informations</p>
+          {/* Informations */}
+          <div style={{ ...sCard, display: "flex", flexDirection: "column", gap: 14 }}>
+            <p style={sEye}>Informations</p>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--muted)" }}>Nom complet</label>
-              <input value={editNom} onChange={(e) => setEditNom(e.target.value)} className="input" placeholder="Ton nom" />
+              <label style={sLabel}>Nom complet</label>
+              <input value={editNom} onChange={(e) => setEditNom(e.target.value)} placeholder="Ton nom" className="lk-edit-input" style={sInput} />
             </div>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--muted)" }}>École / Université</label>
-              <input value={editEcole} onChange={(e) => setEditEcole(e.target.value)} className="input" placeholder="HEC, 42, EPITECH..." />
+              <label style={sLabel}>École / Université</label>
+              <input value={editEcole} onChange={(e) => setEditEcole(e.target.value)} placeholder="HEC, 42, EPITECH..." className="lk-edit-input" style={sInput} />
             </div>
             <div>
-              <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--muted)" }}>Bio</label>
-              <textarea value={editBio} onChange={(e) => setEditBio(e.target.value)} rows={3} maxLength={300} className="input resize-none" placeholder="Présente-toi..." />
+              <label style={sLabel}>Bio</label>
+              <textarea value={editBio} onChange={(e) => setEditBio(e.target.value)} rows={3} maxLength={300} placeholder="Présente-toi..." className="lk-edit-input" style={{ ...sInput, resize: "none" }} />
             </div>
           </div>
 
           {/* Liens & dispo (dev only) */}
-          {!isFounder && (
-            <div className="card p-5 flex flex-col gap-3">
-              <p className="label">Liens & disponibilité</p>
-              <input value={editGithub} onChange={(e) => setEditGithub(e.target.value)} className="input" placeholder="GitHub URL" />
-              <input value={editLinkedin} onChange={(e) => setEditLinkedin(e.target.value)} className="input" placeholder="LinkedIn URL" />
+          {!isFounderEdit && (
+            <div style={{ ...sCard, display: "flex", flexDirection: "column", gap: 14 }}>
+              <p style={sEye}>Liens & disponibilité</p>
               <div>
-                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--muted)" }}>Heures disponibles / semaine</label>
-                <input type="number" value={editDispo} onChange={(e) => setEditDispo(Number(e.target.value))} className="input w-32" placeholder="h/sem" />
+                <label style={sLabel}>GitHub</label>
+                <input value={editGithub} onChange={(e) => setEditGithub(e.target.value)} placeholder="https://github.com/…" className="lk-edit-input" style={sInput} />
+              </div>
+              <div>
+                <label style={sLabel}>LinkedIn</label>
+                <input value={editLinkedin} onChange={(e) => setEditLinkedin(e.target.value)} placeholder="https://linkedin.com/in/…" className="lk-edit-input" style={sInput} />
+              </div>
+              <div>
+                <label style={sLabel}>Heures disponibles / semaine</label>
+                <input type="number" value={editDispo} onChange={(e) => setEditDispo(Number(e.target.value))} placeholder="h/sem" className="lk-edit-input" style={{ ...sInput, width: 120 }} />
               </div>
             </div>
           )}
 
           {/* Compétences (dev only) */}
-          {!isFounder && (
-            <div className="card p-5 flex flex-col gap-3">
-              <p className="label">Compétences</p>
-              <div className="flex flex-wrap gap-1.5">
+          {!isFounderEdit && (
+            <div style={{ ...sCard, display: "flex", flexDirection: "column", gap: 14 }}>
+              <p style={sEye}>Compétences</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {editComp.map((c) => (
-                  <div key={c} className="flex items-center gap-1 tag tag-blue">
+                  <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 8, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138" }}>
                     {c}
-                    <button onClick={() => setEditComp(editComp.filter((x) => x !== c))} className="ml-1 opacity-60 hover:opacity-100">
+                    <button onClick={() => setEditComp(editComp.filter((x) => x !== c))}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8579", padding: 0, display: "flex", alignItems: "center", lineHeight: 1 }}>
                       <X size={10} strokeWidth={2.5} />
                     </button>
-                  </div>
+                  </span>
                 ))}
               </div>
-              <div className="flex gap-2">
+              <div style={{ display: "flex", gap: 8 }}>
                 <input value={newComp} onChange={(e) => setNewComp(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && newComp.trim()) { setEditComp([...editComp, newComp.trim()]); setNewComp(""); } }}
-                  placeholder="React, Node.js..." className="input flex-1 text-sm" />
-                <button onClick={() => { if (newComp.trim()) { setEditComp([...editComp, newComp.trim()]); setNewComp(""); } }} className="btn-primary text-sm px-4 py-2">+</button>
+                  placeholder="React, Node.js…" className="lk-edit-input" style={{ ...sInput, flex: 1 }} />
+                <button onClick={() => { if (newComp.trim()) { setEditComp([...editComp, newComp.trim()]); setNewComp(""); } }}
+                  className="lk-edit-navy" style={{ ...sNavy, padding: "0 18px", fontSize: 18, borderRadius: 10, flexShrink: 0 }}>
+                  +
+                </button>
               </div>
             </div>
           )}
 
           {/* Expériences */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="label">Expériences</p>
-              <button onClick={() => openExpModal()} className="text-sm font-semibold" style={{ color: "var(--rose)" }}>+ Ajouter</button>
+          <div style={sCard}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <p style={{ ...sEye, margin: 0 }}>Expériences</p>
+              <button onClick={() => openExpModal()} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#8A8579", padding: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                + Ajouter
+              </button>
             </div>
-            {editExps.length === 0 ? (
-              <p className="text-sm italic" style={{ color: "var(--muted)" }}>Aucune expérience</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {editExps.map((exp) => (
-                  <div key={exp.id} className="flex items-start gap-3 rounded-xl p-3" style={{ background: "var(--bg)" }}>
-                    <div className="flex-1">
-                      <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{exp.titre}</p>
-                      <p className="text-xs" style={{ color: "var(--muted)" }}>{exp.entreprise} · {exp.date_debut}{exp.date_fin ? ` → ${exp.date_fin}` : " → Présent"}</p>
+            {editExps.length === 0
+              ? <p style={{ fontSize: 13, color: "#8A8579", fontStyle: "italic", margin: 0 }}>Aucune expérience</p>
+              : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {editExps.map((exp) => (
+                    <div key={exp.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 12, background: "#FAF8F4", border: "1px solid #ECE7DD" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: "#1A2138", margin: "0 0 3px" }}>{exp.titre}</p>
+                        <p style={{ fontSize: 12, color: "#8A8579", margin: 0 }}>{exp.entreprise} · {exp.date_debut}{exp.date_fin ? ` → ${exp.date_fin}` : " → Présent"}</p>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button onClick={() => openExpModal(exp)} className="lk-edit-icon" style={sIconBtn}><Pencil size={11} strokeWidth={2} /></button>
+                        <button onClick={() => setEditExps(editExps.filter((e) => e.id !== exp.id))} className="lk-edit-icon" style={sIconBtn}><X size={11} strokeWidth={2.5} /></button>
+                      </div>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button onClick={() => openExpModal(exp)} className="btn-icon" style={{ width: 28, height: 28 }}><Pencil size={11} strokeWidth={2} /></button>
-                      <button onClick={() => setEditExps(editExps.filter((e) => e.id !== exp.id))} className="btn-icon" style={{ width: 28, height: 28, color: "var(--rose)" }}><X size={11} strokeWidth={2.5} /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+            }
           </div>
 
           {/* Formation */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="label">Formation</p>
-              <button onClick={() => openFormModal()} className="text-sm font-semibold" style={{ color: "var(--rose)" }}>+ Ajouter</button>
+          <div style={sCard}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <p style={{ ...sEye, margin: 0 }}>Formation</p>
+              <button onClick={() => openFormModal()} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#8A8579", padding: 0, display: "flex", alignItems: "center", gap: 4 }}>
+                + Ajouter
+              </button>
             </div>
-            {editForms.length === 0 ? (
-              <p className="text-sm italic" style={{ color: "var(--muted)" }}>Aucune formation</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {editForms.map((f) => (
-                  <div key={f.id} className="flex items-start gap-3 rounded-xl p-3" style={{ background: "var(--bg)" }}>
-                    <div className="flex-1">
-                      <p className="font-bold text-sm" style={{ color: "var(--text)" }}>{f.diplome}</p>
-                      <p className="text-xs" style={{ color: "var(--muted)" }}>{f.etablissement}{f.annee ? ` · ${f.annee}` : ""}</p>
+            {editForms.length === 0
+              ? <p style={{ fontSize: 13, color: "#8A8579", fontStyle: "italic", margin: 0 }}>Aucune formation</p>
+              : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {editForms.map((f) => (
+                    <div key={f.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 12, background: "#FAF8F4", border: "1px solid #ECE7DD" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: "#1A2138", margin: "0 0 3px" }}>{f.diplome}</p>
+                        <p style={{ fontSize: 12, color: "#8A8579", margin: 0 }}>{f.etablissement}{f.annee ? ` · ${f.annee}` : ""}</p>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button onClick={() => openFormModal(f)} className="lk-edit-icon" style={sIconBtn}><Pencil size={11} strokeWidth={2} /></button>
+                        <button onClick={() => setEditForms(editForms.filter((x) => x.id !== f.id))} className="lk-edit-icon" style={sIconBtn}><X size={11} strokeWidth={2.5} /></button>
+                      </div>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button onClick={() => openFormModal(f)} className="btn-icon" style={{ width: 28, height: 28 }}><Pencil size={11} strokeWidth={2} /></button>
-                      <button onClick={() => setEditForms(editForms.filter((x) => x.id !== f.id))} className="btn-icon" style={{ width: 28, height: 28, color: "var(--rose)" }}><X size={11} strokeWidth={2.5} /></button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+            }
           </div>
 
-          <button onClick={saveEdit} disabled={saving} className="btn-primary w-full py-4">
-            {saving ? "Enregistrement..." : "Enregistrer les modifications"}
+          {/* Actions bas de page */}
+          <button onClick={saveEdit} disabled={saving} className="lk-edit-navy" style={{ ...sNavy, width: "100%", justifyContent: "center", padding: "14px 0", fontSize: 14, opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Enregistrement…" : "Enregistrer les modifications"}
           </button>
-          <button onClick={() => setEditing(false)} className="btn-ghost w-full py-3">Annuler</button>
+          <button onClick={() => setEditing(false)} className="lk-edit-ghost" style={{ ...sGhost, width: "100%", padding: "12px 0", fontSize: 14, textAlign: "center" }}>
+            Annuler
+          </button>
         </div>
 
         {/* Modal expérience */}
         {showExpModal && (
-          <div className="fixed inset-0 z-[60] flex items-end justify-center p-4" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}>
-            <div className="card w-full max-w-sm p-6 flex flex-col gap-3">
-              <h2 className="text-base font-bold" style={{ color: "var(--text)" }}>{editingExp ? "Modifier" : "Ajouter"} une expérience</h2>
-              <input value={expF.titre} onChange={(e) => setExpF({ ...expF, titre: e.target.value })} placeholder="Titre du poste" className="input" />
-              <input value={expF.entreprise} onChange={(e) => setExpF({ ...expF, entreprise: e.target.value })} placeholder="Entreprise" className="input" />
-              <div className="grid grid-cols-2 gap-2">
-                <input value={expF.date_debut} onChange={(e) => setExpF({ ...expF, date_debut: e.target.value })} placeholder="Début" className="input text-sm" />
-                <input value={expF.date_fin} onChange={(e) => setExpF({ ...expF, date_fin: e.target.value })} placeholder="Fin (vide = présent)" className="input text-sm" />
+          <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.45)" }}>
+            <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 20, padding: 24, width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: 12 }}>
+              <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: "#1A2138", margin: 0 }}>{editingExp ? "Modifier" : "Ajouter"} une expérience</h2>
+              <input value={expF.titre} onChange={(e) => setExpF({ ...expF, titre: e.target.value })} placeholder="Titre du poste" className="lk-edit-input" style={sInput} />
+              <input value={expF.entreprise} onChange={(e) => setExpF({ ...expF, entreprise: e.target.value })} placeholder="Entreprise" className="lk-edit-input" style={sInput} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <input value={expF.date_debut} onChange={(e) => setExpF({ ...expF, date_debut: e.target.value })} placeholder="Début" className="lk-edit-input" style={{ ...sInput, fontSize: 12 }} />
+                <input value={expF.date_fin} onChange={(e) => setExpF({ ...expF, date_fin: e.target.value })} placeholder="Fin (vide = présent)" className="lk-edit-input" style={{ ...sInput, fontSize: 12 }} />
               </div>
-              <textarea value={expF.description} onChange={(e) => setExpF({ ...expF, description: e.target.value })} rows={2} placeholder="Description" className="input resize-none" />
-              <button onClick={saveExp} className="btn-primary w-full py-3">Valider</button>
-              <button onClick={() => setShowExpModal(false)} className="btn-ghost w-full py-2">Annuler</button>
+              <textarea value={expF.description} onChange={(e) => setExpF({ ...expF, description: e.target.value })} rows={2} placeholder="Description" className="lk-edit-input" style={{ ...sInput, resize: "none" }} />
+              <button onClick={saveExp} className="lk-edit-navy" style={{ ...sNavy, width: "100%", justifyContent: "center", padding: "13px 0", fontSize: 14 }}>Valider</button>
+              <button onClick={() => setShowExpModal(false)} className="lk-edit-ghost" style={{ ...sGhost, width: "100%", padding: "11px 0", fontSize: 14, textAlign: "center" }}>Annuler</button>
             </div>
           </div>
         )}
 
         {/* Modal formation */}
         {showFormModal && (
-          <div className="fixed inset-0 z-[60] flex items-end justify-center p-4" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}>
-            <div className="card w-full max-w-sm p-6 flex flex-col gap-3">
-              <h2 className="text-base font-bold" style={{ color: "var(--text)" }}>{editingForm ? "Modifier" : "Ajouter"} une formation</h2>
-              <input value={formF.diplome} onChange={(e) => setFormF({ ...formF, diplome: e.target.value })} placeholder="Diplôme" className="input" />
-              <input value={formF.etablissement} onChange={(e) => setFormF({ ...formF, etablissement: e.target.value })} placeholder="École" className="input" />
-              <input value={formF.annee} onChange={(e) => setFormF({ ...formF, annee: e.target.value })} placeholder="Année" className="input" />
-              <textarea value={formF.description} onChange={(e) => setFormF({ ...formF, description: e.target.value })} rows={2} placeholder="Description" className="input resize-none" />
-              <button onClick={saveForm} className="btn-primary w-full py-3">Valider</button>
-              <button onClick={() => setShowFormModal(false)} className="btn-ghost w-full py-2">Annuler</button>
+          <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.45)" }}>
+            <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 20, padding: 24, width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: 12 }}>
+              <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: "#1A2138", margin: 0 }}>{editingForm ? "Modifier" : "Ajouter"} une formation</h2>
+              <input value={formF.diplome} onChange={(e) => setFormF({ ...formF, diplome: e.target.value })} placeholder="Diplôme" className="lk-edit-input" style={sInput} />
+              <input value={formF.etablissement} onChange={(e) => setFormF({ ...formF, etablissement: e.target.value })} placeholder="École" className="lk-edit-input" style={sInput} />
+              <input value={formF.annee} onChange={(e) => setFormF({ ...formF, annee: e.target.value })} placeholder="Année" className="lk-edit-input" style={sInput} />
+              <textarea value={formF.description} onChange={(e) => setFormF({ ...formF, description: e.target.value })} rows={2} placeholder="Description" className="lk-edit-input" style={{ ...sInput, resize: "none" }} />
+              <button onClick={saveForm} className="lk-edit-navy" style={{ ...sNavy, width: "100%", justifyContent: "center", padding: "13px 0", fontSize: 14 }}>Valider</button>
+              <button onClick={() => setShowFormModal(false)} className="lk-edit-ghost" style={{ ...sGhost, width: "100%", padding: "11px 0", fontSize: 14, textAlign: "center" }}>Annuler</button>
             </div>
           </div>
         )}
@@ -619,7 +723,7 @@ export default function PublicProfilePage() {
   ].filter((h): h is NonNullable<typeof h> => h !== null) as Highlight[];
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg)", paddingBottom: canPin || convId ? 88 : 40 }}>
+    <div className="min-h-screen" style={{ background: "#FAF8F4", paddingBottom: canPin || convId ? 88 : 40 }}>
 
       {/* ── Modal pin ── */}
       {showPinModal && (
@@ -723,28 +827,6 @@ export default function PublicProfilePage() {
         </div>
       )}
 
-      {/* ── Floating back + edit ── */}
-      <div className="fixed top-0 left-0 right-0 z-40 pointer-events-none">
-        <div className="max-w-2xl mx-auto px-4 pt-3 flex items-center justify-between">
-          <button
-            onClick={() => router.back()}
-            className="btn-icon pointer-events-auto"
-            style={{ background: "rgba(255,255,255,0.90)", backdropFilter: "blur(12px)" }}
-          >
-            <ArrowLeft size={16} strokeWidth={2} />
-          </button>
-          {isMe && (
-            <button
-              onClick={openEdit}
-              className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl pointer-events-auto"
-              style={{ background: "rgba(255,255,255,0.90)", backdropFilter: "blur(12px)", color: "var(--text)", border: "1px solid rgba(0,0,0,0.08)", boxShadow: "var(--shadow-xs)" }}
-            >
-              <Pencil size={12} strokeWidth={2} /> Modifier
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* ── Mini-header scroll-triggered ── */}
       <div
         className="fixed top-0 left-0 right-0 z-30 transition-all duration-200"
@@ -757,16 +839,12 @@ export default function PublicProfilePage() {
         }}
       >
         <div className="max-w-2xl mx-auto px-4 flex items-center gap-3" style={{ height: 56 }}>
-          <button onClick={() => router.back()} className="btn-icon shrink-0" style={{ width: 32, height: 32 }}>
-            <ArrowLeft size={14} strokeWidth={2} />
-          </button>
-          {profile.avatar_url ? (
-            <img src={profile.avatar_url} alt={profile.nom} className="avatar w-7 h-7 shrink-0" />
-          ) : (
-            <div className="avatar-placeholder w-7 h-7 text-xs shrink-0" style={{ background: heroBg }}>
-              {profile.nom?.[0]?.toUpperCase()}
-            </div>
-          )}
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: "#1A2138", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {profile.avatar_url
+              ? <img src={profile.avatar_url} alt={profile.nom} style={{ width: 28, height: 28, objectFit: "cover" }} />
+              : <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 13, fontWeight: 600, color: "#fff", userSelect: "none", lineHeight: 1 }}>{profile.nom?.[0]?.toUpperCase() ?? "?"}</span>
+            }
+          </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-sm truncate" style={{ color: "var(--text)" }}>{profile.nom}</p>
             {score !== null && <StarRating rating={Math.round(score)} size="sm" />}
@@ -804,165 +882,239 @@ export default function PublicProfilePage() {
         </div>
       </div>
 
-      {/* ── Hero banner ── */}
-      <div className="relative overflow-hidden" style={{ height: 210, background: heroBg }}>
-        <div className="absolute inset-0 opacity-25" style={{ background: "radial-gradient(ellipse at 25% 60%, rgba(255,255,255,0.4) 0%, transparent 55%)" }} />
-        {/* Badge disponible */}
-        {isDevProfile && isAvailable && (
-          <div className="absolute bottom-4 left-4">
-            <span
-              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full"
-              style={{ background: "rgba(255,255,255,0.18)", backdropFilter: "blur(8px)", color: "#fff", border: "1px solid rgba(255,255,255,0.30)" }}
-            >
-              <span className="pulse-ring">
-                <span className="w-2 h-2 rounded-full block" style={{ background: "#4ade80" }} />
-              </span>
-              Disponible
-            </span>
-          </div>
-        )}
-      </div>
+      {/* ── IDENTITÉ — fond papier, pas de bandeau ── */}
+      <style>{`
+        .lk-ghost:hover  { border-color: #1A2138 !important; }
+        .lk-ghost:focus-visible { outline: 2px solid #D4537E; outline-offset: 2px; border-radius: 9px; }
+        .lk-extlink { text-decoration: none; transition: border-color 0.14s; }
+        .lk-extlink:hover { border-color: #1A2138 !important; }
+        .lk-extlink:focus-visible { outline: 2px solid #D4537E; outline-offset: 2px; border-radius: 9px; }
+      `}</style>
 
       <div className="max-w-2xl mx-auto px-4">
+        <div style={{ paddingTop: 60, paddingBottom: 24 }}>
 
-        {/* ── Avatar + CTA ── */}
-        <div className="flex items-end justify-between -mt-14 mb-4">
-          <div className="relative">
-            {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt={profile.nom} className="w-28 h-28 rounded-full object-cover"
-                style={{ border: "4px solid #fff", boxShadow: "var(--shadow-md)" }} />
-            ) : (
-              <div className="w-28 h-28 rounded-full flex items-center justify-center text-white text-4xl font-black"
-                style={{ background: heroBg, border: "4px solid #fff", boxShadow: "var(--shadow-md)" }}>
-                {profile.nom?.[0]?.toUpperCase() ?? "?"}
-              </div>
-            )}
-            <span
-              className="absolute bottom-1 right-1 text-[10px] font-black px-2 py-0.5 rounded-full"
-              style={{ background: accentColor, color: "#fff", boxShadow: "0 2px 6px rgba(0,0,0,0.25)" }}
-            >
-              {isFounder ? "Founder" : "Dev"}
-            </span>
-          </div>
-          <div className="flex gap-2 pb-1">
-            {!isMe && convId && (
-              <button
-                onClick={() => router.push(`/messages/${convId}`)}
-                className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-2xl"
-                style={{ background: accentSoft, color: accentColor, border: `1px solid ${accentBorder}`, boxShadow: "var(--shadow-xs)" }}
-              >
-                <MessageCircle size={15} strokeWidth={2} /> Message
-              </button>
-            )}
-            {canPin && (
-              <button
-                onClick={openPinModal}
-                className="flex items-center gap-2 text-sm font-bold px-4 py-2.5 rounded-2xl"
-                style={alreadyPinned || pinDone ? {
-                  background: "var(--green-soft)", color: "var(--green)", border: "1px solid var(--green-border)",
-                } : {
-                  background: "linear-gradient(135deg, #f43f5e, #fb7185)", color: "#fff", boxShadow: "var(--shadow-rose)",
-                }}
-              >
-                {alreadyPinned || pinDone
-                  ? <><Check size={14} strokeWidth={2.5} /> Pinné</>
-                  : <><Pin size={14} strokeWidth={2} /> Pinner</>
-                }
-              </button>
-            )}
-          </div>
-        </div>
+          {/* Avatar + boutons owner */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
 
-        {/* ── Identité ── */}
-        <div className="mb-1">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-black leading-tight" style={{ color: "var(--text)" }}>{profile.nom}</h1>
-              {profile.ecole && <p className="text-sm mt-0.5" style={{ color: "var(--muted)" }}>{profile.ecole}</p>}
+            {/* Avatar carré navy, initiale Fraunces */}
+            <div style={{ width: 72, height: 72, borderRadius: 12, background: "#1A2138", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {profile.avatar_url
+                ? <img src={profile.avatar_url} alt={profile.nom} style={{ width: 72, height: 72, objectFit: "cover" }} />
+                : <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, color: "#fff", userSelect: "none", lineHeight: 1 }}>
+                    {profile.nom?.[0]?.toUpperCase() ?? "?"}
+                  </span>
+              }
             </div>
-            {score !== null && (
-              <div className="text-right shrink-0">
-                <p className="text-3xl font-black leading-none" style={{ color: "var(--text)" }}>
-                  {score}<span className="text-base font-semibold" style={{ color: "var(--subtle)" }}>/5</span>
-                </p>
-                <StarRating rating={Math.round(score)} count={reviews.length} size="sm" />
+
+            {/* Actions owner */}
+            {isMe && (
+              <div style={{ display: "flex", gap: 8, paddingTop: 4, flexShrink: 0 }}>
+                <button onClick={openEdit} className="lk-ghost"
+                  style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "border-color 0.14s" }}>
+                  Modifier
+                </button>
+                <button onClick={() => router.push("/parametres")} className="lk-ghost"
+                  style={{ padding: "7px 12px", borderRadius: 9, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, transition: "border-color 0.14s" }}>
+                  <span style={{ fontSize: 14, lineHeight: 1 }}>⚙</span>
+                </button>
+                <button onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }} className="lk-ghost"
+                  style={{ padding: "7px 10px", borderRadius: 9, border: "1px solid #ECE7DD", background: "#fff", color: "#8A8579", cursor: "pointer", display: "flex", alignItems: "center", transition: "border-color 0.14s" }}>
+                  <LogOut size={14} strokeWidth={2} />
+                </button>
               </div>
             )}
           </div>
 
-          {/* Links */}
-          {!isFounder && devProfile && (devProfile.github || devProfile.linkedin) && (
-            <div className="flex gap-2 mt-2">
+          {/* Nom */}
+          <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 34, fontWeight: 600, color: "#1A2138", margin: "0 0 5px", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+            {profile.nom}
+          </h1>
+
+          {/* École */}
+          {profile.ecole && (
+            <p style={{ fontSize: 14, color: "#8A8579", margin: "0 0 6px" }}>{profile.ecole}</p>
+          )}
+
+          {/* Rôle + dispo — une ligne muted, pas de pill */}
+          <p style={{ fontSize: 13, color: "#8A8579", margin: "0 0 14px" }}>
+            {isDevProfile
+              ? [
+                  "Développeur",
+                  (dispo ?? 0) >= 10 ? "Disponible" : null,
+                  dispo ? `${dispo}h/sem` : null,
+                ].filter(Boolean).join(" · ")
+              : "Founder"
+            }
+          </p>
+
+          {/* Bio */}
+          {profile.bio && (
+            <p style={{ fontSize: 14, lineHeight: 1.65, color: "#8A8579", margin: "0 0 14px" }}>{profile.bio}</p>
+          )}
+
+          {/* GitHub / LinkedIn — ghost hairline monochrome */}
+          {isDevProfile && devProfile && (devProfile.github || devProfile.linkedin) && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {devProfile.github && (
-                <a href={devProfile.github} target="_blank" rel="noreferrer"
-                  className="tag transition-opacity hover:opacity-70"
-                  style={{ background: "rgba(0,0,0,0.04)", color: "var(--muted)", border: "1px solid rgba(0,0,0,0.08)" }}>
-                  <GitBranch size={10} strokeWidth={2} /> GitHub <ExternalLink size={9} strokeWidth={2} />
+                <a
+                  href={devProfile.github}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="lk-extlink"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 9, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 12, fontWeight: 600 }}
+                >
+                  GitHub <ExternalLink size={10} strokeWidth={2} />
                 </a>
               )}
               {devProfile.linkedin && (
-                <a href={devProfile.linkedin} target="_blank" rel="noreferrer"
-                  className="tag transition-opacity hover:opacity-70"
-                  style={{ background: "var(--blue-soft)", color: "var(--blue)", border: "1px solid var(--blue-border)" }}>
-                  <Link2 size={10} strokeWidth={2} /> LinkedIn <ExternalLink size={9} strokeWidth={2} />
+                <a
+                  href={devProfile.linkedin}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="lk-extlink"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 9, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 12, fontWeight: 600 }}
+                >
+                  LinkedIn <ExternalLink size={10} strokeWidth={2} />
                 </a>
               )}
             </div>
           )}
-
-          {profile.bio && (
-            <p className="text-sm leading-relaxed mt-3" style={{ color: "var(--text-2)" }}>{profile.bio}</p>
-          )}
         </div>
 
-        {/* ── "En un coup d'œil" row ── */}
-        {highlights.length > 0 && (
-          <div
-            className="flex items-center gap-0 overflow-x-auto scrollbar-hide my-4 rounded-2xl"
-            style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", boxShadow: "var(--shadow-xs)" }}
-          >
-            {highlights.map((h, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2 px-4 py-3 flex-1 justify-center min-w-0"
-                style={i > 0 ? { borderLeft: "1px solid rgba(0,0,0,0.06)" } : {}}
-              >
-                <span style={{ color: h.color, flexShrink: 0 }}>{h.icon}</span>
-                <span className="text-xs font-bold truncate" style={{ color: h.color }}>{h.text}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* ── BANDE TRACK-RECORD ── surface blanche, 3 col, filets hairline ── */}
+        <div style={{ display: "flex", background: "#fff", border: "1.5px solid #ECE7DD", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
+          {([
+            { label: "Missions", value: projects.length      },
+            { label: "Livrés",   value: doneProjects.length  },
+            { label: "Avis",     value: reviews.length       },
+          ] as { label: string; value: number }[]).map((kpi, i) => (
+            <div key={kpi.label} style={{ flex: 1, padding: "18px 0", textAlign: "center", borderLeft: i > 0 ? "1px solid #ECE7DD" : "none" }}>
+              <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 40, fontWeight: 600, color: "#1A2138", margin: "0 0 3px", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                {kpi.value}
+              </p>
+              <p style={{ fontSize: 10, fontWeight: 700, color: "#8A8579", margin: 0, textTransform: "uppercase", letterSpacing: "1.2px" }}>
+                {kpi.label}
+              </p>
+            </div>
+          ))}
+        </div>
 
         <div className="flex flex-col gap-3 pb-4">
 
-          {/* Stats row */}
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { val: projects.length,      label: isFounder ? "Projets" : "Missions" },
-              { val: doneProjects.length,  label: "Livrés"  },
-              { val: reviews.length,       label: "Avis"    },
-            ].map(({ val, label }) => (
-              <div key={label} className="card p-4 text-center" style={{ borderRadius: 16 }}>
-                <p className="text-2xl font-black" style={{ color: "var(--text)" }}>{val}</p>
-                <p className="text-[11px] font-semibold mt-0.5" style={{ color: "var(--muted)" }}>{label}</p>
-              </div>
-            ))}
-          </div>
-
           {/* Stack */}
           {!isFounder && devProfile?.competences && devProfile.competences.length > 0 && (
-            <div className="card p-5">
-              <h2 className="label mb-3 block">Stack</h2>
-              <div className="flex flex-wrap gap-2">
+            <div style={{ background: "#fff", border: "1.5px solid #ECE7DD", borderRadius: 14, padding: "18px 20px" }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: "#8A8579", textTransform: "uppercase", letterSpacing: "1.2px", margin: "0 0 12px" }}>Stack</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {devProfile.competences.map((c) => (
-                  <span key={c} className="tag"
-                    style={{ background: "var(--blue-soft)", color: "var(--blue)", border: "1px solid var(--blue-border)", fontSize: 12, padding: "5px 12px" }}>
+                  <span key={c} style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 8, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138" }}>
                     {c}
                   </span>
                 ))}
               </div>
             </div>
+          )}
+
+          {/* ── CANDIDATURES — visible uniquement si isMe + dev ── */}
+          {isMe && isDevProfile && (
+            <>
+              {/* KPI band */}
+              <div style={{ display: "flex", background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, overflow: "hidden" }}>
+                {[
+                  { label: "Candidatures", value: myCandidatures.length },
+                  { label: "En attente",   value: myDevPending           },
+                  { label: "Acceptées",    value: myDevAccepted          },
+                ].map((kpi, i) => (
+                  <div key={kpi.label} style={{ flex: 1, padding: "14px 0", textAlign: "center", borderLeft: i > 0 ? `1px solid ${C.hairline}` : "none" }}>
+                    <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 26, fontWeight: 600, color: C.ink, margin: "0 0 2px", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                      {kpi.value}
+                    </p>
+                    <p style={{ fontSize: 10, fontWeight: 600, color: C.muted, margin: 0, textTransform: "uppercase", letterSpacing: "0.8px" }}>{kpi.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Tabs */}
+              {myCandidatures.length > 0 && (
+                <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
+                  {MY_DEV_TABS.map((tab) => {
+                    const cnt = tab.key === "all" ? myCandidatures.length : myCandidatures.filter((cand) => cand.statut === tab.key).length;
+                    const active = myDevFilter === tab.key;
+                    return (
+                      <button key={tab.key} onClick={() => setMyDevFilter(tab.key)}
+                        style={{ padding: "6px 12px", borderRadius: 8, border: `1.5px solid ${active ? C.ink : C.hairline}`, background: active ? C.ink : C.surface, color: active ? "#fff" : C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, display: "flex", alignItems: "center", gap: 6, transition: "all 0.12s" }}>
+                        {tab.label}
+                        {cnt > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 5, background: active ? "rgba(255,255,255,0.18)" : C.hairline, color: active ? "#fff" : C.muted }}>{cnt}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Empty state */}
+              {myCandidatures.length === 0 && (
+                <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
+                  <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 600, color: C.ink, margin: "0 0 8px" }}>Aucune candidature</p>
+                  <p style={{ fontSize: 13, color: C.muted, margin: "0 0 20px" }}>Explore les projets et candidate pour être mis en relation avec un fondateur.</p>
+                  <button onClick={() => router.push("/projets")}
+                    style={{ padding: "10px 18px", borderRadius: 10, background: C.ink, color: "#fff", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    Voir les projets <ArrowRight size={14} strokeWidth={2.2} />
+                  </button>
+                </div>
+              )}
+
+              {/* Filtered empty */}
+              {myCandidatures.length > 0 && myDevCandFiltered.length === 0 && (
+                <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "24px", textAlign: "center" }}>
+                  <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>Aucune candidature dans cette catégorie.</p>
+                </div>
+              )}
+
+              {/* Cards */}
+              {myDevCandFiltered.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {myDevCandFiltered.map((cand) => {
+                    const stacks      = cand.projects.stack_souhaitee?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+                    const hasContract = cand.statut === "accepted" && myContractMap[cand.project_id];
+                    return (
+                      <div key={cand.id} style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "16px 18px" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
+                          <h3 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 15, fontWeight: 600, color: C.ink, margin: 0, letterSpacing: "-0.01em", lineHeight: 1.25, flex: 1 }}>
+                            {cand.projects.titre}
+                          </h3>
+                          <CandStatusPill statut={cand.statut} />
+                        </div>
+                        {cand.projects.description && (
+                          <p style={{ fontSize: 12, color: C.muted, margin: "0 0 10px", lineHeight: 1.55, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            {cand.projects.description}
+                          </p>
+                        )}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                          {stacks.slice(0, 4).map((st) => <CandPill key={st}>{st}</CandPill>)}
+                          {cand.projects.deadline && <CandPill>{cand.projects.deadline}</CandPill>}
+                        </div>
+                        <CandTimeline statut={cand.statut} />
+                        {hasContract && (
+                          <div style={{ paddingTop: 10 }}>
+                            <button onClick={() => router.push(`/contrat/${myContractMap[cand.project_id]}`)}
+                              style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: C.ink }}>
+                              <FileText size={13} strokeWidth={2} /> Voir le contrat <ArrowRight size={12} strokeWidth={2.2} />
+                            </button>
+                          </div>
+                        )}
+                        <div style={{ paddingTop: hasContract ? 8 : 10 }}>
+                          <button onClick={() => router.push(`/projets?project=${cand.project_id}`)}
+                            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, color: C.muted, display: "flex", alignItems: "center", gap: 4 }}>
+                            Voir le projet <ArrowRight size={11} strokeWidth={2.2} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
 
           {/* Expériences — timeline */}
@@ -1037,23 +1189,25 @@ export default function PublicProfilePage() {
 
           {/* Projets actifs */}
           {activeProjects.length > 0 && (
-            <div className="card p-5">
-              <h2 className="label mb-4 block">En cours</h2>
+            <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 14, padding: "18px 20px" }}>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", margin: "0 0 14px" }}>En cours</p>
               {activeProjects.map((p, i, arr) => (
-                <div key={p.id} className="flex items-center gap-3"
-                  style={i < arr.length - 1 ? { paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid rgba(0,0,0,0.05)" } : {}}>
-                  <div className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: p.statut === "en_cours" ? "var(--green)" : "var(--blue)" }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate" style={{ color: "var(--text)" }}>{p.titre}</p>
-                    {p.stack_souhaitee && <p className="text-xs truncate mt-0.5" style={{ color: "var(--muted)" }}>{p.stack_souhaitee}</p>}
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12,
+                  ...(i < arr.length - 1 ? { paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #ECE7DD" } : {}) }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#8A8579", flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#1A2138", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.titre}</p>
+                    {p.stack_souhaitee && <p style={{ fontSize: 11, color: "#8A8579", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.stack_souhaitee}</p>}
                   </div>
-                  <span className="tag shrink-0"
-                    style={p.statut === "en_cours"
-                      ? { background: "var(--green-soft)", color: "var(--green)", border: "1px solid var(--green-border)", fontSize: 11 }
-                      : { background: "var(--blue-soft)", color: "var(--blue)", border: "1px solid var(--blue-border)", fontSize: 11 }}>
-                    {p.statut === "en_cours" ? "En cours" : "Matchée"}
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 7, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", flexShrink: 0 }}>
+                    {p.statut === "en_cours" ? "En cours" : p.statut === "matched" ? "Matchée" : "En attente"}
                   </span>
+                  {isMe && p.statut === "pending" && (
+                    <button onClick={() => router.push(`/projets/${p.id}/modifier`)}
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#8A8579", padding: "3px 6px", flexShrink: 0, textDecoration: "underline" }}>
+                      Modifier
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -1061,20 +1215,19 @@ export default function PublicProfilePage() {
 
           {/* Missions livrées */}
           {doneProjects.length > 0 && (
-            <div className="card p-5">
-              <h2 className="label mb-4 block">{isFounder ? "Projets livrés" : "Missions réalisées"}</h2>
+            <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 14, padding: "18px 20px" }}>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", margin: "0 0 14px" }}>{isFounder ? "Projets livrés" : "Missions réalisées"}</p>
               {doneProjects.map((p, i, arr) => (
-                <div key={p.id} className="flex items-center gap-3"
-                  style={i < arr.length - 1 ? { paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid rgba(0,0,0,0.05)" } : {}}>
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ background: "var(--green-soft)" }}>
-                    <Check size={12} strokeWidth={2.5} style={{ color: "var(--green)" }} />
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12,
+                  ...(i < arr.length - 1 ? { paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #ECE7DD" } : {}) }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 7, border: "1px solid #ECE7DD", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Check size={11} strokeWidth={2.5} style={{ color: "#1A2138" }} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate" style={{ color: "var(--text)" }}>{p.titre}</p>
-                    {p.stack_souhaitee && <p className="text-xs truncate mt-0.5" style={{ color: "var(--muted)" }}>{p.stack_souhaitee}</p>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#1A2138", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.titre}</p>
+                    {p.stack_souhaitee && <p style={{ fontSize: 11, color: "#8A8579", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.stack_souhaitee}</p>}
                   </div>
-                  {p.deadline && <span className="text-xs shrink-0" style={{ color: "var(--subtle)" }}>{p.deadline}</span>}
+                  {p.deadline && <span style={{ fontSize: 11, color: "#8A8579", flexShrink: 0 }}>{p.deadline}</span>}
                 </div>
               ))}
             </div>
@@ -1082,26 +1235,26 @@ export default function PublicProfilePage() {
 
           {/* ── Avis ── */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="label">Avis {reviews.length > 0 && `(${reviews.length})`}</h2>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", margin: 0 }}>
+                Avis {reviews.length > 0 && `(${reviews.length})`}
+              </p>
               {score !== null && (
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-black" style={{ color: "var(--text)" }}>{score}</span>
-                  <StarRating rating={Math.round(score)} size="sm" />
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 22, fontWeight: 600, color: "#1A2138", fontVariantNumeric: "tabular-nums" }}>{score}</span>
+                  <span style={{ fontSize: 12, color: "#8A8579" }}>/&nbsp;5</span>
                 </div>
               )}
             </div>
 
             {/* Keywords highlights */}
             {keywords.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 12 }}>
                 {keywords.map(({ word, count }) => (
-                  <span key={word}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                    style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.09)", color: "var(--text-2)", boxShadow: "var(--shadow-xs)" }}>
+                  <span key={word} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 8, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138" }}>
                     {word}
                     {count > 1 && (
-                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full" style={{ background: accentSoft, color: accentColor }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 5, background: "#ECE7DD", color: "#8A8579" }}>
                         ×{count}
                       </span>
                     )}
@@ -1162,16 +1315,19 @@ export default function PublicProfilePage() {
         </div>
       </div>
 
-      {/* ── Sticky bottom bar ── */}
+      <BottomNav />
+
+      {/* ── Sticky bottom bar visiteur (au-dessus de la BottomNav) ── */}
       {(!isMe && (convId || canPin)) && (
         <div
-          className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-safe"
+          className="fixed left-0 right-0 z-40 px-4"
           style={{
+            bottom: "calc(60px + env(safe-area-inset-bottom, 0px))",
             background: "rgba(255,255,255,0.94)",
             backdropFilter: "blur(24px)",
             borderTop: "1px solid rgba(0,0,0,0.07)",
             paddingTop: 12,
-            paddingBottom: `calc(16px + env(safe-area-inset-bottom, 0px))`,
+            paddingBottom: 12,
           }}
         >
           <div className="max-w-2xl mx-auto flex gap-3">
@@ -1205,6 +1361,26 @@ export default function PublicProfilePage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── FAB founder : déposer un projet ── */}
+      {isMe && isFounder && (
+        <button
+          onClick={() => router.push("/projets/nouveau")}
+          style={{
+            position: "fixed", bottom: 76, right: 20, zIndex: 40,
+            background: "#1A2138", color: "#fff", border: "none",
+            borderRadius: 14, padding: "12px 18px",
+            fontSize: 13, fontWeight: 700, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 8,
+            boxShadow: "0 4px 16px rgba(26,33,56,0.28)",
+            transition: "background 0.14s, transform 0.12s",
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#2A3252"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#1A2138"; }}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>+</span> Déposer un projet
+        </button>
       )}
 
       {currentUserId && (

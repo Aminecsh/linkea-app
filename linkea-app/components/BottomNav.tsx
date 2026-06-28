@@ -23,7 +23,9 @@ export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
-  const [role, setRole] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("lk_role") : null
+  );
   const [isBanned, setIsBanned] = useState(false);
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export default function BottomNav() {
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       const r = roleData?.role;
       setRole(r ?? null);
+      if (r) localStorage.setItem("lk_role", r);
       if (!r || r === "admin") return;
 
       let convQuery;
@@ -161,9 +164,8 @@ export default function BottomNav() {
               <span className="relative">
                 <Icon
                   size={22}
-                  strokeWidth={active ? 2.2 : 1.8}
+                  strokeWidth={2}
                   style={{ color: active ? "var(--rose)" : "var(--text)" }}
-                  className="transition-all duration-200"
                 />
                 {showBadge && (
                   <span

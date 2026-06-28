@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { logAudit } from "@/lib/audit";
@@ -170,93 +170,105 @@ export default function ParametresPage() {
 
   const verifiedFactor = factors.find(f => f.status === "verified");
 
+  const sCard:  React.CSSProperties = { background: "#fff", border: "1px solid #ECE7DD", borderRadius: 16, overflow: "hidden" };
+  const sEye:   React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579" };
+  const sInput: React.CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 500, outline: "none", boxSizing: "border-box" };
+  const sNavy:  React.CSSProperties = { width: "100%", padding: "11px 0", borderRadius: 10, background: "#1A2138", color: "#fff", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
+  const sGhost: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 10, background: "#fff", color: "#1A2138", border: "1px solid #ECE7DD", fontSize: 13, fontWeight: 600, cursor: "pointer" };
+  const sDanger:React.CSSProperties = { width: "100%", padding: "11px 0", borderRadius: 10, background: "#fff", color: "#D4537E", border: "1px solid rgba(212,83,126,0.3)", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
+
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
+    <div style={{ minHeight: "100vh", background: "#FAF8F4", paddingBottom: 40 }}>
+      <style>{`
+        .lk-p-input:focus { outline: 2px solid #D4537E; outline-offset: -1px; border-color: #D4537E !important; }
+        .lk-p-navy:hover  { background: #2A3252 !important; }
+        .lk-p-ghost:hover { border-color: #1A2138 !important; }
+        .lk-p-danger:hover { border-color: #D4537E !important; background: rgba(212,83,126,0.04) !important; }
+        @keyframes lk-spin { to { transform: rotate(360deg); } }
+      `}</style>
+
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button onClick={() => router.back()} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors">
-            <ChevronLeft size={20} />
+      <div style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(255,255,255,0.94)", backdropFilter: "blur(20px)", borderBottom: "1px solid #ECE7DD", padding: "12px 20px" }}>
+        <div style={{ maxWidth: 520, margin: "0 auto", display: "flex", alignItems: "center", gap: 12 }}>
+          <button onClick={() => router.back()} style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8579", display: "flex", alignItems: "center", padding: 0 }}>
+            <ChevronLeft size={20} strokeWidth={2} />
           </button>
-          <h1 className="font-bold text-slate-900 text-base">Paramètres & Sécurité</h1>
+          <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, color: "#1A2138", margin: 0, letterSpacing: "-0.02em" }}>
+            Paramètres & Sécurité
+          </h1>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-6 flex flex-col gap-5">
+      <div style={{ maxWidth: 520, margin: "0 auto", padding: "20px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
 
         {/* Compte */}
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100">
-            <h2 className="font-bold text-slate-900 text-sm">Mon compte</h2>
+        <section style={sCard}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #ECE7DD" }}>
+            <p style={sEye}>Mon compte</p>
           </div>
-          <div className="px-5 py-4 flex flex-col gap-3">
-            <div>
-              <p className="text-xs text-slate-400 mb-1">Email</p>
-              <p className="text-sm font-medium text-slate-800">{email || "—"}</p>
-            </div>
+          <div style={{ padding: "16px 20px" }}>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "#8A8579", margin: "0 0 4px" }}>Email</p>
+            <p style={{ fontSize: 14, fontWeight: 500, color: "#1A2138", margin: 0 }}>{email || "—"}</p>
           </div>
         </section>
 
         {/* Mot de passe */}
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100">
-            <h2 className="font-bold text-slate-900 text-sm">Changer de mot de passe</h2>
+        <section style={sCard}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #ECE7DD" }}>
+            <p style={sEye}>Changer de mot de passe</p>
           </div>
-          <div className="px-5 py-4 flex flex-col gap-3">
-            <div className="relative">
+          <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ position: "relative" }}>
               <input
                 type={pwShow ? "text" : "password"}
                 placeholder="Nouveau mot de passe (min. 8 caractères)"
                 value={pwNew}
                 onChange={e => setPwNew(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400 pr-10"
+                className="lk-p-input"
+                style={{ ...sInput, paddingRight: 40 }}
               />
-              <button onClick={() => setPwShow(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                {pwShow ? <EyeOff size={16} /> : <Eye size={16} />}
+              <button onClick={() => setPwShow(v => !v)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#8A8579", display: "flex", alignItems: "center" }}>
+                {pwShow ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
             {pwMsg && (
-              <div className={`flex items-center gap-2 text-xs font-medium ${pwMsg.type === "ok" ? "text-green-600" : "text-red-500"}`}>
-                {pwMsg.type === "ok" ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: pwMsg.type === "ok" ? "#1A2138" : "#D4537E" }}>
+                {pwMsg.type === "ok" ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
                 {pwMsg.text}
               </div>
             )}
-            <button
-              onClick={changePassword}
-              disabled={!pwNew.trim() || pwLoading}
-              className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold disabled:opacity-40 hover:bg-slate-700 transition-colors"
-            >
+            <button onClick={changePassword} disabled={!pwNew.trim() || pwLoading} className="lk-p-navy" style={{ ...sNavy, opacity: (!pwNew.trim() || pwLoading) ? 0.45 : 1 }}>
               {pwLoading ? "Mise à jour…" : "Mettre à jour"}
             </button>
           </div>
         </section>
 
         {/* 2FA */}
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-            <Shield size={16} className="text-indigo-500" />
-            <h2 className="font-bold text-slate-900 text-sm">Double authentification (2FA)</h2>
+        <section style={sCard}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #ECE7DD", display: "flex", alignItems: "center", gap: 8 }}>
+            <Shield size={14} strokeWidth={2} style={{ color: "#8A8579" }} />
+            <p style={{ ...sEye, margin: 0 }}>Double authentification (2FA)</p>
             {verifiedFactor && (
-              <span className="ml-auto text-xs font-semibold bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full">Activé</span>
+              <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, border: "1px solid rgba(26,33,56,0.2)", color: "#1A2138", background: "#fff" }}>Activé</span>
             )}
           </div>
-          <div className="px-5 py-4 flex flex-col gap-4">
+          <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
             {!verifiedFactor && !enrolling && (
               <>
-                <p className="text-xs text-slate-500">Protège ton compte avec une application comme Google Authenticator ou Authy.</p>
-                <button onClick={startEnroll} className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2">
-                  <Smartphone size={15} /> Activer le 2FA
+                <p style={{ fontSize: 12, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Protège ton compte avec une application comme Google Authenticator ou Authy.</p>
+                <button onClick={startEnroll} className="lk-p-navy" style={sNavy}>
+                  <Smartphone size={14} /> Activer le 2FA
                 </button>
               </>
             )}
 
             {enrolling && !verifiedFactor && (
-              <div className="flex flex-col gap-4">
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {qrUri ? (
                   <>
-                    <p className="text-xs text-slate-500">Scanne ce QR code avec Google Authenticator ou Authy, puis entre le code à 6 chiffres.</p>
-                    <div className="flex justify-center">
-                      <img src={qrUri} alt="QR Code 2FA" className="w-44 h-44 rounded-xl border border-slate-200" />
+                    <p style={{ fontSize: 12, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Scanne ce QR code avec Google Authenticator ou Authy, puis entre le code à 6 chiffres.</p>
+                    <div style={{ display: "flex", justifyContent: "center" }}>
+                      <img src={qrUri} alt="QR Code 2FA" style={{ width: 160, height: 160, borderRadius: 12, border: "1px solid #ECE7DD" }} />
                     </div>
                     <input
                       type="text"
@@ -265,38 +277,39 @@ export default function ParametresPage() {
                       placeholder="Code à 6 chiffres"
                       value={totpCode}
                       onChange={e => setTotpCode(e.target.value.replace(/\D/g, ""))}
-                      className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-center tracking-widest font-mono focus:outline-none focus:border-indigo-400"
+                      className="lk-p-input"
+                      style={{ ...sInput, textAlign: "center", letterSpacing: "0.3em", fontFamily: "monospace" }}
                     />
-                    <div className="flex gap-2">
-                      <button onClick={() => { setEnrolling(false); setQrUri(null); setFactorId(null); setTotpCode(""); }} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => { setEnrolling(false); setQrUri(null); setFactorId(null); setTotpCode(""); }} className="lk-p-ghost" style={sGhost}>
                         Annuler
                       </button>
-                      <button onClick={verifyTotp} disabled={totpCode.length !== 6 || verifying} className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-indigo-700 transition-colors">
+                      <button onClick={verifyTotp} disabled={totpCode.length !== 6 || verifying} className="lk-p-navy" style={{ ...sNavy, flex: 1, width: "auto", opacity: (totpCode.length !== 6 || verifying) ? 0.45 : 1 }}>
                         {verifying ? "Vérification…" : "Confirmer"}
                       </button>
                     </div>
                   </>
                 ) : (
-                  <p className="text-xs text-slate-400 text-center">Génération du QR code…</p>
+                  <p style={{ fontSize: 12, color: "#8A8579", textAlign: "center", margin: 0 }}>Génération du QR code…</p>
                 )}
               </div>
             )}
 
             {verifiedFactor && (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <CheckCircle size={16} className="text-green-500" />
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13, color: "#1A2138", fontWeight: 500 }}>
+                  <CheckCircle size={15} strokeWidth={2} style={{ color: "#1A2138", opacity: 0.6 }} />
                   2FA actif — ton compte est protégé
                 </div>
-                <button onClick={() => unenroll(verifiedFactor.id)} className="w-full py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-semibold hover:bg-red-50 transition-colors">
+                <button onClick={() => unenroll(verifiedFactor.id)} className="lk-p-danger" style={sDanger}>
                   Désactiver le 2FA
                 </button>
               </div>
             )}
 
             {twoFaMsg && (
-              <div className={`flex items-center gap-2 text-xs font-medium ${twoFaMsg.type === "ok" ? "text-green-600" : "text-red-500"}`}>
-                {twoFaMsg.type === "ok" ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: twoFaMsg.type === "ok" ? "#1A2138" : "#D4537E" }}>
+                {twoFaMsg.type === "ok" ? <CheckCircle size={13} /> : <AlertTriangle size={13} />}
                 {twoFaMsg.text}
               </div>
             )}
@@ -304,66 +317,66 @@ export default function ParametresPage() {
         </section>
 
         {/* Données RGPD */}
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100">
-            <h2 className="font-bold text-slate-900 text-sm">Mes données (RGPD)</h2>
+        <section style={sCard}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #ECE7DD" }}>
+            <p style={sEye}>Mes données (RGPD)</p>
           </div>
-          <div className="px-5 py-4 flex flex-col gap-3">
-            <p className="text-xs text-slate-500">Tu peux télécharger toutes tes données ou supprimer définitivement ton compte.</p>
-            <button
-              onClick={exportData}
-              disabled={exporting}
-              className="w-full py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold disabled:opacity-40 hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
-            >
-              <Download size={15} />
+          <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <p style={{ fontSize: 12, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Tu peux télécharger toutes tes données ou supprimer définitivement ton compte.</p>
+            <button onClick={exportData} disabled={exporting} className="lk-p-navy" style={{ ...sNavy, opacity: exporting ? 0.5 : 1 }}>
+              <Download size={14} />
               {exporting ? "Préparation…" : "Télécharger mes données"}
             </button>
           </div>
         </section>
 
         {/* Zone danger */}
-        <section className="bg-white rounded-2xl border border-red-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-red-100 flex items-center gap-2">
-            <AlertTriangle size={16} className="text-red-500" />
-            <h2 className="font-bold text-red-600 text-sm">Zone dangereuse</h2>
+        <section style={{ ...sCard, border: "1px solid rgba(212,83,126,0.25)" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid rgba(212,83,126,0.15)", display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertTriangle size={14} strokeWidth={2} style={{ color: "#D4537E" }} />
+            <p style={{ ...sEye, color: "#D4537E", margin: 0 }}>Zone dangereuse</p>
           </div>
-          <div className="px-5 py-4 flex flex-col gap-3">
+          <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
             {deleteStep === "idle" && (
               <>
-                <p className="text-xs text-slate-500">La suppression est <strong>irréversible</strong>. Toutes tes données seront effacées définitivement.</p>
-                <button onClick={() => setDeleteStep("confirm")} className="w-full py-2.5 rounded-xl border border-red-200 text-red-500 text-sm font-semibold hover:bg-red-50 transition-colors flex items-center justify-center gap-2">
-                  <Trash2 size={15} /> Supprimer mon compte
+                <p style={{ fontSize: 12, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>La suppression est <strong style={{ color: "#1A2138" }}>irréversible</strong>. Toutes tes données seront effacées définitivement.</p>
+                <button onClick={() => setDeleteStep("confirm")} className="lk-p-danger" style={sDanger}>
+                  <Trash2 size={14} /> Supprimer mon compte
                 </button>
               </>
             )}
 
             {deleteStep === "confirm" && (
-              <div className="flex flex-col gap-3">
-                <p className="text-xs text-red-600 font-medium">Tape <strong>SUPPRIMER</strong> pour confirmer :</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <p style={{ fontSize: 12, color: "#D4537E", fontWeight: 600, margin: 0 }}>Tape <strong>SUPPRIMER</strong> pour confirmer :</p>
                 <input
                   type="text"
                   placeholder="SUPPRIMER"
                   value={deleteConfirm}
                   onChange={e => setDeleteConfirm(e.target.value)}
-                  className="w-full border border-red-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-red-400 font-mono"
+                  className="lk-p-input"
+                  style={{ ...sInput, fontFamily: "monospace", borderColor: "rgba(212,83,126,0.3)" }}
                 />
                 {deleteError && (
-                  <p className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle size={12} /> {deleteError}</p>
+                  <p style={{ fontSize: 12, color: "#D4537E", display: "flex", alignItems: "center", gap: 5, margin: 0 }}>
+                    <AlertTriangle size={12} /> {deleteError}
+                  </p>
                 )}
-                <div className="flex gap-2">
-                  <button onClick={() => { setDeleteStep("idle"); setDeleteConfirm(""); setDeleteError(null); }} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => { setDeleteStep("idle"); setDeleteConfirm(""); setDeleteError(null); }} className="lk-p-ghost" style={sGhost}>
                     Annuler
                   </button>
-                  <button onClick={deleteAccount} disabled={deleteConfirm !== "SUPPRIMER"} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold disabled:opacity-40 hover:bg-red-600 transition-colors flex items-center justify-center gap-2">
-                    <Trash2 size={14} /> Confirmer
+                  <button onClick={deleteAccount} disabled={deleteConfirm !== "SUPPRIMER"} className="lk-p-danger"
+                    style={{ ...sDanger, flex: 1, width: "auto", opacity: deleteConfirm !== "SUPPRIMER" ? 0.4 : 1 }}>
+                    <Trash2 size={13} /> Confirmer
                   </button>
                 </div>
               </div>
             )}
 
             {deleteStep === "deleting" && (
-              <div className="flex items-center justify-center gap-2 py-2 text-sm text-slate-500">
-                <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "8px 0", fontSize: 13, color: "#8A8579" }}>
+                <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid #ECE7DD", borderTopColor: "#D4537E", animation: "lk-spin 0.8s linear infinite" }} />
                 Suppression en cours…
               </div>
             )}
@@ -373,9 +386,10 @@ export default function ParametresPage() {
         {/* Déconnexion */}
         <button
           onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }}
-          className="w-full py-3 rounded-2xl border border-slate-200 bg-white text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+          className="lk-p-ghost"
+          style={{ ...sGhost, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "13px 0", flex: "none" }}
         >
-          <LogOut size={16} /> Se déconnecter
+          <LogOut size={15} strokeWidth={2} /> Se déconnecter
         </button>
 
       </div>
