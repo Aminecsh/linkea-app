@@ -24,6 +24,7 @@ export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [developerId, setDeveloperId] = useState<string | null>(null);
   const [hasApplied, setHasApplied] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -33,6 +34,7 @@ export default function ProjectDetailPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/connexion"); return; }
+      setCurrentUserId(user.id);
 
       const { data: roleData } = await supabase
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
@@ -46,7 +48,10 @@ export default function ProjectDetailPage() {
         .maybeSingle();
 
       if (!proj) { router.push("/projets"); return; }
-      setProject(proj as unknown as Project);
+      const raw = proj as unknown as Record<string, unknown>;
+      // Supabase peut retourner la relation comme tableau ou objet
+      if (Array.isArray(raw.profiles_founder)) raw.profiles_founder = raw.profiles_founder[0] ?? null;
+      setProject(raw as unknown as Project);
 
       if (r === "developer") {
         const { data: profile } = await supabase
@@ -106,6 +111,7 @@ export default function ProjectDetailPage() {
   if (!project) return null;
 
   const stacks = project.stack_souhaitee?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+  const isOwner = role === "founder" && project.profiles_founder?.user_id === currentUserId;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -180,18 +186,28 @@ export default function ProjectDetailPage() {
             </div>
           )}
 
-          {/* CTA */}
+          {/* CTA owner */}
+          {isOwner && project.statut === "pending" && (
+            <button
+              onClick={() => router.push(`/projets/${id}/modifier`)}
+              style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: "#1A2138", color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            >
+              Modifier ce projet
+            </button>
+          )}
+
+          {/* CTA dev */}
           {role === "developer" && (
             <button
               onClick={handleCandidater}
               disabled={hasApplied || applying}
-              className={`w-full py-4 rounded-xl text-sm font-bold transition-all ${
-                hasApplied
-                  ? "bg-green-50 text-green-600 border border-green-200 cursor-default"
-                  : "btn-pink"
-              }`}
+              style={{
+                width: "100%", padding: "13px 0", borderRadius: 12, fontSize: 14, fontWeight: 700, border: "none", cursor: hasApplied ? "default" : "pointer",
+                background: hasApplied ? "#FAF8F4" : "#D4537E",
+                color: hasApplied ? "#8A8579" : "#fff",
+              }}
             >
-              {applying ? "Envoi..." : hasApplied ? "✓ Candidature envoyée" : "Candidater à ce projet"}
+              {applying ? "Envoi…" : hasApplied ? "Candidature envoyée" : "Candidater à ce projet"}
             </button>
           )}
         </div>

@@ -1,152 +1,148 @@
 import Link from "next/link";
-import { ArrowRight, Zap, Shield, Users } from "lucide-react";
+import Image from "next/image";
+import { FileText } from "lucide-react";
+import HeroMockups from "@/components/HeroMockups";
+import StatCounter from "@/components/StatCounter";
+
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" };
 
 export default function Home() {
   return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{ background: "var(--bg)" }}
-    >
-      {/* Ambient gradient blobs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none select-none" aria-hidden>
-        <div
-          className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full opacity-30"
-          style={{
-            background: "radial-gradient(circle, rgba(244,63,94,0.18) 0%, transparent 70%)",
-            filter: "blur(60px)",
-          }}
-        />
-        <div
-          className="absolute top-1/3 -right-32 w-[420px] h-[420px] rounded-full opacity-20"
-          style={{
-            background: "radial-gradient(circle, rgba(139,92,246,0.20) 0%, transparent 70%)",
-            filter: "blur(60px)",
-          }}
-        />
-        <div
-          className="absolute -bottom-20 left-1/3 w-[360px] h-[360px] rounded-full opacity-20"
-          style={{
-            background: "radial-gradient(circle, rgba(59,130,246,0.16) 0%, transparent 70%)",
-            filter: "blur(60px)",
-          }}
-        />
-      </div>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: C.canvas, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <style>{`
+        .lk-cta-primary {
+          transition: background-color 150ms ease;
+        }
+        .lk-cta-primary:hover {
+          background-color: #2A3252;
+        }
+        .lk-cta-primary:hover .lk-arrow {
+          transform: translateX(3px);
+        }
+        .lk-cta-primary:focus-visible {
+          outline: 2px solid #D4537E;
+          outline-offset: 3px;
+        }
+        .lk-arrow {
+          display: inline-block;
+          transition: transform 150ms ease;
+        }
+        .lk-cta-secondary {
+          transition: border-color 150ms ease;
+        }
+        .lk-cta-secondary:focus-visible {
+          outline: 2px solid #D4537E;
+          outline-offset: 3px;
+        }
+      `}</style>
 
       {/* Nav */}
-      <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-5xl mx-auto w-full">
-        <span
-          className="font-black text-xl tracking-tight"
-          style={{ color: "var(--text)" }}
-        >
-          Linkea
-        </span>
-        <Link
-          href="/connexion"
-          className="btn-ghost"
-          style={{ padding: "9px 18px", fontSize: 14 }}
-        >
-          Se connecter
-        </Link>
+      <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 48px", maxWidth: 1200, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        <Image src="/logo.png" alt="Linkea" width={74} height={34} style={{ objectFit: "contain", height: 34, width: "auto" }} priority />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Link href="/connexion" style={{ padding: "9px 18px", fontSize: 14, fontWeight: 600, borderRadius: 10, color: C.ink, textDecoration: "none", border: `1.5px solid ${C.hairline}`, background: "transparent" }}>
+            Se connecter
+          </Link>
+          <Link href="/inscription" style={{ padding: "9px 20px", fontSize: 14, fontWeight: 600, borderRadius: 10, color: "#fff", textDecoration: "none", background: C.ink }}>
+            Commencer
+          </Link>
+        </div>
       </nav>
 
       {/* Hero */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-16 text-center">
-        {/* Badge */}
-        <div
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-8"
-          style={{
-            background: "rgba(255,255,255,0.70)",
-            backdropFilter: "blur(12px)",
-            border: "1px solid rgba(0,0,0,0.06)",
-            boxShadow: "var(--shadow-xs)",
-          }}
-        >
-          <span
-            className="w-1.5 h-1.5 rounded-full animate-pulse"
-            style={{ background: "var(--rose)" }}
-          />
-          <span className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
-            Bêta V1 · Ouvert aux étudiants
-          </span>
-        </div>
+      <main style={{ flex: 1, maxWidth: 1200, margin: "0 auto", padding: "40px 48px 80px", width: "100%", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 60 }}>
 
-        {/* Title */}
-        <h1
-          className="text-5xl sm:text-6xl font-black tracking-tight leading-[1.05] mb-5 max-w-xl"
-          style={{ color: "var(--text)" }}
-        >
-          De l&apos;idée au{" "}
-          <span className="gradient-text">MVP</span>
-          <br />en 4–8 semaines
-        </h1>
+          {/* Left */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: "clamp(36px, 4.5vw, 58px)", fontWeight: 600, letterSpacing: "-0.035em", lineHeight: 1.05, color: C.ink, margin: "0 0 20px" }}>
+              Ton projet mérite<br />le bon développeur
+            </h1>
 
-        {/* Subtitle */}
-        <p
-          className="text-lg leading-relaxed mb-10 max-w-md"
-          style={{ color: "var(--muted)" }}
-        >
-          La plateforme qui connecte les founders étudiants
-          avec les meilleurs devs de leur promo.
-        </p>
+            <p style={{ fontSize: 17, lineHeight: 1.65, color: C.muted, margin: "0 0 8px", maxWidth: 440 }}>
+              Linkea connecte vos projets digitaux avec des développeurs étudiants motivés et vérifiés.
+            </p>
+            <p style={{ fontSize: 14, color: C.muted, margin: "0 0 40px", maxWidth: 400, opacity: 0.75 }}>
+              Startup, PME, équipe interne ou projet solo.
+            </p>
 
-        {/* CTA */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center mb-16">
-          <Link href="/inscription" className="btn-primary" style={{ fontSize: 16, padding: "15px 28px" }}>
-            Créer un compte
-            <ArrowRight size={17} strokeWidth={2.2} />
-          </Link>
-          <Link href="/connexion" className="btn-ghost" style={{ fontSize: 16, padding: "15px 28px" }}>
-            Se connecter
-          </Link>
-        </div>
-
-        {/* Features */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl w-full">
-          {[
-            {
-              icon: Zap,
-              color: "var(--rose)",
-              bg: "var(--rose-soft)",
-              title: "Match rapide",
-              desc: "Trouvez votre dev en 48h, pas en 2 semaines.",
-            },
-            {
-              icon: Shield,
-              color: "var(--blue)",
-              bg: "var(--blue-soft)",
-              title: "Contrat inclus",
-              desc: "Lettre de mission générée et signée en ligne.",
-            },
-            {
-              icon: Users,
-              color: "var(--violet)",
-              bg: "var(--violet-soft)",
-              title: "Étudiants only",
-              desc: "Une communauté de confiance, école vérifiée.",
-            },
-          ].map(({ icon: Icon, color, bg, title, desc }) => (
-            <div
-              key={title}
-              className="card text-left p-5"
-            >
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
-                style={{ background: bg }}
-              >
-                <Icon size={18} strokeWidth={1.8} style={{ color }} />
-              </div>
-              <p className="font-bold text-sm mb-1" style={{ color: "var(--text)" }}>{title}</p>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--muted)" }}>{desc}</p>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 52 }}>
+              <Link href="/inscription?role=founder" className="lk-cta-primary" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", fontSize: 15, fontWeight: 600, borderRadius: 12, color: "#fff", textDecoration: "none", background: C.ink }}>
+                Déposer un projet <span className="lk-arrow">→</span>
+              </Link>
+              <Link href="/inscription?role=developer" className="lk-cta-secondary" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", fontSize: 15, fontWeight: 600, borderRadius: 12, color: C.ink, textDecoration: "none", background: C.surface, border: `1px solid ${C.rose}` }}>
+                Je suis développeur
+              </Link>
             </div>
-          ))}
+
+            <StatCounter items={[
+              { n: 156, label: "projets lancés" },
+              { n: 214, label: "devs actifs" },
+              { n: 24,  suffix: "h", label: "délai de match" },
+            ]} />
+          </div>
+
+          {/* Right — mockups iPhone */}
+          <div className="hidden lg:block" style={{ flexShrink: 0 }}>
+            <HeroMockups />
+          </div>
+        </div>
+
+        {/* Bento features */}
+        <div style={{ marginTop: 96 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+
+            {/* Grande card */}
+            <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 18, padding: "44px 48px" }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "1.5px", color: C.rose, textTransform: "uppercase", marginBottom: 16 }}>
+                Comment ça marche
+              </p>
+              <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, color: C.ink, letterSpacing: "-0.03em", lineHeight: 1.1, margin: "0 0 36px" }}>
+                De l&apos;idée au MVP,<br />en quelques semaines
+              </h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                {[
+                  { n: "01", title: "Déposez votre projet", desc: "Décrivez le contexte, la stack souhaitée et la deadline. 5 minutes." },
+                  { n: "02", title: "Recevez des profils dès le lendemain", desc: "Des développeurs étudiants candidatent dans les 24h. Vous choisissez." },
+                  { n: "03", title: "Construisez ensemble", desc: "Contrat signé, gestion de projet et livrables inclus." },
+                ].map(({ n, title, desc }) => (
+                  <div key={n} style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+                    <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 13, fontWeight: 600, color: C.rose, flexShrink: 0, marginTop: 2, letterSpacing: "0.02em" }}>{n}</span>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>{title}</p>
+                      <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.55, margin: 0 }}>{desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Petites cards */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ flex: 1, background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 18, padding: "28px 30px" }}>
+                <FileText size={18} strokeWidth={1.5} style={{ color: C.ink, marginBottom: 18 }} />
+                <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 6px" }}>Contrat inclus</p>
+                <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.55, margin: 0 }}>Lettre de mission générée et signée en ligne, sans friction.</p>
+              </div>
+
+              <div style={{ flex: 1, background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 18, padding: "28px 30px" }}>
+                <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 44, fontWeight: 600, color: C.rose, lineHeight: 1, margin: "0 0 10px" }}>24h</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 6px" }}>Délai moyen de match</p>
+                <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.55, margin: 0 }}>Les devs candidatent dès le lendemain de la publication.</p>
+              </div>
+            </div>
+
+          </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 text-center pb-8">
-        <p className="text-xs" style={{ color: "var(--subtle)" }}>
-          © 2025 Linkea · Fait avec passion pour les builders
-        </p>
+      <footer style={{ padding: "24px 48px", borderTop: `1.5px solid ${C.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", gap: 20 }}>
+        <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>© 2026 Linkea</p>
+        <span style={{ color: C.hairline }}>·</span>
+        <Link href="/cgu" style={{ fontSize: 12, color: C.muted, textDecoration: "none" }}>CGU</Link>
+        <span style={{ color: C.hairline }}>·</span>
+        <Link href="/confidentialite" style={{ fontSize: 12, color: C.muted, textDecoration: "none" }}>Confidentialité</Link>
       </footer>
     </div>
   );

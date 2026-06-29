@@ -12,6 +12,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import NotifToast from "@/components/NotifToast";
 
 type Tab = {
   label: string;
@@ -25,6 +26,11 @@ export default function BottomNav() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [role, setRole] = useState<string | null>(null);
   const [isBanned, setIsBanned] = useState(false);
+
+  useEffect(() => {
+    const cached = localStorage.getItem("lk_role");
+    if (cached) setRole(cached);
+  }, []);
 
   useEffect(() => {
     async function checkUnread() {
@@ -47,6 +53,7 @@ export default function BottomNav() {
         .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       const r = roleData?.role;
       setRole(r ?? null);
+      if (r) localStorage.setItem("lk_role", r);
       if (!r || r === "admin") return;
 
       let convQuery;
@@ -132,6 +139,8 @@ export default function BottomNav() {
       ];
 
   return (
+    <>
+      <NotifToast />
     <div
       className="fixed bottom-0 left-0 right-0 z-50"
       style={{
@@ -161,9 +170,8 @@ export default function BottomNav() {
               <span className="relative">
                 <Icon
                   size={22}
-                  strokeWidth={active ? 2.2 : 1.8}
+                  strokeWidth={2}
                   style={{ color: active ? "var(--rose)" : "var(--text)" }}
-                  className="transition-all duration-200"
                 />
                 {showBadge && (
                   <span
@@ -195,5 +203,6 @@ export default function BottomNav() {
         })}
       </div>
     </div>
+    </>
   );
 }

@@ -2,132 +2,50 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import BanModal from "@/components/BanModal";
 
-type Project = {
-  id: string;
-  titre: string;
-  description: string;
-  stack_souhaitee: string;
-  deadline: string;
-  statut: string;
-  created_at: string;
-  profiles_founder: { nom: string; ecole: string };
-};
+// ── Types ───────────────────────────────────────────────────────────────────
+type Project = { id: string; titre: string; description: string; stack_souhaitee: string; deadline: string; statut: string; created_at: string; profiles_founder: { nom: string; ecole: string }; };
+type Founder  = { id: string; user_id: string; nom: string; email: string; ecole: string; linkedin: string; budget: string; created_at: string; };
+type Developer = { id: string; user_id: string; nom: string; email: string; ecole: string; competences: string[]; dispo_heures_semaine: number; github: string; linkedin: string; created_at: string; };
+type Match    = { id: string; statut: string; created_at: string; projects: { titre: string; statut: string }; profiles_developer: { nom: string; ecole: string }; };
+type Report   = { id: string; reporter_id: string; target_type: string; target_id: string; target_nom?: string; raison: string; description?: string; statut: "pending" | "resolu" | "ignore"; created_at: string; };
+type SupportConv = { id: string; user_id: string; created_at: string; nom?: string; role?: string; lastMessage?: string; unreadCount: number; };
+type ActiveBan   = { id: string; user_id: string; type: "temp" | "permanent"; raison: string; expires_at: string | null; created_at: string; nom?: string; role?: string; };
+type Tab = "analytics" | "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support";
 
-type Founder = {
-  id: string;
-  user_id: string;
-  nom: string;
-  email: string;
-  ecole: string;
-  linkedin: string;
-  budget: string;
-  created_at: string;
-};
-
-type Developer = {
-  id: string;
-  user_id: string;
-  nom: string;
-  email: string;
-  ecole: string;
-  competences: string[];
-  dispo_heures_semaine: number;
-  github: string;
-  linkedin: string;
-  created_at: string;
-};
-
-type Match = {
-  id: string;
-  statut: string;
-  created_at: string;
-  projects: { titre: string; statut: string };
-  profiles_developer: { nom: string; ecole: string };
-};
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" };
 
 const STATUTS = ["pending", "matched", "en_cours", "livre", "suspendu"];
-const statutColors: Record<string, string> = {
-  pending:   "bg-amber-50 text-amber-600 border-amber-200",
-  matched:   "bg-blue-50 text-blue-600 border-blue-200",
-  en_cours:  "bg-green-50 text-green-600 border-green-200",
-  livre:     "bg-slate-100 text-slate-500 border-slate-200",
-  suspendu:  "bg-red-50 text-red-500 border-red-200",
-};
-const statutLabels: Record<string, string> = {
-  pending: "En attente", matched: "Matchée", en_cours: "En cours", livre: "Livré", suspendu: "Suspendu",
-};
+const statutLabels: Record<string, string> = { pending: "En attente", matched: "Matchée", en_cours: "En cours", livre: "Livré", suspendu: "Suspendu" };
+const RAISON_LABELS: Record<string, string> = { spam: "Spam", faux_profil: "Faux profil", contenu_inapproprie: "Contenu inapproprié", arnaque: "Arnaque", autre: "Autre" };
 
-type Report = {
-  id: string;
-  reporter_id: string;
-  target_type: string;
-  target_id: string;
-  target_nom?: string;
-  raison: string;
-  description?: string;
-  statut: "pending" | "resolu" | "ignore";
-  created_at: string;
-};
-
-const RAISON_LABELS: Record<string, string> = {
-  spam: "Spam",
-  faux_profil: "Faux profil",
-  contenu_inapproprie: "Contenu inapproprié",
-  arnaque: "Arnaque",
-  autre: "Autre",
-};
-
-type SupportConv = {
-  id: string;
-  user_id: string;
-  created_at: string;
-  nom?: string;
-  role?: string;
-  lastMessage?: string;
-  unreadCount: number;
-};
-
-type ActiveBan = {
-  id: string;
-  user_id: string;
-  type: "temp" | "permanent";
-  raison: string;
-  expires_at: string | null;
-  created_at: string;
-  nom?: string;
-  role?: string;
-};
-
-type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support" | "analytics";
-
+// ── Composant ────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("projets");
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [founders, setFounders] = useState<Founder[]>([]);
-  const [developers, setDevelopers] = useState<Developer[]>([]);
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [reports, setReports] = useState<Report[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [filterReport, setFilterReport] = useState<"all" | "pending" | "resolu" | "ignore">("pending");
-  const [adminId, setAdminId] = useState<string | null>(null);
-  const [banTarget, setBanTarget] = useState<{ userId: string; nom: string } | null>(null);
-  const [activeBans, setActiveBans] = useState<ActiveBan[]>([]);
-  const [liftingBan, setLiftingBan] = useState<string | null>(null);
-  const [supportConvs, setSupportConvs] = useState<SupportConv[]>([]);
+  const [tab, setTab] = useState<Tab>("analytics");
+  const [projects,    setProjects]    = useState<Project[]>([]);
+  const [founders,    setFounders]    = useState<Founder[]>([]);
+  const [developers,  setDevelopers]  = useState<Developer[]>([]);
+  const [matches,     setMatches]     = useState<Match[]>([]);
+  const [reports,     setReports]     = useState<Report[]>([]);
+  const [activeBans,  setActiveBans]  = useState<ActiveBan[]>([]);
+  const [supportConvs,setSupportConvs]= useState<SupportConv[]>([]);
+  const [loading,      setLoading]     = useState(true);
+  const [updatingId,   setUpdatingId]  = useState<string | null>(null);
+  const [filterReport, setFilterReport]= useState<"all" | "pending" | "resolu" | "ignore">("pending");
+  const [adminId,      setAdminId]     = useState<string | null>(null);
+  const [banTarget,    setBanTarget]   = useState<{ userId: string; nom: string } | null>(null);
+  const [liftingBan,   setLiftingBan]  = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/connexion"); return; }
-
       setAdminId(user.id);
-      const { data: roleData } = await supabase
-        .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+      const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       if (roleData?.role !== "admin") { router.push("/projets"); return; }
 
       const [{ data: projs }, { data: founds }, { data: devs }, { data: matchData }, { data: reportsData }, { data: bansData }] = await Promise.all([
@@ -136,10 +54,7 @@ export default function AdminDashboard() {
         supabase.from("profiles_developer").select("*").order("created_at", { ascending: false }),
         supabase.from("candidatures").select("id, statut, created_at, projects(titre, statut), profiles_developer(nom, ecole)").eq("statut", "accepted").order("created_at", { ascending: false }),
         supabase.from("reports").select("*").order("created_at", { ascending: false }),
-        supabase.from("bans").select("id, user_id, type, raison, expires_at, created_at")
-          .eq("is_active", true)
-          .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
-          .order("created_at", { ascending: false }),
+        supabase.from("bans").select("id, user_id, type, raison, expires_at, created_at").eq("is_active", true).or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).order("created_at", { ascending: false }),
       ]);
 
       setProjects((projs as Project[]) ?? []);
@@ -148,40 +63,36 @@ export default function AdminDashboard() {
       setMatches((matchData as unknown as Match[]) ?? []);
       setReports((reportsData as Report[]) ?? []);
 
-      // Enrichir les bans avec le nom de l'utilisateur
       const rawBans = (bansData as ActiveBan[]) ?? [];
       if (rawBans.length > 0) {
-        const userIds = rawBans.map((b) => b.user_id);
+        const uids = rawBans.map((b) => b.user_id);
         const [{ data: fP }, { data: dP }] = await Promise.all([
-          supabase.from("profiles_founder").select("user_id, nom").in("user_id", userIds),
-          supabase.from("profiles_developer").select("user_id, nom").in("user_id", userIds),
+          supabase.from("profiles_founder").select("user_id, nom").in("user_id", uids),
+          supabase.from("profiles_developer").select("user_id, nom").in("user_id", uids),
         ]);
-        const nameMap: Record<string, { nom: string; role: string }> = {};
-        (fP ?? []).forEach((p) => { nameMap[p.user_id] = { nom: p.nom, role: "founder" }; });
-        (dP ?? []).forEach((p) => { nameMap[p.user_id] = { nom: p.nom, role: "developer" }; });
-        setActiveBans(rawBans.map((b) => ({ ...b, nom: nameMap[b.user_id]?.nom, role: nameMap[b.user_id]?.role })));
+        const nm: Record<string, { nom: string; role: string }> = {};
+        (fP ?? []).forEach((p) => { nm[p.user_id] = { nom: p.nom, role: "founder" }; });
+        (dP ?? []).forEach((p) => { nm[p.user_id] = { nom: p.nom, role: "developer" }; });
+        setActiveBans(rawBans.map((b) => ({ ...b, nom: nm[b.user_id]?.nom, role: nm[b.user_id]?.role })));
       }
-      // Support conversations
-      const { data: sConvs } = await supabase
-        .from("support_conversations").select("id, user_id, created_at").order("created_at", { ascending: false });
-      if (sConvs && sConvs.length > 0) {
-        const sUserIds = sConvs.map((c: { user_id: string }) => c.user_id);
+
+      const { data: sConvs } = await supabase.from("support_conversations").select("id, user_id, created_at").order("created_at", { ascending: false });
+      if (sConvs?.length) {
+        const sIds = sConvs.map((c: { user_id: string }) => c.user_id);
         const [{ data: sfP }, { data: sdP }] = await Promise.all([
-          supabase.from("profiles_founder").select("user_id, nom").in("user_id", sUserIds),
-          supabase.from("profiles_developer").select("user_id, nom").in("user_id", sUserIds),
+          supabase.from("profiles_founder").select("user_id, nom").in("user_id", sIds),
+          supabase.from("profiles_developer").select("user_id, nom").in("user_id", sIds),
         ]);
-        const sNameMap: Record<string, { nom: string; role: string }> = {};
-        (sfP ?? []).forEach((p: { user_id: string; nom: string }) => { sNameMap[p.user_id] = { nom: p.nom, role: "founder" }; });
-        (sdP ?? []).forEach((p: { user_id: string; nom: string }) => { sNameMap[p.user_id] = { nom: p.nom, role: "developer" }; });
+        const sNm: Record<string, { nom: string; role: string }> = {};
+        (sfP ?? []).forEach((p: { user_id: string; nom: string }) => { sNm[p.user_id] = { nom: p.nom, role: "founder" }; });
+        (sdP ?? []).forEach((p: { user_id: string; nom: string }) => { sNm[p.user_id] = { nom: p.nom, role: "developer" }; });
         const enriched = await Promise.all(sConvs.map(async (c: { id: string; user_id: string; created_at: string }) => {
-          const { data: last } = await supabase.from("support_messages").select("content, sender_id").eq("conversation_id", c.id).order("created_at", { ascending: false }).limit(1);
-          const lastRead = `lastRead_support_${c.id}`;
+          const { data: last } = await supabase.from("support_messages").select("content").eq("conversation_id", c.id).order("created_at", { ascending: false }).limit(1);
           const { count: unread } = await supabase.from("support_messages").select("*", { count: "exact", head: true }).eq("conversation_id", c.id).neq("sender_id", user.id).gt("created_at", "1970-01-01");
-          return { ...c, nom: sNameMap[c.user_id]?.nom, role: sNameMap[c.user_id]?.role, lastMessage: last?.[0]?.content, unreadCount: unread ?? 0, _lastRead: lastRead };
+          return { ...c, nom: sNm[c.user_id]?.nom, role: sNm[c.user_id]?.role, lastMessage: last?.[0]?.content, unreadCount: unread ?? 0 };
         }));
         setSupportConvs(enriched as SupportConv[]);
       }
-
       setLoading(false);
     }
     load();
@@ -190,12 +101,7 @@ export default function AdminDashboard() {
   async function liftBan(banId: string, userId: string) {
     setLiftingBan(banId);
     await supabase.from("bans").update({ is_active: false }).eq("id", banId);
-    await supabase.from("notifications").insert({
-      user_id: userId,
-      type: "admin_unban",
-      title: "✅ Sanction levée",
-      body: "Ton compte Linkea a été réactivé. Bienvenue de retour !",
-    });
+    await supabase.from("notifications").insert({ user_id: userId, type: "admin_unban", title: "Sanction levée", body: "Ton compte Linkea a été réactivé." });
     setActiveBans((prev) => prev.filter((b) => b.id !== banId));
     setLiftingBan(null);
   }
@@ -219,468 +125,398 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.canvas }}>
+        <div style={{ width: 24, height: 24, borderRadius: "50%", border: `2px solid ${C.ink}`, borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  const pendingReports = reports.filter((r) => r.statut === "pending");
+  // ── Métriques ─────────────────────────────────────────────────────────────
+  const pendingReports   = reports.filter((r) => r.statut === "pending");
+  const totalUsers       = founders.length + developers.length;
+  const projectsMatched  = projects.filter((p) => ["matched", "en_cours", "livre"].includes(p.statut)).length;
+  const projectsLivre    = projects.filter((p) => p.statut === "livre").length;
+  const tauxMatch        = projects.length > 0 ? Math.round((projectsMatched / projects.length) * 100) : 0;
+  const tauxCompletion   = projectsMatched > 0 ? Math.round((projectsLivre / projectsMatched) * 100) : 0;
 
-  // ── Analytics ────────────────────────────────────────────────────────────────
-  const totalUsers = founders.length + developers.length;
-  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const newUsersWeek = [...founders, ...developers].filter((u) => u.created_at > oneWeekAgo).length;
+  const recentActivity = [
+    ...matches.slice(0, 5).map((m) => ({ date: m.created_at, type: "match" as const, label: "Nouveau match", sub: m.projects?.titre ?? "—", statut: m.projects?.statut ?? "" })),
+    ...projects.slice(0, 4).map((p) => ({ date: p.created_at, type: "project" as const, label: "Projet publié", sub: p.titre, statut: p.statut })),
+  ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
 
-  const projectsMatched = projects.filter((p) => ["matched", "en_cours", "livre"].includes(p.statut)).length;
-  const projectsLivre   = projects.filter((p) => p.statut === "livre").length;
-  const tauxMatch       = projects.length > 0 ? Math.round((projectsMatched / projects.length) * 100) : 0;
-  const tauxCompletion  = projectsMatched > 0 ? Math.round((projectsLivre / projectsMatched) * 100) : 0;
-
-  // Croissance : 8 dernières semaines
-  function weekLabel(weeksAgo: number) {
-    const d = new Date(Date.now() - weeksAgo * 7 * 24 * 60 * 60 * 1000);
-    return `S${d.getMonth() + 1}/${String(d.getDate()).padStart(2, "0")}`;
-  }
-  const growthWeeks = Array.from({ length: 8 }, (_, i) => {
-    const weeksAgo = 7 - i;
-    const from = new Date(Date.now() - weeksAgo * 7 * 24 * 60 * 60 * 1000).toISOString();
-    const to   = new Date(Date.now() - (weeksAgo - 1) * 7 * 24 * 60 * 60 * 1000).toISOString();
-    const count = [...founders, ...developers].filter((u) => u.created_at >= from && u.created_at < to).length;
-    return { label: weekLabel(weeksAgo), count };
-  });
-  const maxGrowth = Math.max(...growthWeeks.map((w) => w.count), 1);
-
-  // Funnel
-  const funnel = [
-    { label: "Inscrits",       val: totalUsers,       color: "bg-indigo-500" },
-    { label: "Projets publiés", val: projects.length,  color: "bg-purple-500" },
-    { label: "Matchés",         val: projectsMatched,  color: "bg-blue-500"   },
-    { label: "Livrés",          val: projectsLivre,    color: "bg-green-500"  },
-  ];
-  const maxFunnel = Math.max(totalUsers, 1);
+  const urgentSupport = supportConvs.some((c) => c.unreadCount > 0);
 
   const tabs: { key: Tab; label: string; count?: number; urgent?: boolean }[] = [
-    { key: "analytics",     label: "📊 Analytics" },
-    { key: "projets",       label: "Projets",       count: projects.length },
-    { key: "founders",      label: "Founders",      count: founders.length },
-    { key: "developers",    label: "Developers",    count: developers.length },
-    { key: "matchings",     label: "Matchings",     count: matches.length },
-    { key: "signalements",  label: "Signalements",  count: pendingReports.length, urgent: pendingReports.length > 0 },
-    { key: "bans",          label: "Bans actifs",   count: activeBans.length, urgent: activeBans.length > 0 },
-    { key: "support",       label: "Support",       count: supportConvs.length, urgent: supportConvs.some((c) => c.unreadCount > 0) },
+    { key: "analytics",    label: "Vue d'ensemble" },
+    { key: "projets",      label: "Projets",       count: projects.length },
+    { key: "founders",     label: "Founders",      count: founders.length },
+    { key: "developers",   label: "Developers",    count: developers.length },
+    { key: "matchings",    label: "Matchings",     count: matches.length },
+    { key: "signalements", label: "Signalements",  count: pendingReports.length, urgent: pendingReports.length > 0 },
+    { key: "bans",         label: "Bans",          count: activeBans.length },
+    { key: "support",      label: "Support",       count: supportConvs.length, urgent: urgentSupport },
   ];
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div style={{ minHeight: "100vh", background: C.canvas, fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      <style>{`
+        .lk-tab { cursor: pointer; padding: 12px 0; margin-right: 32px; font-size: 14px; font-weight: 600; color: ${C.muted}; border-bottom: 2.5px solid transparent; white-space: nowrap; transition: color 0.12s, border-color 0.12s; background: none; border-left: none; border-right: none; border-top: none; }
+        .lk-tab:hover { color: ${C.ink}; }
+        .lk-tab.active { color: ${C.ink}; border-bottom-color: ${C.rose}; }
+        .lk-tab:focus-visible { outline: 2px solid ${C.rose}; outline-offset: 2px; border-radius: 2px; }
+        .lk-btn-ghost { cursor: pointer; padding: 9px 16px; font-size: 13px; font-weight: 600; border-radius: 9px; color: ${C.ink}; border: 1.5px solid ${C.hairline}; background: transparent; transition: border-color 0.15s; }
+        .lk-btn-ghost:hover { border-color: ${C.ink}; }
+        .lk-btn-ghost:focus-visible { outline: 2px solid ${C.rose}; outline-offset: 2px; }
+        .lk-row:hover { background: ${C.canvas}; }
+        @media (max-width: 768px) {
+          .lk-kpi { flex-direction: column !important; }
+          .lk-kpi-item { border-right: none !important; border-bottom: 1.5px solid ${C.hairline} !important; }
+          .lk-kpi-item:last-child { border-bottom: none !important; }
+          .lk-taux { grid-template-columns: 1fr !important; }
+          .lk-bifold { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
 
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-indigo-500 mb-0.5">Linkea · Admin</p>
-            <h1 className="text-xl font-black text-slate-900">Dashboard</h1>
+      {/* HEADER */}
+      <header style={{ background: C.surface, borderBottom: `1.5px solid ${C.hairline}` }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "18px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <Image src="/logo.png" alt="Linkea" width={72} height={32} style={{ objectFit: "contain", height: 30, width: "auto" }} priority />
+            <div style={{ width: 1, height: 32, background: C.hairline }} />
+            <div>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase", color: C.muted, margin: "0 0 4px" }}>Admin</p>
+              <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", color: C.ink, margin: 0, lineHeight: 1 }}>Dashboard</h1>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => router.push("/messages")} className="btn-ghost text-sm px-4 py-2">💬 Messagerie</button>
-            <button onClick={handleLogout} className="btn-ghost text-sm px-4 py-2">Déconnexion</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => router.push("/messages")} className="lk-btn-ghost">Messagerie</button>
+            <button onClick={handleLogout} style={{ cursor: "pointer", padding: "9px 18px", fontSize: 13, fontWeight: 600, borderRadius: 9, color: "#fff", background: C.ink, border: "none" }}>
+              Déconnexion
+            </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-6">
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 32px" }}>
 
-        {/* Stats */}
-        <div className="grid grid-cols-5 gap-3 mb-6">
+        {/* KPI BAND — une seule surface, filets verticaux */}
+        <div className="lk-kpi" style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, display: "flex", marginBottom: 24 }}>
           {[
-            { label: "Projets", val: projects.length, color: "text-pink-500" },
-            { label: "Founders", val: founders.length, color: "text-purple-500" },
-            { label: "Developers", val: developers.length, color: "text-blue-500" },
-            { label: "Matchings", val: matches.length, color: "text-green-500" },
-            { label: "Signalements", val: pendingReports.length, color: pendingReports.length > 0 ? "text-red-500" : "text-slate-400" },
-          ].map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
-              <p className={`text-3xl font-black ${s.color}`}>{s.val}</p>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">{s.label}</p>
+            { label: "Projets",      val: projects.length },
+            { label: "Founders",     val: founders.length },
+            { label: "Developers",   val: developers.length },
+            { label: "Matchings",    val: matches.length },
+            { label: "Signalements", val: pendingReports.length },
+          ].map((s, i, arr) => (
+            <div key={s.label} className="lk-kpi-item" style={{ flex: 1, padding: "24px 20px", borderRight: i < arr.length - 1 ? `1.5px solid ${C.hairline}` : "none", textAlign: "center" }}>
+              <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", lineHeight: 1, color: C.ink, margin: "0 0 7px", fontVariantNumeric: "tabular-nums" }}>{s.val}</p>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted, margin: 0 }}>{s.label}</p>
             </div>
           ))}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6">
+        {/* TABS */}
+        <div style={{ display: "flex", borderBottom: `1.5px solid ${C.hairline}`, marginBottom: 28, overflowX: "auto" }}>
           {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex-1 py-2 px-3 rounded-lg text-sm font-semibold transition-all relative ${
-                tab === t.key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
+            <button key={t.key} onClick={() => setTab(t.key)} className={`lk-tab${tab === t.key ? " active" : ""}`}>
               {t.label}
               {t.count !== undefined && (
-                <span className={`ml-1.5 text-xs font-bold ${t.urgent ? "text-red-500" : tab === t.key ? "text-indigo-500" : "text-slate-400"}`}>
-                  {t.count}
-                </span>
+                <span style={{ marginLeft: 5, fontSize: 12, color: C.muted, fontVariantNumeric: "tabular-nums" }}>{t.count}</span>
+              )}
+              {t.urgent && (
+                <span style={{ marginLeft: 6, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 14, height: 14, borderRadius: "50%", background: C.rose, color: "#fff", fontSize: 9, fontWeight: 700, verticalAlign: "middle" }} />
               )}
             </button>
           ))}
         </div>
 
-        {/* ── Analytics ─────────────────────────────────────────────────────── */}
+        {/* ── VUE D'ENSEMBLE ─────────────────────────────────────────────── */}
         {tab === "analytics" && (
-          <div className="flex flex-col gap-6">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-            {/* KPI cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: "Utilisateurs total", val: totalUsers, sub: `+${newUsersWeek} cette semaine`, color: "text-indigo-600", bg: "bg-indigo-50 border-indigo-100" },
-                { label: "Taux de match",       val: `${tauxMatch}%`,     sub: `${projectsMatched} projets matchés`, color: "text-blue-600",   bg: "bg-blue-50 border-blue-100" },
-                { label: "Taux de complétion",  val: `${tauxCompletion}%`, sub: `${projectsLivre} projets livrés`,  color: "text-green-600",  bg: "bg-green-50 border-green-100" },
-                { label: "Projets actifs",      val: projects.filter((p) => p.statut === "en_cours").length, sub: `${projects.filter((p) => p.statut === "matched").length} en attente de démarrage`, color: "text-purple-600", bg: "bg-purple-50 border-purple-100" },
-              ].map((k) => (
-                <div key={k.label} className={`rounded-2xl border p-5 ${k.bg}`}>
-                  <p className={`text-3xl font-black ${k.color}`}>{k.val}</p>
-                  <p className="text-xs font-bold text-slate-700 mt-1">{k.label}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{k.sub}</p>
-                </div>
-              ))}
-            </div>
+            {/* Taux — grille asymétrique */}
+            <div className="lk-taux" style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr", gap: 16 }}>
 
-            {/* Funnel */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              <h2 className="font-bold text-slate-900 mb-5">Funnel de conversion</h2>
-              <div className="flex flex-col gap-3">
-                {funnel.map((f, i) => (
-                  <div key={f.label}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-slate-700">{f.label}</span>
-                      <span className="text-sm font-black text-slate-900">{f.val}</span>
-                    </div>
-                    <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className={`h-3 rounded-full transition-all ${f.color}`}
-                        style={{ width: `${Math.round((f.val / maxFunnel) * 100)}%` }}
-                      />
-                    </div>
-                    {i < funnel.length - 1 && funnel[i].val > 0 && (
-                      <p className="text-xs text-slate-400 mt-1 text-right">
-                        {Math.round((funnel[i + 1].val / funnel[i].val) * 100)}% conversion →
-                      </p>
-                    )}
-                  </div>
-                ))}
+              {/* Héros : Taux de match */}
+              <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "32px 36px" }}>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted, margin: "0 0 6px" }}>Taux de match</p>
+                <div style={{ width: 24, height: 2, background: C.rose, marginBottom: 18 }} />
+                <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 58, fontWeight: 600, letterSpacing: "-0.04em", color: C.ink, lineHeight: 1, margin: "0 0 10px", fontVariantNumeric: "tabular-nums" }}>
+                  {tauxMatch}<span style={{ fontSize: 28 }}>%</span>
+                </p>
+                <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{projectsMatched} projet{projectsMatched !== 1 ? "s" : ""} matchés sur {projects.length} publiés</p>
+              </div>
+
+              {/* Taux de complétion */}
+              <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "32px 28px" }}>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted, margin: "0 0 22px" }}>Taux de complétion</p>
+                <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 38, fontWeight: 600, letterSpacing: "-0.04em", color: C.ink, lineHeight: 1, margin: "0 0 10px", fontVariantNumeric: "tabular-nums" }}>
+                  {tauxCompletion}<span style={{ fontSize: 20 }}>%</span>
+                </p>
+                <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{projectsLivre} livré{projectsLivre !== 1 ? "s" : ""}</p>
+              </div>
+
+              {/* Utilisateurs */}
+              <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "32px 28px" }}>
+                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted, margin: "0 0 22px" }}>Utilisateurs</p>
+                <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 38, fontWeight: 600, letterSpacing: "-0.04em", color: C.ink, lineHeight: 1, margin: "0 0 10px", fontVariantNumeric: "tabular-nums" }}>
+                  {totalUsers}
+                </p>
+                <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{founders.length} founders · {developers.length} devs</p>
               </div>
             </div>
 
-            {/* Courbe de croissance */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              <h2 className="font-bold text-slate-900 mb-5">Nouveaux utilisateurs (8 dernières semaines)</h2>
-              <div className="flex items-end gap-2 h-32">
-                {growthWeeks.map((w) => (
-                  <div key={w.label} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-xs font-bold text-slate-600">{w.count > 0 ? w.count : ""}</span>
-                    <div className="w-full rounded-t-lg bg-indigo-500 transition-all" style={{ height: `${Math.round((w.count / maxGrowth) * 96)}px`, minHeight: w.count > 0 ? "4px" : "0" }} />
-                    <span className="text-[10px] text-slate-400 truncate w-full text-center">{w.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Funnel + Activité récente */}
+            <div className="lk-bifold" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
-            {/* Répartition projets par statut */}
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              <h2 className="font-bold text-slate-900 mb-5">Répartition des projets par statut</h2>
-              <div className="flex flex-col gap-3">
-                {[
-                  { label: "En attente",  statut: "pending",  color: "bg-amber-400" },
-                  { label: "Matchés",     statut: "matched",  color: "bg-blue-500" },
-                  { label: "En cours",    statut: "en_cours", color: "bg-purple-500" },
-                  { label: "Livrés",      statut: "livre",    color: "bg-green-500" },
-                  { label: "Suspendus",   statut: "suspendu", color: "bg-red-400" },
-                ].map((s) => {
-                  const count = projects.filter((p) => p.statut === s.statut).length;
+              {/* Funnel de conversion */}
+              <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "28px 32px" }}>
+                <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em", color: C.ink, margin: "0 0 24px" }}>Funnel de conversion</h2>
+                {([
+                  { label: "Projets publiés", val: projects.length,   prev: null,              navy: 1    },
+                  { label: "Matchés",          val: projectsMatched,   prev: projects.length,   navy: 0.58 },
+                  { label: "Livrés",           val: projectsLivre,     prev: projectsMatched,   navy: 0.30 },
+                ] as { label: string; val: number; prev: number | null; navy: number }[]).map(({ label, val, prev, navy }, i) => {
+                  const isLast = i === 2;
+                  const pct = prev !== null && prev > 0 ? Math.round((val / prev) * 100) : 100;
+                  const barW = prev !== null && prev > 0 ? pct : 100;
                   return (
-                    <div key={s.statut}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-semibold text-slate-700">{s.label}</span>
-                        <span className="text-sm font-black text-slate-900">{count}</span>
+                    <div key={label} style={{ marginBottom: i < 2 ? 20 : 0 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: isLast ? C.rose : C.ink }}>{label}</span>
+                        <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, fontWeight: 600, color: isLast ? C.rose : C.ink, fontVariantNumeric: "tabular-nums" }}>{val}</span>
                       </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={`h-2 rounded-full ${s.color}`} style={{ width: projects.length > 0 ? `${Math.round((count / projects.length) * 100)}%` : "0%" }} />
+                      <div style={{ height: 8, borderRadius: 4, background: C.hairline, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 4, width: `${barW}%`, background: `rgba(26,33,56,${navy})` }} />
                       </div>
+                      {prev !== null && prev > 0 && (
+                        <p style={{ fontSize: 11, color: C.muted, margin: "4px 0 0", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{pct}% de l&apos;étape précédente</p>
+                      )}
                     </div>
                   );
                 })}
               </div>
-            </div>
 
+              {/* Activité récente */}
+              <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "28px 32px" }}>
+                <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em", color: C.ink, margin: "0 0 4px" }}>Activité récente</h2>
+                {recentActivity.length === 0 ? (
+                  <p style={{ fontSize: 13, color: C.muted, padding: "20px 0" }}>Aucune activité récente.</p>
+                ) : recentActivity.map((a, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < recentActivity.length - 1 ? `1px solid ${C.hairline}` : "none", gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: a.type === "match" ? C.rose : C.ink, margin: "0 0 2px" }}>{a.label}</p>
+                      <p style={{ fontSize: 12, color: C.muted, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.sub}</p>
+                    </div>
+                    <span style={{ fontSize: 12, color: C.muted, flexShrink: 0 }}>{statutLabels[a.statut] ?? a.statut}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Projets */}
+        {/* ── PROJETS ───────────────────────────────────────────────────────── */}
         {tab === "projets" && (
-          <div className="flex flex-col gap-3">
-            {projects.map((p) => (
-              <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-slate-900 text-base mb-0.5">{p.titre}</h3>
-                    <p className="text-xs text-slate-400 mb-2">
-                      {p.profiles_founder?.nom ?? "—"} · {p.profiles_founder?.ecole ?? "—"}
-                    </p>
-                    {p.description && (
-                      <p className="text-sm text-slate-500 line-clamp-2 mb-3">{p.description}</p>
-                    )}
-                    <div className="flex gap-3 text-xs text-slate-400">
-                      {p.stack_souhaitee && <span>🛠 {p.stack_souhaitee}</span>}
-                      {p.deadline && <span>📅 {p.deadline}</span>}
-                    </div>
-                  </div>
-                  <div className="shrink-0 flex flex-col items-end gap-2">
-                    <select
-                      value={p.statut}
-                      onChange={(e) => updateProjectStatut(p.id, e.target.value)}
-                      disabled={updatingId === p.id}
-                      className={`text-xs font-semibold px-3 py-1.5 rounded-full border cursor-pointer ${statutColors[p.statut] ?? "bg-slate-100 text-slate-500 border-slate-200"}`}
-                    >
-                      {STATUTS.map((s) => (
-                        <option key={s} value={s}>{statutLabels[s] ?? s}</option>
-                      ))}
-                    </select>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {projects.map((p, i) => (
+              <div key={p.id} className="lk-row" style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "18px 22px", display: "flex", alignItems: "flex-start", gap: 16, transition: "background 0.1s", borderTop: i === 0 ? undefined : undefined }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 2px" }}>{p.titre}</p>
+                  <p style={{ fontSize: 12, color: C.muted, margin: "0 0 8px" }}>{p.profiles_founder?.nom ?? "—"} · {p.profiles_founder?.ecole ?? "—"}</p>
+                  {p.description && <p style={{ fontSize: 13, color: C.muted, margin: "0 0 8px", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{p.description}</p>}
+                  <div style={{ display: "flex", gap: 16, fontSize: 12, color: C.muted }}>
+                    {p.stack_souhaitee && <span>{p.stack_souhaitee}</span>}
+                    {p.deadline && <span>Deadline : {p.deadline}</span>}
                   </div>
                 </div>
+                <select value={p.statut} onChange={(e) => updateProjectStatut(p.id, e.target.value)} disabled={updatingId === p.id}
+                  style={{ fontSize: 12, fontWeight: 600, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${C.hairline}`, color: C.ink, background: C.surface, cursor: "pointer", flexShrink: 0 }}>
+                  {STATUTS.map((s) => <option key={s} value={s}>{statutLabels[s] ?? s}</option>)}
+                </select>
               </div>
             ))}
           </div>
         )}
 
-        {/* Founders */}
+        {/* ── FOUNDERS ──────────────────────────────────────────────────────── */}
         {tab === "founders" && (
-          <div className="flex flex-col gap-3">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {founders.map((f) => (
-              <div key={f.id} className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white font-black shrink-0">
+              <div key={f.id} className="lk-row" style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "16px 22px", display: "flex", alignItems: "center", gap: 14, transition: "background 0.1s" }}>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: C.ink, color: "#fff", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   {f.nom?.[0]?.toUpperCase() ?? "?"}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-900">{f.nom}</p>
-                  <p className="text-xs text-slate-400">{f.email} · {f.ecole}</p>
-                  {f.budget && <p className="text-xs text-slate-400 mt-0.5">Budget : {f.budget}</p>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 2px" }}>{f.nom}</p>
+                  <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>{f.email} · {f.ecole}{f.budget ? ` · Budget : ${f.budget}` : ""}</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {f.linkedin && <a href={f.linkedin} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">LinkedIn ↗</a>}
-                  <button onClick={() => setBanTarget({ userId: f.user_id, nom: f.nom })} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 transition-colors">
-                    🚫 Bannir
-                  </button>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+                  {f.linkedin && <a href={f.linkedin} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.ink, textDecoration: "none", borderBottom: `1px solid ${C.hairline}` }}>LinkedIn ↗</a>}
+                  <button onClick={() => setBanTarget({ userId: f.user_id, nom: f.nom })} className="lk-btn-ghost" style={{ fontSize: 12, padding: "6px 12px" }}>Bannir</button>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Developers */}
+        {/* ── DEVELOPERS ────────────────────────────────────────────────────── */}
         {tab === "developers" && (
-          <div className="flex flex-col gap-3">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {developers.map((d) => (
-              <div key={d.id} className="bg-white rounded-2xl border border-slate-200 p-5 flex items-start gap-4">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-black shrink-0">
+              <div key={d.id} className="lk-row" style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "16px 22px", display: "flex", alignItems: "flex-start", gap: 14, transition: "background 0.1s" }}>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: C.ink, color: "#fff", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   {d.nom?.[0]?.toUpperCase() ?? "?"}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-slate-900">{d.nom}</p>
-                  <p className="text-xs text-slate-400 mb-2">{d.email} · {d.ecole} · {d.dispo_heures_semaine}h/sem</p>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 2px" }}>{d.nom}</p>
+                  <p style={{ fontSize: 12, color: C.muted, margin: "0 0 8px" }}>{d.email} · {d.ecole} · {d.dispo_heures_semaine}h/sem</p>
                   {d.competences?.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {d.competences.map((c) => (
-                        <span key={c} className="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full font-medium">{c}</span>
+                        <span key={c} style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.hairline}`, color: C.muted }}>{c}</span>
                       ))}
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2 shrink-0 flex-col items-end">
-                  <div className="flex gap-2">
-                    {d.github && <a href={d.github} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">GitHub ↗</a>}
-                    {d.linkedin && <a href={d.linkedin} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">LinkedIn ↗</a>}
-                  </div>
-                  <button onClick={() => setBanTarget({ userId: d.user_id, nom: d.nom })} className="text-xs font-semibold px-3 py-1.5 rounded-full bg-red-50 text-red-500 border border-red-100 hover:bg-red-100 transition-colors">
-                    🚫 Bannir
-                  </button>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0 }}>
+                  {d.github && <a href={d.github} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.ink, textDecoration: "none", borderBottom: `1px solid ${C.hairline}` }}>GitHub ↗</a>}
+                  {d.linkedin && <a href={d.linkedin} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.ink, textDecoration: "none", borderBottom: `1px solid ${C.hairline}` }}>LinkedIn ↗</a>}
+                  <button onClick={() => setBanTarget({ userId: d.user_id, nom: d.nom })} className="lk-btn-ghost" style={{ fontSize: 12, padding: "6px 12px" }}>Bannir</button>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Matchings */}
+        {/* ── MATCHINGS ─────────────────────────────────────────────────────── */}
         {tab === "matchings" && (
-          <div className="flex flex-col gap-3">
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {matches.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
-                <p className="text-slate-400">Aucun matching actif pour l'instant.</p>
+              <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "48px 32px", textAlign: "center" }}>
+                <p style={{ fontSize: 13, color: C.muted }}>Aucun matching actif pour l&apos;instant.</p>
               </div>
             ) : matches.map((m) => (
-              <div key={m.id} className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center gap-4">
-                <div className="flex-1">
-                  <p className="font-bold text-slate-900 text-sm">{m.projects?.titre ?? "—"}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Dev : {m.profiles_developer?.nom ?? "—"} · {m.profiles_developer?.ecole ?? "—"}</p>
+              <div key={m.id} className="lk-row" style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "16px 22px", display: "flex", alignItems: "center", gap: 16, transition: "background 0.1s" }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 2px" }}>{m.projects?.titre ?? "—"}</p>
+                  <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Dev : {m.profiles_developer?.nom ?? "—"} · {m.profiles_developer?.ecole ?? "—"}</p>
                 </div>
-                <span className="text-xs font-semibold bg-green-50 text-green-600 border border-green-200 px-3 py-1 rounded-full shrink-0">
-                  ✓ Matchée
-                </span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.muted, border: `1px solid ${C.hairline}`, borderRadius: 7, padding: "4px 10px", flexShrink: 0 }}>Matchée</span>
               </div>
             ))}
           </div>
         )}
 
-        {/* Signalements */}
+        {/* ── SIGNALEMENTS ──────────────────────────────────────────────────── */}
         {tab === "signalements" && (
           <div>
-            {/* Filtres */}
-            <div className="flex gap-2 mb-4">
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
               {(["all", "pending", "resolu", "ignore"] as const).map((f) => (
                 <button key={f} onClick={() => setFilterReport(f)}
-                  className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
-                    filterReport === f
-                      ? f === "pending" ? "bg-red-500 text-white border-red-500"
-                        : f === "resolu" ? "bg-green-500 text-white border-green-500"
-                        : f === "ignore" ? "bg-slate-400 text-white border-slate-400"
-                        : "bg-slate-900 text-white border-slate-900"
-                      : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
-                  }`}>
-                  { f === "all" ? "Tous" : f === "pending" ? "En attente" : f === "resolu" ? "Résolus" : "Ignorés" }
+                  style={{ fontSize: 12, fontWeight: 600, padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${filterReport === f ? C.ink : C.hairline}`, background: filterReport === f ? C.ink : C.surface, color: filterReport === f ? "#fff" : C.muted, cursor: "pointer", transition: "all 0.12s" }}>
+                  {f === "all" ? "Tous" : f === "pending" ? "En attente" : f === "resolu" ? "Résolus" : "Ignorés"}
                 </button>
               ))}
             </div>
-
-            <div className="flex flex-col gap-3">
-              {reports
-                .filter((r) => filterReport === "all" || r.statut === filterReport)
-                .map((r) => (
-                  <div key={r.id} className={`bg-white rounded-2xl border-2 p-5 ${r.statut === "pending" ? "border-red-100" : "border-slate-100"}`}>
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${r.target_type === "profile" ? "bg-purple-50 text-purple-600" : "bg-pink-50 text-pink-600"}`}>
-                            {r.target_type === "profile" ? "Profil" : "Projet"}
-                          </span>
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
-                            {RAISON_LABELS[r.raison] ?? r.raison}
-                          </span>
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                            r.statut === "pending" ? "bg-amber-50 text-amber-600" :
-                            r.statut === "resolu" ? "bg-green-50 text-green-600" : "bg-slate-100 text-slate-400"
-                          }`}>
-                            {r.statut === "pending" ? "En attente" : r.statut === "resolu" ? "Résolu" : "Ignoré"}
-                          </span>
-                        </div>
-                        <p className="font-bold text-slate-900 text-sm">{r.target_nom ?? r.target_id}</p>
-                        {r.description && <p className="text-sm text-slate-500 mt-1 italic">&ldquo;{r.description}&rdquo;</p>}
-                        <p className="text-xs text-slate-400 mt-1">{new Date(r.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {reports.filter((r) => filterReport === "all" || r.statut === filterReport).map((r) => (
+                <div key={r.id} style={{ background: C.surface, border: `1.5px solid ${r.statut === "pending" ? C.rose : C.hairline}`, borderRadius: 14, padding: "18px 22px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.hairline}`, color: C.muted }}>{r.target_type === "profile" ? "Profil" : "Projet"}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.hairline}`, color: C.muted }}>{RAISON_LABELS[r.raison] ?? r.raison}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.hairline}`, color: r.statut === "pending" ? C.rose : C.muted }}>{r.statut === "pending" ? "En attente" : r.statut === "resolu" ? "Résolu" : "Ignoré"}</span>
                       </div>
-                      <button onClick={() => router.push(`/profil/${r.target_id}`)} className="text-xs text-indigo-500 hover:underline shrink-0">
-                        Voir →
-                      </button>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>{r.target_nom ?? r.target_id}</p>
+                      {r.description && <p style={{ fontSize: 13, color: C.muted, margin: "0 0 4px", fontStyle: "italic" }}>&ldquo;{r.description}&rdquo;</p>}
+                      <p style={{ fontSize: 11, color: C.muted, margin: 0 }}>{new Date(r.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
                     </div>
-
-                    {r.statut === "pending" && (
-                      <div className="flex gap-2 pt-3 border-t border-slate-100">
-                        <button onClick={() => updateReportStatut(r.id, "resolu")} className="flex-1 text-sm font-semibold py-2 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-colors">
-                          ✓ Résolu
-                        </button>
-                        <button onClick={() => updateReportStatut(r.id, "ignore")} className="flex-1 text-sm font-semibold py-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
-                          Ignorer
-                        </button>
-                        <button onClick={() => { updateReportStatut(r.id, "resolu"); setBanTarget({ userId: r.target_id, nom: r.target_nom ?? r.target_id }); }} className="flex-1 text-sm font-semibold py-2 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
-                          🚫 Bannir
-                        </button>
-                      </div>
-                    )}
+                    <button onClick={() => router.push(`/profil/${r.target_id}`)} style={{ fontSize: 12, color: C.ink, background: "none", border: "none", cursor: "pointer", textDecoration: "underline", flexShrink: 0 }}>Voir →</button>
                   </div>
-                ))}
+                  {r.statut === "pending" && (
+                    <div style={{ display: "flex", gap: 8, paddingTop: 12, borderTop: `1px solid ${C.hairline}` }}>
+                      <button onClick={() => updateReportStatut(r.id, "resolu")} style={{ flex: 1, fontSize: 13, fontWeight: 600, padding: "9px", borderRadius: 9, border: `1.5px solid ${C.hairline}`, background: C.surface, color: C.ink, cursor: "pointer" }}>Résoudre</button>
+                      <button onClick={() => updateReportStatut(r.id, "ignore")} style={{ flex: 1, fontSize: 13, fontWeight: 600, padding: "9px", borderRadius: 9, border: `1.5px solid ${C.hairline}`, background: C.surface, color: C.muted, cursor: "pointer" }}>Ignorer</button>
+                      <button onClick={() => { updateReportStatut(r.id, "resolu"); setBanTarget({ userId: r.target_id, nom: r.target_nom ?? r.target_id }); }}
+                        style={{ flex: 1, fontSize: 13, fontWeight: 600, padding: "9px", borderRadius: 9, border: `1.5px solid ${C.rose}`, background: C.surface, color: C.rose, cursor: "pointer" }}>Bannir</button>
+                    </div>
+                  )}
+                </div>
+              ))}
               {reports.filter((r) => filterReport === "all" || r.statut === filterReport).length === 0 && (
-                <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
-                  <p className="text-2xl mb-2">🚩</p>
-                  <p className="text-slate-400 text-sm">Aucun signalement{filterReport !== "all" ? " dans cette catégorie" : ""}.</p>
+                <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "48px 32px", textAlign: "center" }}>
+                  <p style={{ fontSize: 13, color: C.muted }}>Aucun signalement{filterReport !== "all" ? " dans cette catégorie" : ""}.</p>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* Support */}
-        {tab === "support" && (
-          <div className="flex flex-col gap-3">
-            {supportConvs.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
-                <p className="text-2xl mb-2">💬</p>
-                <p className="text-slate-400 text-sm">Aucune conversation support pour l&apos;instant.</p>
+        {/* ── BANS ──────────────────────────────────────────────────────────── */}
+        {tab === "bans" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {activeBans.length === 0 ? (
+              <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "48px 32px", textAlign: "center" }}>
+                <p style={{ fontSize: 13, color: C.muted }}>Aucun utilisateur banni actuellement.</p>
               </div>
-            ) : supportConvs.map((c) => (
-              <div key={c.id} onClick={() => router.push(`/support/${c.id}`)}
-                className={`bg-white rounded-2xl border-2 p-4 flex items-center gap-4 cursor-pointer transition-all ${c.unreadCount > 0 ? "border-red-200 shadow-sm" : "border-slate-200 hover:border-slate-300"}`}>
-                <div className="relative shrink-0">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-lg ${c.role === "founder" ? "bg-gradient-to-br from-pink-400 to-purple-500" : "bg-gradient-to-br from-blue-400 to-indigo-500"}`}>
-                    {c.nom?.[0]?.toUpperCase() ?? "?"}
-                  </div>
-                  {c.unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">{c.unreadCount}</span>
-                  )}
+            ) : activeBans.map((b) => (
+              <div key={b.id} style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "16px 22px", display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: C.ink, color: "#fff", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {b.nom?.[0]?.toUpperCase() ?? "?"}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className={`font-bold text-slate-900 ${c.unreadCount > 0 ? "text-red-600" : ""}`}>{c.nom ?? "—"}</p>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c.role === "founder" ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}>
-                      {c.role === "founder" ? "Founder" : "Developer"}
-                    </span>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500">Banni</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 3 }}>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: 0 }}>{b.nom ?? b.user_id}</p>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 5, border: `1px solid ${C.hairline}`, color: C.muted }}>{b.role === "founder" ? "Founder" : "Developer"}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 5, border: `1px solid ${b.type === "permanent" ? C.rose : C.hairline}`, color: b.type === "permanent" ? C.rose : C.muted }}>{b.type === "permanent" ? "Définitif" : "Temporaire"}</span>
                   </div>
-                  {c.lastMessage && <p className="text-xs text-slate-400 truncate mt-0.5">{c.lastMessage}</p>}
+                  <p style={{ fontSize: 12, color: C.muted, margin: "0 0 2px" }}>{b.raison}</p>
+                  <p style={{ fontSize: 11, color: C.muted, margin: 0 }}>
+                    Banni le {new Date(b.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
+                    {b.expires_at && ` · Jusqu'au ${new Date(b.expires_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`}
+                  </p>
                 </div>
-                <span className="text-slate-300 text-lg shrink-0">›</span>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <button onClick={() => router.push(`/profil/${b.user_id}`)} style={{ fontSize: 12, color: C.ink, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>Voir →</button>
+                  <button onClick={() => liftBan(b.id, b.user_id)} disabled={liftingBan === b.id} className="lk-btn-ghost" style={{ fontSize: 12, padding: "6px 12px", opacity: liftingBan === b.id ? 0.5 : 1 }}>
+                    {liftingBan === b.id ? "…" : "Lever"}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Bans actifs */}
-        {tab === "bans" && (
-          <div className="flex flex-col gap-3">
-            {activeBans.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
-                <p className="text-2xl mb-2">✅</p>
-                <p className="text-slate-400 text-sm">Aucun utilisateur banni actuellement.</p>
+        {/* ── SUPPORT ───────────────────────────────────────────────────────── */}
+        {tab === "support" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {supportConvs.length === 0 ? (
+              <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "48px 32px", textAlign: "center" }}>
+                <p style={{ fontSize: 13, color: C.muted }}>Aucune conversation support pour l&apos;instant.</p>
               </div>
-            ) : activeBans.map((b) => (
-              <div key={b.id} className="bg-white rounded-2xl border-2 border-red-100 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-full flex items-center justify-center text-white font-black shrink-0 ${b.role === "founder" ? "bg-gradient-to-br from-pink-400 to-purple-500" : "bg-gradient-to-br from-blue-400 to-indigo-500"}`}>
-                      {b.nom?.[0]?.toUpperCase() ?? "?"}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-bold text-slate-900">{b.nom ?? b.user_id}</p>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${b.role === "founder" ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}>
-                          {b.role === "founder" ? "Founder" : "Developer"}
-                        </span>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${b.type === "permanent" ? "bg-red-100 text-red-600" : "bg-amber-50 text-amber-600"}`}>
-                          {b.type === "permanent" ? "🚫 Définitif" : "⏸ Temporaire"}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">{b.raison}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Banni le {new Date(b.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}
-                        {b.expires_at && ` · Jusqu'au ${new Date(b.expires_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}`}
-                      </p>
-                    </div>
+            ) : supportConvs.map((c) => (
+              <div key={c.id} onClick={() => router.push(`/support/${c.id}`)} className="lk-row"
+                style={{ background: C.surface, border: `1.5px solid ${c.unreadCount > 0 ? C.rose : C.hairline}`, borderRadius: 14, padding: "14px 22px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", transition: "background 0.1s" }}>
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: C.ink, color: "#fff", fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {c.nom?.[0]?.toUpperCase() ?? "?"}
                   </div>
-                  <div className="flex flex-col gap-2 shrink-0 items-end">
-                    <button onClick={() => router.push(`/profil/${b.user_id}`)} className="text-xs text-indigo-500 hover:underline">Voir →</button>
-                    <button onClick={() => liftBan(b.id, b.user_id)} disabled={liftingBan === b.id}
-                      className="text-xs font-bold px-4 py-2 rounded-xl bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-colors disabled:opacity-50">
-                      {liftingBan === b.id ? "..." : "✅ Lever le ban"}
-                    </button>
-                  </div>
+                  {c.unreadCount > 0 && (
+                    <span style={{ position: "absolute", top: -3, right: -3, minWidth: 16, height: 16, borderRadius: "50%", background: C.rose, color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{c.unreadCount}</span>
+                  )}
                 </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 2 }}>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: c.unreadCount > 0 ? C.rose : C.ink, margin: 0 }}>{c.nom ?? "—"}</p>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 7px", borderRadius: 5, border: `1px solid ${C.hairline}`, color: C.muted }}>{c.role === "founder" ? "Founder" : "Developer"}</span>
+                  </div>
+                  {c.lastMessage && <p style={{ fontSize: 12, color: C.muted, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.lastMessage}</p>}
+                </div>
+                <span style={{ color: C.muted, fontSize: 18, flexShrink: 0 }}>›</span>
               </div>
             ))}
           </div>
@@ -688,16 +524,8 @@ export default function AdminDashboard() {
 
       </div>
 
-      {/* Modal ban */}
       {banTarget && adminId && (
-        <BanModal
-          isOpen={!!banTarget}
-          onClose={() => setBanTarget(null)}
-          targetUserId={banTarget.userId}
-          targetNom={banTarget.nom}
-          adminId={adminId}
-          onBanned={() => setBanTarget(null)}
-        />
+        <BanModal isOpen={!!banTarget} onClose={() => setBanTarget(null)} targetUserId={banTarget.userId} targetNom={banTarget.nom} adminId={adminId} onBanned={() => setBanTarget(null)} />
       )}
     </div>
   );

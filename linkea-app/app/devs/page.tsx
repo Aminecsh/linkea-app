@@ -10,7 +10,6 @@ import {
   ArrowRight, GitBranch, Link2, ExternalLink,
   Pin, Sparkles, X, TrendingUp, Zap, CalendarClock,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 type Dev = {
   id: string;
@@ -66,11 +65,6 @@ function matchScore(dev: Dev, project: Project | undefined): number {
   return getMatchedStacks(dev, project).size;
 }
 
-function dispoStyle(h: number): { color: string; bg: string; border: string } {
-  if (h >= 20) return { color: "var(--green)",  bg: "var(--green-soft)",  border: "var(--green-border)"  };
-  if (h >= 10) return { color: "var(--blue)",   bg: "var(--blue-soft)",   border: "var(--blue-border)"   };
-  return              { color: "var(--amber)",  bg: "var(--amber-soft)",  border: "var(--amber-border)"  };
-}
 
 export default function DevsPage() {
   const router = useRouter();
@@ -89,6 +83,8 @@ export default function DevsPage() {
   const [confirmDev, setConfirmDev]   = useState<Dev | null>(null);
   const [modalProjectId, setModalProjectId] = useState<string | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [aiScores, setAiScores]       = useState<Record<string, { score: number; reason: string; strengths: string[]; concern: string | null }>>({});
+  const [aiLoading, setAiLoading]     = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -238,27 +234,57 @@ export default function DevsPage() {
     setPinning(false);
   }
 
+  async function runAiMatching() {
+    if (!selectedProjectId || aiLoading || sortedDevs.length === 0) return;
+    setAiLoading(true);
+    setAiScores({});
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      const res = await fetch("/api/ai/matching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({
+          projectId: selectedProjectId,
+          devs: sortedDevs.slice(0, 15).map((d) => ({
+            id: d.id, nom: d.nom, competences: d.competences,
+            ecole: d.ecole, dispo_heures_semaine: d.dispo_heures_semaine,
+            score: d.score, reviewCount: d.reviewCount,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { console.error("[AI Matching]", data.error); return; }
+      const map: typeof aiScores = {};
+      for (const s of data.scores ?? []) map[s.devId] = s;
+      setAiScores(map);
+    } catch (e) {
+      console.error("[AI Matching]", e);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   const currentPins = pinsMap[selectedProjectId ?? ""] ?? new Set<string>();
   const pinCount    = currentPins.size;
   const pinsLeft    = 3 - pinCount;
 
+  const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#fff" };
+
   if (loading) {
     return (
-      <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
-        <div className="page-header px-4 py-4">
-          <div className="max-w-2xl mx-auto">
-            <div className="flex items-center justify-between mb-3">
-              <div className="skeleton w-16 h-4" />
-              <div className="skeleton w-9 h-9 rounded-xl" />
-            </div>
-            <div className="skeleton w-full h-10 rounded-xl mb-3" />
-            <div className="flex gap-2">
-              {[...Array(5)].map((_, i) => <div key={i} className="skeleton w-16 h-7 rounded-full" />)}
+      <div style={{ minHeight: "100vh", background: C.canvas, paddingBottom: 80 }}>
+        <div style={{ background: C.surface, borderBottom: `1px solid ${C.hairline}`, padding: "16px 20px 12px", position: "sticky", top: 0, zIndex: 40 }}>
+          <div style={{ maxWidth: 672, margin: "0 auto" }}>
+            <div style={{ height: 14, width: 80, borderRadius: 6, background: C.hairline, marginBottom: 12 }} />
+            <div style={{ height: 40, borderRadius: 10, background: C.hairline, marginBottom: 12 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              {[...Array(5)].map((_, i) => <div key={i} style={{ height: 28, width: 64, borderRadius: 8, background: C.hairline }} />)}
             </div>
           </div>
         </div>
-        <div className="max-w-2xl mx-auto px-4 py-5 flex flex-col gap-3">
-          {[...Array(4)].map((_, i) => <div key={i} className="skeleton h-44 rounded-2xl" />)}
+        <div style={{ maxWidth: 672, margin: "0 auto", padding: "20px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+          {[...Array(4)].map((_, i) => <div key={i} style={{ height: 176, borderRadius: 20, background: C.hairline }} />)}
         </div>
         <BottomNav />
       </div>
@@ -266,86 +292,84 @@ export default function DevsPage() {
   }
 
   return (
-    <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+    <div style={{ minHeight: "100vh", background: C.canvas, paddingBottom: 80 }}>
+      <style>{`
+        .lk-d-input:focus { outline: 2px solid ${C.rose}; outline-offset: -1px; border-color: ${C.rose} !important; }
+        .lk-d-chip:focus-visible { outline: 2px solid ${C.rose}; outline-offset: 2px; }
+        .lk-d-btn:focus-visible { outline: 2px solid ${C.rose}; outline-offset: 2px; }
+        .lk-d-navy:hover:not(:disabled) { background: #2A3252 !important; }
+        .lk-d-navy:disabled { opacity: 0.4; }
+        .lk-d-ghost:hover { opacity: 0.6; }
+      `}</style>
 
       {/* ── Modal pin ── */}
       {confirmDev && (
         <div
-          className="fixed inset-0 flex items-end justify-center px-4"
-          style={{ zIndex: 60, background: "rgba(0,0,0,0.40)", backdropFilter: "blur(4px)", paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }}
+          style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(0,0,0,0.40)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0 16px", paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }}
           onClick={() => setConfirmDev(null)}
         >
           <div
-            className="w-full max-w-sm flex flex-col"
-            style={{ background: "#fff", borderRadius: 24, boxShadow: "0 24px 64px rgba(0,0,0,0.18)", maxHeight: "70vh", overflow: "hidden" }}
+            style={{ width: "100%", maxWidth: 400, background: C.surface, borderRadius: 24, border: `1px solid ${C.hairline}`, maxHeight: "70vh", overflow: "hidden", display: "flex", flexDirection: "column" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-center pt-3">
-              <div className="w-8 h-1 rounded-full" style={{ background: "rgba(0,0,0,0.12)" }} />
+            <div style={{ display: "flex", justifyContent: "center", paddingTop: 12 }}>
+              <div style={{ width: 32, height: 4, borderRadius: 99, background: C.hairline }} />
             </div>
 
-            <div className="overflow-y-auto px-5 pt-4 pb-5" style={{ flex: 1 }}>
+            <div style={{ overflowY: "auto", padding: "16px 20px 20px", flex: 1 }}>
               {/* Dev row */}
-              <div className="flex items-center gap-3 mb-4">
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
                 {confirmDev.avatar_url ? (
-                  <img src={confirmDev.avatar_url} alt={confirmDev.nom} className="avatar w-11 h-11 shrink-0" />
+                  <img src={confirmDev.avatar_url} alt={confirmDev.nom}
+                    style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", border: `1px solid ${C.hairline}`, flexShrink: 0 }} />
                 ) : (
-                  <div className="avatar-placeholder w-11 h-11 text-base shrink-0" style={{ background: "linear-gradient(135deg,#3b82f6,#8b5cf6)" }}>
-                    {confirmDev.nom?.[0]?.toUpperCase() ?? "?"}
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 600, color: "#fff" }}>{confirmDev.nom?.[0]?.toUpperCase() ?? "?"}</span>
                   </div>
                 )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-black text-base leading-tight" style={{ color: "var(--text)" }}>{confirmDev.nom}</p>
-                  {confirmDev.ecole && <p className="text-xs" style={{ color: "var(--muted)" }}>{confirmDev.ecole}</p>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: C.ink, margin: 0 }}>{confirmDev.nom}</p>
+                  {confirmDev.ecole && <p style={{ fontSize: 12, color: C.muted, margin: "2px 0 0" }}>{confirmDev.ecole}</p>}
                 </div>
-                <button onClick={() => setConfirmDev(null)} className="btn-icon w-8 h-8 shrink-0">
-                  <X size={13} strokeWidth={2} />
+                <button onClick={() => setConfirmDev(null)} className="lk-d-btn"
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 6, color: C.muted, display: "flex", alignItems: "center" }}>
+                  <X size={14} strokeWidth={2} />
                 </button>
               </div>
 
-              {/* Sélecteur de projet */}
               {projects.length > 1 && (
-                <p className="label mb-2 block">Sur quel projet ?</p>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, marginBottom: 8, display: "block" }}>Sur quel projet ?</p>
               )}
-              <div className="flex flex-col gap-1.5 mb-4">
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
                 {projects.map((p) => {
                   const pPins    = pinsMap[p.id] ?? new Set();
                   const pLeft    = 3 - pPins.size;
                   const isPinned = pPins.has(confirmDev.id);
                   const active   = modalProjectId === p.id;
                   return (
-                    <button
-                      key={p.id}
+                    <button key={p.id}
                       onClick={() => !isPinned && pLeft > 0 && setModalProjectId(p.id)}
                       disabled={isPinned || pLeft === 0}
-                      className="flex items-center justify-between px-4 py-3 rounded-2xl text-left transition-all"
-                      style={isPinned ? {
-                        background: "var(--green-soft)", border: "1px solid var(--green-border)",
-                        cursor: "default", opacity: 0.7,
-                      } : pLeft === 0 ? {
-                        background: "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.06)",
-                        cursor: "not-allowed", opacity: 0.5,
-                      } : active ? {
-                        background: "var(--rose-soft)", border: "1.5px solid var(--rose-border)",
-                      } : {
-                        background: "var(--bg)", border: "1px solid rgba(0,0,0,0.07)",
+                      className="lk-d-btn"
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "12px 16px", borderRadius: 14, textAlign: "left", cursor: isPinned || pLeft === 0 ? "default" : "pointer",
+                        background: active ? C.canvas : C.surface,
+                        border: active ? `1.5px solid ${C.ink}` : `1px solid ${C.hairline}`,
+                        opacity: pLeft === 0 && !isPinned ? 0.45 : 1,
                       }}
                     >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-sm truncate" style={{ color: isPinned ? "var(--green)" : "var(--text)" }}>
-                          {p.titre}
-                        </p>
-                        <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: C.ink, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.titre}</p>
+                        <p style={{ fontSize: 11, color: C.muted, margin: "2px 0 0" }}>
                           {isPinned ? "Déjà pinné" : pLeft === 0 ? "Limite atteinte" : `${pLeft} pin${pLeft > 1 ? "s" : ""} restant${pLeft > 1 ? "s" : ""}`}
                         </p>
                       </div>
-                      {/* Pin dots */}
-                      <div className="flex items-center gap-1 shrink-0 ml-3">
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: 12 }}>
                         {isPinned
-                          ? <Check size={13} strokeWidth={2.5} style={{ color: "var(--green)" }} />
+                          ? <Check size={13} strokeWidth={2.5} style={{ color: C.ink }} />
                           : [0,1,2].map((i) => (
-                              <div key={i} className="w-1.5 h-1.5 rounded-full"
-                                style={{ background: i < pPins.size ? "var(--rose)" : "rgba(0,0,0,0.12)" }} />
+                              <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: i < pPins.size ? C.rose : C.hairline }} />
                             ))
                         }
                       </div>
@@ -354,28 +378,22 @@ export default function DevsPage() {
                 })}
               </div>
 
-              {/* Pins restants après action */}
               {modalProjectId && (() => {
                 const mp = pinsMap[modalProjectId] ?? new Set();
                 const after = 3 - mp.size - 1;
                 return after >= 0 ? (
-                  <p className="text-xs text-center mb-4" style={{ color: "var(--muted)" }}>
-                    Il te restera <strong style={{ color: "var(--text)" }}>{after} pin{after > 1 ? "s" : ""}</strong> après ça
+                  <p style={{ fontSize: 11, color: C.muted, textAlign: "center", marginBottom: 4 }}>
+                    Il te restera <strong style={{ color: C.ink }}>{after} pin{after > 1 ? "s" : ""}</strong> après ça
                   </p>
                 ) : null;
               })()}
-
             </div>
-            {/* Bouton fixe en bas du modal */}
-            <div className="px-5 pb-5 pt-3 shrink-0" style={{ borderTop: "1px solid rgba(0,0,0,0.05)" }}>
-              <button
-                onClick={confirmPin}
-                disabled={pinning || !modalProjectId}
-                className="btn-primary w-full"
-                style={{ padding: "13px 0", fontSize: 14 }}
-              >
+
+            <div style={{ padding: "12px 20px 20px", borderTop: `1px solid ${C.hairline}`, flexShrink: 0 }}>
+              <button onClick={confirmPin} disabled={pinning || !modalProjectId} className="lk-d-navy lk-d-btn"
+                style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 {pinning
-                  ? <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                  ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
                   : <><Pin size={13} strokeWidth={2} /> Pinner ce dev</>
                 }
               </button>
@@ -385,109 +403,93 @@ export default function DevsPage() {
       )}
 
       {/* ── Header sticky ── */}
-      <div className="page-header px-4 pt-4 pb-3">
-        <div className="max-w-2xl mx-auto">
+      <div style={{ background: "rgba(255,255,255,0.96)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderBottom: `1px solid ${C.hairline}`, position: "sticky", top: 0, zIndex: 40, padding: "14px 20px 12px" }}>
+        <div style={{ maxWidth: 672, margin: "0 auto" }}>
 
           {/* Top bar */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles size={13} strokeWidth={2} style={{ color: "var(--rose)" }} />
-              <span className="label" style={{ color: "var(--rose)" }}>Trouver un dev</span>
-            </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.rose, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+              <Sparkles size={12} strokeWidth={2} /> Trouver un dev
+            </p>
             <NotificationBell />
           </div>
 
           {/* Search */}
-          <div className="relative mb-3">
-            <Search size={14} strokeWidth={2} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--subtle)" }} />
-            <input
-              type="text"
-              placeholder="Nom, école, compétence..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input-field text-sm"
-              style={{ paddingLeft: 38, paddingTop: 10, paddingBottom: 10 }}
+          <div style={{ position: "relative", marginBottom: 12 }}>
+            <Search size={14} strokeWidth={2} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: C.muted, pointerEvents: "none" }} />
+            <input type="text" placeholder="Nom, école, compétence..."
+              value={search} onChange={(e) => setSearch(e.target.value)}
+              className="lk-d-input"
+              style={{ width: "100%", padding: "10px 14px 10px 40px", borderRadius: 10, border: `1px solid ${C.hairline}`, background: C.surface, color: C.ink, fontSize: 13, fontWeight: 500, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
             />
           </div>
 
           {/* Filtres stack + dispo */}
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide mb-3">
-            {STACKS.map((s) => (
-              <button
-                key={s}
-                onClick={() => setActiveStack(activeStack === s ? null : s)}
-                className={cn("chip", activeStack === s && "chip-active-blue")}
-              >
-                {s}
-              </button>
-            ))}
-            <div className="w-px shrink-0 mx-0.5" style={{ background: "var(--border-2)" }} />
-            {DISPOS.map((d) => (
-              <button
-                key={d.label}
-                onClick={() => setActiveDispo(activeDispo === d.min ? null : d.min)}
-                className={cn("chip", activeDispo === d.min && "chip-active-rose")}
-              >
-                <Clock size={10} strokeWidth={2} />
-                {d.label}
-              </button>
-            ))}
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2, marginBottom: 12, scrollbarWidth: "none" }}>
+            {STACKS.map((s) => {
+              const active = activeStack === s;
+              return (
+                <button key={s} onClick={() => setActiveStack(active ? null : s)} className="lk-d-chip"
+                  style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, cursor: "pointer", border: active ? `1.5px solid ${C.ink}` : `1px solid ${C.hairline}`, background: active ? C.ink : C.surface, color: active ? "#fff" : C.muted, transition: "all 0.12s" }}>
+                  {s}
+                </button>
+              );
+            })}
+            <div style={{ width: 1, flexShrink: 0, margin: "0 2px", background: C.hairline }} />
+            {DISPOS.map((d) => {
+              const active = activeDispo === d.min;
+              return (
+                <button key={d.label} onClick={() => setActiveDispo(active ? null : d.min)} className="lk-d-chip"
+                  style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, border: active ? `1.5px solid ${C.ink}` : `1px solid ${C.hairline}`, background: active ? C.ink : C.surface, color: active ? "#fff" : C.muted, transition: "all 0.12s" }}>
+                  <Clock size={10} strokeWidth={2} /> {d.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Sélecteur projet + pin counter */}
           {projects.length === 0 ? (
-            <div
-              className="flex items-center gap-2.5 px-4 py-3 rounded-2xl text-sm font-medium"
-              style={{ background: "var(--amber-soft)", border: "1px solid var(--amber-border)", color: "var(--amber)" }}
-            >
-              <AlertTriangle size={15} strokeWidth={2} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 12, border: `1px solid ${C.hairline}`, background: C.canvas, color: C.muted, fontSize: 13, fontWeight: 500 }}>
+              <AlertTriangle size={14} strokeWidth={2} style={{ flexShrink: 0 }} />
               Aucun projet en attente — dépose un nouveau projet pour pinner des devs.
             </div>
           ) : (
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1">
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", gap: 6, overflowX: "auto", flex: 1, scrollbarWidth: "none" }}>
                 {projects.map((p) => {
                   const pPins  = pinsMap[p.id] ?? new Set();
                   const active = selectedProjectId === p.id;
                   return (
-                    <button
-                      key={p.id}
-                      onClick={() => setSelectedProjectId(p.id)}
-                      className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150"
-                      style={active ? {
-                        background: "var(--text)", color: "#fff", boxShadow: "var(--shadow-xs)",
-                      } : {
-                        background: "#fff", color: "var(--muted)", border: "1px solid rgba(0,0,0,0.08)",
-                      }}
-                    >
-                      <span className="truncate max-w-[100px]">{p.titre}</span>
-                      <div className="flex items-center gap-0.5 shrink-0">
+                    <button key={p.id} onClick={() => setSelectedProjectId(p.id)} className="lk-d-chip"
+                      style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 12px", borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.12s",
+                        background: active ? C.ink : C.surface, color: active ? "#fff" : C.muted, border: active ? `1.5px solid ${C.ink}` : `1px solid ${C.hairline}` }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 100 }}>{p.titre}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
                         {[0, 1, 2].map((i) => (
-                          <div
-                            key={i}
-                            className="w-1.5 h-1.5 rounded-full transition-all"
-                            style={{
-                              background: i < pPins.size
-                                ? "var(--rose)"
-                                : active ? "rgba(255,255,255,0.30)" : "rgba(0,0,0,0.12)",
-                            }}
-                          />
+                          <div key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: i < pPins.size ? C.rose : active ? "rgba(255,255,255,0.3)" : C.hairline }} />
                         ))}
                       </div>
                     </button>
                   );
                 })}
               </div>
-              <div
-                className="shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold"
-                style={pinsLeft === 0 ? {
-                  background: "rgba(0,0,0,0.04)", color: "var(--subtle)", border: "1px solid rgba(0,0,0,0.06)",
-                } : {
-                  background: "var(--rose-soft)", color: "var(--rose-hover)", border: "1px solid var(--rose-border)",
-                }}
-              >
-                <Pin size={11} strokeWidth={2} />
-                <span>{pinsLeft} restant{pinsLeft > 1 ? "s" : ""}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <button
+                  onClick={runAiMatching}
+                  disabled={aiLoading || !selectedProjectId}
+                  title="Scorer les devs avec l'IA"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: C.ink, color: "#fff", border: "none", cursor: "pointer", opacity: (aiLoading || !selectedProjectId) ? 0.4 : 1 }}
+                >
+                  {aiLoading
+                    ? <div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
+                    : <span style={{ fontSize: 13, lineHeight: 1 }}>✦</span>
+                  }
+                  {Object.keys(aiScores).length > 0 ? "Rescorer" : "IA"}
+                </button>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, border: `1px solid ${C.hairline}`, background: C.surface, color: pinsLeft === 0 ? C.muted : C.ink }}>
+                  <Pin size={11} strokeWidth={2} />
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{pinsLeft} restant{pinsLeft > 1 ? "s" : ""}</span>
+                </div>
               </div>
             </div>
           )}
@@ -495,137 +497,107 @@ export default function DevsPage() {
       </div>
 
       {/* ── Content ── */}
-      <div className="max-w-2xl mx-auto px-4 py-4">
+      <div style={{ maxWidth: 672, margin: "0 auto", padding: "16px 20px" }}>
 
-        {/* Barre tri + compteur */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
+        {/* Tri + compteur */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: C.muted, margin: 0 }}>
             {sortedDevs.length} développeur{sortedDevs.length > 1 ? "s" : ""}
           </p>
-          <div className="flex items-center gap-1">
-            {SORTS.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setSortMode(s.key)}
-                className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-all"
-                style={sortMode === s.key ? {
-                  background: "var(--text)", color: "#fff",
-                } : {
-                  background: "transparent", color: "var(--subtle)",
-                }}
-              >
-                {s.icon} {s.label}
-              </button>
-            ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+            {SORTS.map((s) => {
+              const active = sortMode === s.key;
+              return (
+                <button key={s.key} onClick={() => setSortMode(s.key)} className="lk-d-chip"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, padding: "6px 10px", borderRadius: 8, cursor: "pointer", transition: "all 0.12s",
+                    background: active ? C.ink : "transparent", color: active ? "#fff" : C.muted, border: "none" }}>
+                  {s.icon} {s.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {sortedDevs.length === 0 && (
-          <div className="card flex flex-col items-center py-16 text-center">
-            <Search size={32} strokeWidth={1.2} className="mb-3" style={{ color: "var(--subtle)" }} />
-            <p className="font-semibold text-sm mb-1" style={{ color: "var(--text-2)" }}>Aucun développeur trouvé</p>
-            <p className="text-xs" style={{ color: "var(--muted)" }}>Essaie d'autres filtres</p>
+          <div style={{ background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 20, padding: "64px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+            <Search size={32} strokeWidth={1.2} style={{ color: C.muted, marginBottom: 12 }} />
+            <p style={{ fontSize: 14, fontWeight: 600, color: C.ink, margin: "0 0 4px" }}>Aucun développeur trouvé</p>
+            <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Essaie d'autres filtres</p>
           </div>
         )}
 
-        <div className="flex flex-col gap-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {sortedDevs.map((dev) => {
-            const isPinned     = currentPins.has(dev.id);
-            const canPin       = !isPinned && pinsLeft > 0 && projects.length > 0;
-            const hasApplied   = applicantsSet.has(dev.id);
-            const isNew        = dev.created_at
-              ? Date.now() - new Date(dev.created_at).getTime() < NEW_THRESHOLD_MS
-              : false;
-            const matchedSet   = getMatchedStacks(dev, selectedProject);
-            const hasMatch     = matchedSet.size > 0;
-            const dispo        = dev.dispo_heures_semaine;
-            const ds           = dispo ? dispoStyle(dispo) : null;
+            const isPinned   = currentPins.has(dev.id);
+            const canPin     = !isPinned && pinsLeft > 0 && projects.length > 0;
+            const hasApplied = applicantsSet.has(dev.id);
+            const isNew      = dev.created_at ? Date.now() - new Date(dev.created_at).getTime() < NEW_THRESHOLD_MS : false;
+            const matchedSet = getMatchedStacks(dev, selectedProject);
+            const dispo      = dev.dispo_heures_semaine;
 
             return (
-              <div
-                key={dev.id}
-                className="card"
-                style={{
-                  borderRadius: 20,
-                  ...(isPinned ? {
-                    borderColor: "rgba(16,185,129,0.20)",
-                  } : hasMatch ? {
-                    borderColor: "rgba(16,185,129,0.12)",
-                  } : {}),
-                }}
-              >
-                <div className="p-5">
-                  {/* Top: avatar + infos + badges */}
-                  <div className="flex items-start gap-3.5">
-                    <button
-                      onClick={() => router.push(`/profil/${dev.user_id}`)}
-                      className="shrink-0 hover:opacity-80 transition-opacity relative"
-                    >
+              <div key={dev.id} style={{ background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 20, overflow: "hidden" }}>
+                <div style={{ padding: "18px 20px 14px" }}>
+                  {/* Top: avatar + infos */}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                    <button onClick={() => router.push(`/profil/${dev.user_id}`)} className="lk-d-ghost lk-d-btn"
+                      style={{ flexShrink: 0, position: "relative", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
                       {dev.avatar_url ? (
-                        <img src={dev.avatar_url} alt={dev.nom} className="avatar w-12 h-12" />
+                        <img src={dev.avatar_url} alt={dev.nom}
+                          style={{ width: 48, height: 48, borderRadius: 12, objectFit: "cover", border: `1px solid ${C.hairline}`, display: "block" }} />
                       ) : (
-                        <div className="avatar-placeholder w-12 h-12 text-lg" style={{ background: "linear-gradient(135deg, #3b82f6, #8b5cf6)" }}>
-                          {dev.nom?.[0]?.toUpperCase() ?? "?"}
+                        <div style={{ width: 48, height: 48, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, fontWeight: 600, color: "#fff" }}>{dev.nom?.[0]?.toUpperCase() ?? "?"}</span>
                         </div>
                       )}
                       {isNew && (
-                        <span
-                          className="absolute -top-1 -right-1 text-[9px] font-black px-1.5 py-0.5 rounded-full"
-                          style={{ background: "var(--green)", color: "#fff", lineHeight: 1.4 }}
-                        >
+                        <span style={{ position: "absolute", top: -4, right: -4, fontSize: 9, fontWeight: 800, padding: "2px 5px", borderRadius: 6, background: C.ink, color: "#fff", lineHeight: 1.4 }}>
                           NEW
                         </span>
                       )}
                     </button>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <button
-                              onClick={() => router.push(`/profil/${dev.user_id}`)}
-                              className="font-bold text-[15px] leading-tight text-left hover:opacity-70 transition-opacity"
-                              style={{ color: "var(--text)" }}
-                            >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <button onClick={() => router.push(`/profil/${dev.user_id}`)} className="lk-d-ghost lk-d-btn"
+                              style={{ fontSize: 15, fontWeight: 700, color: C.ink, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
                               {dev.nom}
                             </button>
                             {hasApplied && (
-                              <span
-                                className="tag"
-                                style={{
-                                  background: "var(--violet-soft)",
-                                  color: "var(--violet)",
-                                  border: "1px solid var(--violet-border)",
-                                  fontSize: 10,
-                                  padding: "2px 8px",
-                                }}
-                              >
-                                <TrendingUp size={9} strokeWidth={2} />
-                                Déjà candidaté
+                              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 6, border: `1px solid ${C.hairline}`, background: C.surface, color: C.muted, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                <TrendingUp size={9} strokeWidth={2} /> Candidaté
                               </span>
                             )}
                           </div>
                           {dev.ecole && (
-                            <p className="text-xs mt-0.5 truncate" style={{ color: "var(--muted)" }}>
-                              {dev.ecole}
-                            </p>
+                            <p style={{ fontSize: 12, color: C.muted, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dev.ecole}</p>
                           )}
                         </div>
-                        {dev.score !== undefined && (
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Star size={12} strokeWidth={1.5} fill="var(--amber)" style={{ color: "var(--amber)" }} />
-                            <span className="text-xs font-bold" style={{ color: "var(--text)" }}>{dev.score}</span>
-                            <span className="text-xs" style={{ color: "var(--subtle)" }}>({dev.reviewCount})</span>
-                          </div>
-                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                          {aiScores[dev.id] && (
+                            <div
+                              title={aiScores[dev.id].reason}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 8, border: `1px solid ${C.hairline}`, background: C.canvas }}
+                            >
+                              <span style={{ fontSize: 11, fontWeight: 800, color: C.ink, fontVariantNumeric: "tabular-nums" }}>✦ {aiScores[dev.id].score}%</span>
+                            </div>
+                          )}
+                          {dev.score !== undefined && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <Star size={12} strokeWidth={1.5} fill={C.ink} style={{ color: C.ink }} />
+                              <span style={{ fontSize: 12, fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{dev.score}</span>
+                              <span style={{ fontSize: 11, color: C.muted, fontVariantNumeric: "tabular-nums" }}>({dev.reviewCount})</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {dispo && ds && (
-                        <div className="mt-2 inline-flex">
-                          <span className="tag" style={{ background: ds.bg, color: ds.color, border: `1px solid ${ds.border}`, fontSize: 11 }}>
-                            <Clock size={9} strokeWidth={2} />
-                            {dispo}h/sem
-                          </span>
+                      {dispo && (
+                        <div style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <Clock size={11} strokeWidth={1.8} style={{ color: C.muted }} />
+                          <span style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>{dispo}h/sem</span>
                         </div>
                       )}
                     </div>
@@ -633,22 +605,12 @@ export default function DevsPage() {
 
                   {/* Stack chips */}
                   {(dev.competences ?? []).length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3">
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
                       {(dev.competences ?? []).map((c) => {
                         const isMatch = matchedSet.has(c);
                         return (
-                          <span
-                            key={c}
-                            className="tag"
-                            style={isMatch ? {
-                              background: "var(--green-soft)", color: "var(--green)",
-                              border: "1px solid var(--green-border)", fontSize: 11, fontWeight: 700,
-                            } : {
-                              background: "var(--blue-soft)", color: "var(--blue)",
-                              border: "1px solid var(--blue-border)", fontSize: 11,
-                            }}
-                          >
-                            {isMatch && <Check size={9} strokeWidth={3} />}
+                          <span key={c} style={{ fontSize: 11, fontWeight: isMatch ? 700 : 500, padding: "3px 9px", borderRadius: 7, border: `1px solid ${C.hairline}`, background: C.surface, color: C.ink, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            {isMatch && <Check size={9} strokeWidth={3} style={{ color: C.ink }} />}
                             {c}
                           </span>
                         );
@@ -656,30 +618,20 @@ export default function DevsPage() {
                     </div>
                   )}
 
-                  {/* Liens externes */}
+                  {/* Liens */}
                   {(dev.github || dev.linkedin) && (
-                    <div className="flex items-center gap-2 mt-3">
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
                       {dev.github && (
-                        <a
-                          href={dev.github} target="_blank" rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1.5 text-xs font-semibold transition-opacity hover:opacity-60"
-                          style={{ color: "var(--muted)" }}
-                        >
-                          <GitBranch size={13} strokeWidth={1.8} /> GitHub
-                          <ExternalLink size={10} strokeWidth={2} />
+                        <a href={dev.github} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: C.muted, textDecoration: "none" }}>
+                          <GitBranch size={13} strokeWidth={1.8} /> GitHub <ExternalLink size={10} strokeWidth={2} />
                         </a>
                       )}
-                      {dev.github && dev.linkedin && <span style={{ color: "var(--border-2)" }}>·</span>}
+                      {dev.github && dev.linkedin && <span style={{ color: C.hairline }}>·</span>}
                       {dev.linkedin && (
-                        <a
-                          href={dev.linkedin} target="_blank" rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center gap-1.5 text-xs font-semibold transition-opacity hover:opacity-60"
-                          style={{ color: "var(--muted)" }}
-                        >
-                          <Link2 size={13} strokeWidth={1.8} /> LinkedIn
-                          <ExternalLink size={10} strokeWidth={2} />
+                        <a href={dev.linkedin} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: C.muted, textDecoration: "none" }}>
+                          <Link2 size={13} strokeWidth={1.8} /> LinkedIn <ExternalLink size={10} strokeWidth={2} />
                         </a>
                       )}
                     </div>
@@ -687,36 +639,26 @@ export default function DevsPage() {
                 </div>
 
                 {/* Action bar */}
-                <div
-                  className="flex items-center justify-between px-5 py-3"
-                  style={{ borderTop: "1px solid rgba(0,0,0,0.05)" }}
-                >
-                  <button
-                    onClick={() => router.push(`/profil/${dev.user_id}`)}
-                    className="flex items-center gap-1.5 text-xs font-semibold transition-opacity hover:opacity-60"
-                    style={{ color: "var(--muted)" }}
-                  >
-                    Voir le profil <ArrowRight size={12} strokeWidth={2.2} />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px 14px", borderTop: `1px solid ${C.hairline}` }}>
+                  <button onClick={() => router.push(`/profil/${dev.user_id}`)} className="lk-d-ghost lk-d-btn"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: C.muted, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                    Voir le profil <ArrowRight size={12} strokeWidth={2} />
                   </button>
 
                   {projects.length > 0 && (
                     <button
                       onClick={() => { if (canPin) { setConfirmDev(dev); setModalProjectId(selectedProjectId); } }}
                       disabled={isPinned || !canPin}
-                      className="flex items-center gap-1.5 text-xs font-bold rounded-xl transition-all"
+                      className={canPin ? "lk-d-navy lk-d-btn" : "lk-d-btn"}
                       style={isPinned ? {
-                        padding: "7px 14px",
-                        background: "var(--green-soft)", color: "var(--green)",
-                        border: "1px solid var(--green-border)", cursor: "default",
+                        display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                        background: C.surface, border: `1px solid ${C.hairline}`, color: C.muted, cursor: "default",
                       } : canPin ? {
-                        padding: "7px 14px",
-                        background: "linear-gradient(135deg, #f43f5e, #fb7185)",
-                        color: "white", border: "none", cursor: "pointer",
-                        boxShadow: "var(--shadow-rose)",
+                        display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                        background: C.ink, border: "none", color: "#fff", cursor: "pointer",
                       } : {
-                        padding: "7px 14px",
-                        background: "rgba(0,0,0,0.04)", color: "var(--subtle)",
-                        border: "1px solid rgba(0,0,0,0.06)", cursor: "not-allowed",
+                        display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                        background: C.surface, border: `1px solid ${C.hairline}`, color: C.muted, cursor: "not-allowed", opacity: 0.5,
                       }}
                     >
                       {isPinned ? (
@@ -734,7 +676,7 @@ export default function DevsPage() {
           })}
         </div>
       </div>
-
+      <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
       <BottomNav />
     </div>
   );
