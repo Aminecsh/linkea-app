@@ -23,10 +23,13 @@ export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
-  const [role, setRole] = useState<string | null>(() =>
-    typeof window !== "undefined" ? localStorage.getItem("lk_role") : null
-  );
+  const [role, setRole] = useState<string | null>(null);
   const [isBanned, setIsBanned] = useState(false);
+
+  useEffect(() => {
+    const cached = localStorage.getItem("lk_role");
+    if (cached) setRole(cached);
+  }, []);
 
   useEffect(() => {
     async function checkUnread() {

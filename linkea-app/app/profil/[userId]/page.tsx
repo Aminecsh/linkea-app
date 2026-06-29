@@ -52,8 +52,8 @@ function StarRating({ rating, count, size = "sm" }: { rating: number; count?: nu
       <div className="flex gap-0.5">
         {[1,2,3,4,5].map((s) => (
           <Star key={s} size={sz} strokeWidth={1.5}
-            fill={s <= rating ? "var(--amber)" : "transparent"}
-            style={{ color: s <= rating ? "var(--amber)" : "rgba(0,0,0,0.12)" }} />
+            fill={s <= rating ? "#1A2138" : "transparent"}
+            style={{ color: s <= rating ? "#1A2138" : "#ECE7DD" }} />
         ))}
       </div>
       {count !== undefined && <span style={{ fontSize: 11, color: "var(--subtle)" }}>({count})</span>}
@@ -781,45 +781,46 @@ export default function PublicProfilePage() {
                           disabled={p.alreadyPinned}
                           className="flex items-center justify-between px-4 py-3 rounded-2xl text-left transition-all"
                           style={p.alreadyPinned ? {
-                            background: "var(--green-soft)", border: "1px solid var(--green-border)",
+                            background: "#FAF8F4", border: "1px solid #ECE7DD", opacity: 0.65,
                           } : active ? {
-                            background: "var(--rose-soft)", border: "1.5px solid var(--rose-border)",
+                            background: "#FAF8F4", border: "1.5px solid #1A2138",
                           } : {
-                            background: "var(--bg)", border: "1px solid rgba(0,0,0,0.06)",
+                            background: "#fff", border: "1px solid #ECE7DD",
                           }}
                         >
                           <div>
-                            <p className="font-semibold text-sm truncate" style={{ color: p.alreadyPinned ? "var(--green)" : "var(--text)" }}>
+                            <p className="font-semibold text-sm truncate" style={{ color: "#1A2138" }}>
                               {p.titre}
                             </p>
-                            <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
+                            <p className="text-xs mt-0.5" style={{ color: "#8A8579" }}>
                               {p.alreadyPinned ? "Déjà pinné" : `${3 - p.pinsCount} pin${3 - p.pinsCount > 1 ? "s" : ""} restant${3 - p.pinsCount > 1 ? "s" : ""}`}
                             </p>
                           </div>
                           {p.alreadyPinned
-                            ? <Check size={15} strokeWidth={2.5} style={{ color: "var(--green)", flexShrink: 0 }} />
-                            : active && <div className="w-3 h-3 rounded-full shrink-0" style={{ background: "var(--rose)" }} />
+                            ? <Check size={15} strokeWidth={2.5} style={{ color: "#1A2138", flexShrink: 0 }} />
+                            : active && <div className="w-3 h-3 rounded-full shrink-0" style={{ background: "#1A2138" }} />
                           }
                         </button>
                       );
                     })}
                   </div>
                   <div className="flex gap-3">
-                    <button onClick={() => setShowPinModal(false)} className="btn-ghost flex-1" style={{ padding: "11px 0", fontSize: 14 }}>
+                    <button onClick={() => setShowPinModal(false)}
+                      style={{ flex: 1, padding: "11px 0", fontSize: 14, fontWeight: 600, borderRadius: 12, border: "1px solid #ECE7DD", background: "#fff", color: "#8A8579", cursor: "pointer" }}>
                       Annuler
                     </button>
                     <button
                       onClick={confirmPin}
                       disabled={pinLoading || !pinProjectId || selectedPinProj?.alreadyPinned}
-                      className="btn-primary flex-1"
-                      style={{ padding: "11px 0", fontSize: 14 }}
+                      style={{ flex: 1, padding: "11px 0", fontSize: 14, fontWeight: 700, borderRadius: 12, background: "#1A2138", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (pinLoading || !pinProjectId || selectedPinProj?.alreadyPinned) ? 0.4 : 1 }}
                     >
                       {pinLoading
-                        ? <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                        ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
                         : <><Pin size={13} strokeWidth={2} /> Confirmer</>
                       }
                     </button>
                   </div>
+                  <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
                 </>
               )}
             </div>
@@ -862,8 +863,7 @@ export default function PublicProfilePage() {
             {canPin && !pinDone && (
               <button
                 onClick={openPinModal}
-                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl"
-                style={{ background: "var(--rose-soft)", color: "var(--rose-hover)", border: "1px solid var(--rose-border)" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#1A2138", color: "#fff", border: "none", borderRadius: 9, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
               >
                 <Pin size={11} strokeWidth={2} /> Pinner
               </button>
@@ -871,8 +871,7 @@ export default function PublicProfilePage() {
             {!isMe && currentUserId && (
               <button
                 onClick={() => setShowReport(true)}
-                className="btn-icon shrink-0"
-                style={{ width: 32, height: 32, color: "var(--subtle)" }}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex", alignItems: "center", color: "#8A8579", borderRadius: 8 }}
                 title="Signaler ce profil"
               >
                 <Flag size={13} strokeWidth={2} />
@@ -893,6 +892,16 @@ export default function PublicProfilePage() {
 
       <div className="max-w-2xl mx-auto px-4">
         <div style={{ paddingTop: 60, paddingBottom: 24 }}>
+
+          {/* Flèche retour — visiteur uniquement */}
+          {!isMe && (
+            <button
+              onClick={() => router.back()}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#8A8579", padding: "0 0 16px", marginLeft: -2 }}
+            >
+              <ArrowLeft size={15} strokeWidth={2} /> Retour
+            </button>
+          )}
 
           {/* Avatar + boutons owner */}
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
@@ -1276,10 +1285,9 @@ export default function PublicProfilePage() {
                     <div className="flex items-start gap-3 mb-3">
                       <button
                         onClick={() => router.push(`/profil/${r.reviewer_id}`)}
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-black shrink-0 hover:opacity-80 transition-opacity"
-                        style={{ background: r.reviewer_role === "founder" ? "linear-gradient(135deg,#f43f5e,#8b5cf6)" : "linear-gradient(135deg,#3b82f6,#8b5cf6)" }}
+                        style={{ width: 40, height: 40, borderRadius: 10, background: "#1A2138", border: "none", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
                       >
-                        {r.reviewer_nom?.[0]?.toUpperCase() ?? "?"}
+                        <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{r.reviewer_nom?.[0]?.toUpperCase() ?? "?"}</span>
                       </button>
                       <div className="flex-1 min-w-0">
                         <button onClick={() => router.push(`/profil/${r.reviewer_id}`)}
@@ -1295,14 +1303,14 @@ export default function PublicProfilePage() {
                       </div>
                       <div className="shrink-0 text-right">
                         <StarRating rating={r.rating} size="sm" />
-                        <p className="text-[11px] font-semibold mt-1" style={{ color: "var(--amber)" }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, marginTop: 2, color: "#8A8579" }}>
                           {RATING_LABEL[r.rating]}
                         </p>
                       </div>
                     </div>
                     {r.comment && (
                       <p className="text-sm leading-relaxed px-4 py-3 rounded-xl"
-                        style={{ background: "var(--bg)", color: "var(--text-2)", borderLeft: `3px solid ${accentColor}` }}>
+                        style={{ background: "#FAF8F4", color: "#1A2138", borderLeft: "3px solid #ECE7DD" }}>
                         &ldquo;{r.comment}&rdquo;
                       </p>
                     )}
@@ -1344,13 +1352,14 @@ export default function PublicProfilePage() {
               <button
                 onClick={alreadyPinned || pinDone ? undefined : openPinModal}
                 disabled={alreadyPinned || pinDone}
-                className="flex-1 text-sm font-bold flex items-center justify-center gap-2 rounded-2xl transition-all"
                 style={alreadyPinned || pinDone ? {
-                  padding: "12px 0",
-                  background: "var(--green-soft)", color: "var(--green)", border: "1px solid var(--green-border)",
+                  flex: 1, padding: "12px 0", fontSize: 14, fontWeight: 600, borderRadius: 14,
+                  background: "#fff", color: "#8A8579", border: "1px solid #ECE7DD", cursor: "default",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 } : {
-                  padding: "12px 0",
-                  background: "linear-gradient(135deg, #f43f5e, #fb7185)", color: "white", boxShadow: "var(--shadow-rose)",
+                  flex: 1, padding: "12px 0", fontSize: 14, fontWeight: 700, borderRadius: 14,
+                  background: "#1A2138", color: "#fff", border: "none", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}
               >
                 {alreadyPinned || pinDone
