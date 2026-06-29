@@ -12,6 +12,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import NotifToast from "@/components/NotifToast";
 
 type Tab = {
   label: string;
@@ -138,6 +139,8 @@ export default function BottomNav() {
       ];
 
   return (
+    <>
+      <NotifToast />
     <div
       className="fixed bottom-0 left-0 right-0 z-50"
       style={{
@@ -200,5 +203,6 @@ export default function BottomNav() {
         })}
       </div>
     </div>
+    </>
   );
 }

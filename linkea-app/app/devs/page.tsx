@@ -83,6 +83,8 @@ export default function DevsPage() {
   const [confirmDev, setConfirmDev]   = useState<Dev | null>(null);
   const [modalProjectId, setModalProjectId] = useState<string | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [aiScores, setAiScores]       = useState<Record<string, { score: number; reason: string; strengths: string[]; concern: string | null }>>({});
+  const [aiLoading, setAiLoading]     = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -230,6 +232,37 @@ export default function DevsPage() {
       });
     }
     setPinning(false);
+  }
+
+  async function runAiMatching() {
+    if (!selectedProjectId || aiLoading || sortedDevs.length === 0) return;
+    setAiLoading(true);
+    setAiScores({});
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      const res = await fetch("/api/ai/matching", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({
+          projectId: selectedProjectId,
+          devs: sortedDevs.slice(0, 15).map((d) => ({
+            id: d.id, nom: d.nom, competences: d.competences,
+            ecole: d.ecole, dispo_heures_semaine: d.dispo_heures_semaine,
+            score: d.score, reviewCount: d.reviewCount,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { console.error("[AI Matching]", data.error); return; }
+      const map: typeof aiScores = {};
+      for (const s of data.scores ?? []) map[s.devId] = s;
+      setAiScores(map);
+    } catch (e) {
+      console.error("[AI Matching]", e);
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   const currentPins = pinsMap[selectedProjectId ?? ""] ?? new Set<string>();
@@ -440,9 +473,23 @@ export default function DevsPage() {
                   );
                 })}
               </div>
-              <div style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, border: `1px solid ${C.hairline}`, background: C.surface, color: pinsLeft === 0 ? C.muted : C.ink }}>
-                <Pin size={11} strokeWidth={2} />
-                <span style={{ fontVariantNumeric: "tabular-nums" }}>{pinsLeft} restant{pinsLeft > 1 ? "s" : ""}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <button
+                  onClick={runAiMatching}
+                  disabled={aiLoading || !selectedProjectId}
+                  title="Scorer les devs avec l'IA"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: C.ink, color: "#fff", border: "none", cursor: "pointer", opacity: (aiLoading || !selectedProjectId) ? 0.4 : 1 }}
+                >
+                  {aiLoading
+                    ? <div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
+                    : <span style={{ fontSize: 13, lineHeight: 1 }}>✦</span>
+                  }
+                  {Object.keys(aiScores).length > 0 ? "Rescorer" : "IA"}
+                </button>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, border: `1px solid ${C.hairline}`, background: C.surface, color: pinsLeft === 0 ? C.muted : C.ink }}>
+                  <Pin size={11} strokeWidth={2} />
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{pinsLeft} restant{pinsLeft > 1 ? "s" : ""}</span>
+                </div>
               </div>
             </div>
           )}
@@ -528,13 +575,23 @@ export default function DevsPage() {
                             <p style={{ fontSize: 12, color: C.muted, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{dev.ecole}</p>
                           )}
                         </div>
-                        {dev.score !== undefined && (
-                          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                            <Star size={12} strokeWidth={1.5} fill={C.ink} style={{ color: C.ink }} />
-                            <span style={{ fontSize: 12, fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{dev.score}</span>
-                            <span style={{ fontSize: 11, color: C.muted, fontVariantNumeric: "tabular-nums" }}>({dev.reviewCount})</span>
-                          </div>
-                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                          {aiScores[dev.id] && (
+                            <div
+                              title={aiScores[dev.id].reason}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 8, border: `1px solid ${C.hairline}`, background: C.canvas }}
+                            >
+                              <span style={{ fontSize: 11, fontWeight: 800, color: C.ink, fontVariantNumeric: "tabular-nums" }}>✦ {aiScores[dev.id].score}%</span>
+                            </div>
+                          )}
+                          {dev.score !== undefined && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <Star size={12} strokeWidth={1.5} fill={C.ink} style={{ color: C.ink }} />
+                              <span style={{ fontSize: 12, fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{dev.score}</span>
+                              <span style={{ fontSize: 11, color: C.muted, fontVariantNumeric: "tabular-nums" }}>({dev.reviewCount})</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {dispo && (

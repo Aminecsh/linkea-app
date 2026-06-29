@@ -48,7 +48,10 @@ export default function ProjectDetailPage() {
         .maybeSingle();
 
       if (!proj) { router.push("/projets"); return; }
-      setProject(proj as unknown as Project);
+      const raw = proj as unknown as Record<string, unknown>;
+      // Supabase peut retourner la relation comme tableau ou objet
+      if (Array.isArray(raw.profiles_founder)) raw.profiles_founder = raw.profiles_founder[0] ?? null;
+      setProject(raw as unknown as Project);
 
       if (r === "developer") {
         const { data: profile } = await supabase

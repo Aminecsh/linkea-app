@@ -1217,6 +1217,12 @@ export default function PublicProfilePage() {
                       Modifier
                     </button>
                   )}
+                  {isMe && (p.statut === "matched" || p.statut === "en_cours") && (
+                    <button onClick={() => router.push(`/projets/${p.id}/gestion`)}
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#1A2138", padding: "3px 6px", flexShrink: 0, textDecoration: "underline" }}>
+                      Gérer
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
