@@ -7,8 +7,9 @@ import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import {
   ArrowLeft, ArrowUp, Paperclip, Smile, FileText, ImageIcon,
   ChevronDown, FileArchive, LayoutDashboard, ScrollText, BellRing, X,
-  CheckCircle2, Circle, Clock, RotateCcw,
+  CheckCircle2, Circle, RotateCcw, Video, Calendar, Users, ExternalLink,
 } from "lucide-react";
+import JitsiCall from "@/components/JitsiCall";
 
 type Message = {
   id: string;
@@ -22,6 +23,8 @@ type Message = {
 type Conversation = {
   id: string;
   project_id: string;
+  is_group?: boolean;
+  group_name?: string;
   projects: { titre: string; statut: string };
   profiles_founder: { nom: string; user_id: string };
   profiles_developer: { nom: string; user_id: string };
@@ -36,6 +39,20 @@ type SprintTask = {
   id: string; sprint_id: string | null; titre: string;
   statut: "todo" | "en_cours" | "review" | "done";
   priorite: "basse" | "normale" | "haute";
+};
+
+type MeetingData = {
+  id?: string;
+  title: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  jitsi_room: string;
+};
+
+type CallData = {
+  room: string;
+  url: string;
+  starter: string;
 };
 
 function formatMsgTime(iso: string) {
@@ -58,6 +75,76 @@ function formatDateSeparator(iso: string) {
 
 function isSameDay(a: string, b: string) {
   return new Date(a).toDateString() === new Date(b).toDateString();
+}
+
+function parseMeetingContent(content: string): MeetingData | null {
+  if (!content.startsWith("__MEETING__:")) return null;
+  try { return JSON.parse(content.slice(12)); } catch { return null; }
+}
+
+function parseCallContent(content: string): CallData | null {
+  if (!content.startsWith("__CALL__:")) return null;
+  try { return JSON.parse(content.slice(9)); } catch { return null; }
+}
+
+function MeetingCard({ data }: { data: MeetingData }) {
+  const d = new Date(data.scheduled_at);
+  const now = new Date();
+  const isPast = d < now;
+  const url = `https://meet.jit.si/${data.jitsi_room}`;
+  const label = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(99,102,241,0.25)", background: "rgba(99,102,241,0.04)", minWidth: 220, maxWidth: 280 }}>
+      <div className="px-4 pt-3 pb-2">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: "rgba(99,102,241,0.12)" }}>
+            <Calendar size={13} style={{ color: "#6366f1" }} />
+          </div>
+          <span className="text-xs font-bold" style={{ color: "#6366f1" }}>Réunion planifiée</span>
+        </div>
+        <p className="text-sm font-bold text-slate-900 leading-tight">{data.title}</p>
+        <p className="text-xs text-slate-500 mt-1 capitalize">{label} · {time}</p>
+        <p className="text-xs text-slate-400">{data.duration_minutes} min</p>
+      </div>
+      <div style={{ borderTop: "1px solid rgba(99,102,241,0.15)" }} className="px-3 py-2.5">
+        <a
+          href={url} target="_blank" rel="noreferrer"
+          className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-bold text-white transition-opacity hover:opacity-90"
+          style={{ background: isPast ? "#6366f1" : "linear-gradient(135deg,#6366f1,#8b5cf6)", opacity: isPast ? 0.7 : 1 }}
+        >
+          <Video size={12} /> {isPast ? "Voir le replay" : "Rejoindre le call"}
+          <ExternalLink size={10} style={{ opacity: 0.7 }} />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function CallCard({ data, onJoin }: { data: CallData; onJoin: (room: string) => void }) {
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(16,185,129,0.25)", background: "rgba(16,185,129,0.04)", minWidth: 200, maxWidth: 260 }}>
+      <div className="px-4 py-3">
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: "rgba(16,185,129,0.12)" }}>
+            <Video size={13} style={{ color: "#10b981" }} />
+          </div>
+          <span className="text-xs font-bold" style={{ color: "#10b981" }}>Appel démarré</span>
+        </div>
+        <p className="text-xs text-slate-500">par {data.starter}</p>
+      </div>
+      <div style={{ borderTop: "1px solid rgba(16,185,129,0.15)" }} className="px-3 py-2.5">
+        <button
+          onClick={() => onJoin(data.room)}
+          className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity"
+          style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
+        >
+          <Video size={12} /> Rejoindre l'appel
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function ChatPage() {
@@ -86,6 +173,19 @@ export default function ChatPage() {
   const [sprintTasks,      setSprintTasks]      = useState<SprintTask[]>([]);
   const [selectedSprint,   setSelectedSprint]   = useState<Sprint | null>(null);
 
+  // Call + Meeting state
+  const [showCallModal,    setShowCallModal]    = useState(false);
+  const [activeCall,       setActiveCall]       = useState<{ room: string } | null>(null);
+  const callStartRef = useRef<number | null>(null);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [meetingTitle,     setMeetingTitle]     = useState("Réunion");
+  const [meetingDate,      setMeetingDate]      = useState("");
+  const [meetingTime,      setMeetingTime]      = useState("10:00");
+  const [meetingDuration,  setMeetingDuration]  = useState(60);
+  const [meetingCreating,  setMeetingCreating]  = useState(false);
+  const [isGroup,          setIsGroup]          = useState(false);
+  const [groupName,        setGroupName]        = useState("");
+
   const bottomRef      = useRef<HTMLDivElement>(null);
   const scrollAreaRef  = useRef<HTMLDivElement>(null);
   const fileInputRef   = useRef<HTMLInputElement>(null);
@@ -107,20 +207,19 @@ export default function ChatPage() {
 
       const { data: conv } = await supabase
         .from("conversations")
-        .select("id, project_id, projects(titre, statut), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
+        .select("id, project_id, is_group, group_name, projects(titre, statut), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
         .eq("id", id).maybeSingle();
 
       if (!conv) { router.push("/messages"); return; }
-      setConversation(conv as unknown as Conversation);
+      const convTyped = conv as unknown as Conversation;
+      setConversation(convTyped);
+      setIsGroup(!!convTyped.is_group);
+      setGroupName(convTyped.group_name ?? "");
 
       const { data: contract } = await supabase
         .from("contracts").select("id").eq("project_id", conv.project_id).maybeSingle();
       if (contract) setContractId(contract.id);
 
-      const convTyped = conv as unknown as {
-        profiles_founder: { user_id: string };
-        profiles_developer: { user_id: string };
-      };
       const myTable    = r === "founder" ? "profiles_founder" : "profiles_developer";
       const otherTable = r === "founder" ? "profiles_developer" : "profiles_founder";
       const otherUserId = r === "founder"
@@ -179,14 +278,12 @@ export default function ChatPage() {
     return () => { supabase.removeChannel(channel); };
   }, [id, loading, userId]);
 
-  // Scroll to bottom on new messages (only if already at bottom)
   useEffect(() => {
     if (isAtBottomRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, otherTyping]);
 
-  // Scroll listener
   useEffect(() => {
     const el = scrollAreaRef.current;
     if (!el) return;
@@ -218,6 +315,18 @@ export default function ChatPage() {
     broadcastTyping();
   }
 
+  async function notifyOther(title: string, body: string) {
+    if (!conversation) return;
+    const otherUid = role === "founder"
+      ? conversation.profiles_developer?.user_id
+      : conversation.profiles_founder?.user_id;
+    if (otherUid) {
+      await supabase.from("notifications").insert({
+        user_id: otherUid, type: "nouveau_message", title, body, link: `/messages/${id}`,
+      });
+    }
+  }
+
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!content.trim() || !userId || sending) return;
@@ -236,21 +345,7 @@ export default function ChatPage() {
     await supabase.from("messages").insert({
       conversation_id: id, sender_id: userId, content: newMsg.content,
     });
-
-    if (conversation) {
-      const otherUserId = role === "founder"
-        ? conversation.profiles_developer?.user_id
-        : conversation.profiles_founder?.user_id;
-      if (otherUserId) {
-        await supabase.from("notifications").insert({
-          user_id: otherUserId,
-          type: "nouveau_message",
-          title: "Nouveau message 💬",
-          body: newMsg.content.slice(0, 80),
-          link: `/messages/${id}`,
-        });
-      }
-    }
+    await notifyOther("Nouveau message 💬", newMsg.content.slice(0, 80));
     setSending(false);
   }
 
@@ -281,6 +376,80 @@ export default function ChatPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  async function startCall() {
+    if (!userId) return;
+    const room = `linkea-${id.slice(0, 8)}`;
+    const url  = `https://meet.jit.si/${room}`;
+    const msgContent = `__CALL__:${JSON.stringify({ room, url, starter: myNom })}`;
+
+    const newMsg: Message = { id: crypto.randomUUID(), sender_id: userId, content: msgContent, created_at: new Date().toISOString() };
+    setMessages((prev) => [...prev, newMsg]);
+    isAtBottomRef.current = true;
+    await supabase.from("messages").insert({ conversation_id: id, sender_id: userId, content: msgContent });
+    await notifyOther("📹 Appel entrant", `${myNom} vous appelle`);
+    setShowCallModal(false);
+    callStartRef.current = Date.now();
+    setActiveCall({ room });
+  }
+
+  async function handleHangup() {
+    if (userId && callStartRef.current !== null) {
+      const secs = Math.floor((Date.now() - callStartRef.current) / 1000);
+      const label = secs < 60
+        ? `${secs}s`
+        : `${Math.floor(secs / 60)} min${secs % 60 > 0 ? ` ${secs % 60}s` : ""}`;
+      const msgContent = `__CALL_END__:${label}`;
+      const newMsg: Message = { id: crypto.randomUUID(), sender_id: userId, content: msgContent, created_at: new Date().toISOString() };
+      setMessages((prev) => [...prev, newMsg]);
+      isAtBottomRef.current = true;
+      await supabase.from("messages").insert({ conversation_id: id, sender_id: userId, content: msgContent });
+      callStartRef.current = null;
+    }
+    setActiveCall(null);
+  }
+
+  async function scheduleMeeting() {
+    if (!userId || !meetingDate || !meetingTime || meetingCreating) return;
+    setMeetingCreating(true);
+
+    const scheduled_at = new Date(`${meetingDate}T${meetingTime}`).toISOString();
+    const jitsi_room   = `linkea-meeting-${crypto.randomUUID().slice(0, 8)}`;
+
+    const { data: meeting } = await supabase.from("meetings").insert({
+      conversation_id: id,
+      project_id: conversation?.project_id,
+      title: meetingTitle.trim() || "Réunion",
+      scheduled_at,
+      duration_minutes: meetingDuration,
+      jitsi_room,
+      created_by: userId,
+    }).select().maybeSingle();
+
+    if (meeting) {
+      const msgContent = `__MEETING__:${JSON.stringify({
+        id: meeting.id,
+        title: meeting.title,
+        scheduled_at: meeting.scheduled_at,
+        duration_minutes: meeting.duration_minutes,
+        jitsi_room: meeting.jitsi_room,
+      })}`;
+      const newMsg: Message = { id: crypto.randomUUID(), sender_id: userId, content: msgContent, created_at: new Date().toISOString() };
+      setMessages((prev) => [...prev, newMsg]);
+      isAtBottomRef.current = true;
+      await supabase.from("messages").insert({ conversation_id: id, sender_id: userId, content: msgContent });
+
+      const label = new Date(scheduled_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      await notifyOther("📅 Réunion planifiée", `${meeting.title} — ${label}`);
+    }
+
+    setMeetingCreating(false);
+    setShowMeetingModal(false);
+    setMeetingTitle("Réunion");
+    setMeetingDate("");
+    setMeetingTime("10:00");
+    setMeetingDuration(60);
+  }
+
   async function openSprintModal() {
     if (!conversation?.project_id) return;
     setShowSprintModal(true);
@@ -304,12 +473,8 @@ export default function ChatPage() {
     const inProg  = tasks.filter((t) => t.statut === "en_cours" || t.statut === "review");
     const todo    = tasks.filter((t) => t.statut === "todo");
 
-    const daysLeft = Math.ceil(
-      (new Date(selectedSprint.date_fin).getTime() - Date.now()) / 86400000
-    );
-    const echeance = new Date(selectedSprint.date_fin).toLocaleDateString("fr-FR", {
-      weekday: "long", day: "numeric", month: "long",
-    });
+    const daysLeft = Math.ceil((new Date(selectedSprint.date_fin).getTime() - Date.now()) / 86400000);
+    const echeance = new Date(selectedSprint.date_fin).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
     const lines: string[] = [
       `📋 Rappel sprint · ${selectedSprint.nom}`,
@@ -317,35 +482,18 @@ export default function ChatPage() {
     ];
     if (selectedSprint.objectif) lines.push(`Objectif : ${selectedSprint.objectif}`);
     lines.push("");
-
     if (done.length)   lines.push(`✅ Terminé (${done.length})`, ...done.map((t) => `  · ${t.titre}`), "");
     if (inProg.length) lines.push(`🔄 En cours (${inProg.length})`, ...inProg.map((t) => `  · ${t.titre}`), "");
     if (todo.length)   lines.push(`⏳ À faire (${todo.length})`, ...todo.map((t) => `  · ${t.titre}`));
 
     const msgContent = lines.join("\n");
-
-    const newMsg: Message = {
-      id: crypto.randomUUID(), sender_id: userId,
-      content: msgContent, created_at: new Date().toISOString(),
-    };
+    const newMsg: Message = { id: crypto.randomUUID(), sender_id: userId, content: msgContent, created_at: new Date().toISOString() };
     setMessages((prev) => [...prev, newMsg]);
     setShowSprintModal(false);
     isAtBottomRef.current = true;
 
     await supabase.from("messages").insert({ conversation_id: id, sender_id: userId, content: msgContent });
-
-    if (conversation) {
-      const otherUid = role === "founder"
-        ? conversation.profiles_developer?.user_id
-        : conversation.profiles_founder?.user_id;
-      if (otherUid) {
-        await supabase.from("notifications").insert({
-          user_id: otherUid, type: "nouveau_message",
-          title: "Rappel sprint 📋", body: `${selectedSprint.nom} — J-${daysLeft}`,
-          link: `/messages/${id}`,
-        });
-      }
-    }
+    await notifyOther("Rappel sprint 📋", `${selectedSprint.nom} — J-${daysLeft}`);
   }
 
   if (loading) {
@@ -356,13 +504,22 @@ export default function ChatPage() {
     );
   }
 
-  const otherNom    = role === "founder" ? conversation?.profiles_developer?.nom : conversation?.profiles_founder?.nom;
+  const otherNom    = isGroup ? groupName : (role === "founder" ? conversation?.profiles_developer?.nom : conversation?.profiles_founder?.nom);
   const otherUserId = role === "founder" ? conversation?.profiles_founder?.user_id : conversation?.profiles_developer?.user_id;
   const isArchived  = ["livre", "termine"].includes(conversation?.projects?.statut ?? "");
   const hasText     = content.trim().length > 0;
 
   return (
     <div className="flex flex-col" style={{ height: "100dvh", background: "var(--bg)" }}>
+
+      {/* ── Appel Jitsi in-app ── */}
+      {activeCall && (
+        <JitsiCall
+          room={activeCall.room}
+          displayName={myNom || "Utilisateur"}
+          onHangup={handleHangup}
+        />
+      )}
 
       {/* ── Header ── */}
       <div
@@ -377,35 +534,23 @@ export default function ChatPage() {
       >
         <div className="max-w-2xl mx-auto px-3 py-3 flex items-center gap-2.5">
 
-          {/* Retour */}
-          <button
-            onClick={() => router.push("/messages")}
-            className="btn-icon shrink-0"
-            style={{ width: 34, height: 34, borderRadius: 10 }}
-          >
+          <button onClick={() => router.push("/messages")} className="btn-icon shrink-0" style={{ width: 34, height: 34, borderRadius: 10 }}>
             <ArrowLeft size={17} />
           </button>
 
           {/* Avatar */}
-          <button
-            onClick={() => otherUserId && router.push(`/profil/${otherUserId}`)}
-            className="shrink-0"
-          >
-            {otherAvatarUrl ? (
-              <img
-                src={otherAvatarUrl} alt={otherNom ?? ""}
-                className="w-9 h-9 rounded-full object-cover"
-                style={{ border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 6px rgba(0,0,0,0.10)" }}
-              />
+          <button onClick={() => !isGroup && otherUserId && router.push(`/profil/${otherUserId}`)} className="shrink-0">
+            {isGroup ? (
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 6px rgba(0,0,0,0.10)" }}>
+                <Users size={16} />
+              </div>
+            ) : otherAvatarUrl ? (
+              <img src={otherAvatarUrl} alt={otherNom ?? ""} className="w-9 h-9 rounded-full object-cover"
+                style={{ border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 6px rgba(0,0,0,0.10)" }} />
             ) : (
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                style={{
-                  background: "linear-gradient(135deg, #f43f5e, #8b5cf6)",
-                  border: "2px solid rgba(255,255,255,0.9)",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.10)",
-                }}
-              >
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                style={{ background: "linear-gradient(135deg, #f43f5e, #8b5cf6)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 6px rgba(0,0,0,0.10)" }}>
                 {otherNom?.[0]?.toUpperCase() ?? "?"}
               </div>
             )}
@@ -413,31 +558,41 @@ export default function ChatPage() {
 
           {/* Nom + statut */}
           <div className="flex-1 min-w-0">
-            <button
-              onClick={() => otherUserId && router.push(`/profil/${otherUserId}`)}
-              className="font-bold text-sm leading-tight truncate block text-left w-full"
-              style={{ color: "var(--text)", letterSpacing: "-0.015em" }}
-            >
-              {otherNom}
-            </button>
-            <p
-              className="text-xs truncate transition-all duration-200"
-              style={{ color: otherTyping ? "var(--rose)" : "var(--muted)", fontWeight: otherTyping ? 600 : 400 }}
-            >
+            <p className="font-bold text-sm leading-tight truncate" style={{ color: "var(--text)", letterSpacing: "-0.015em" }}>{otherNom}</p>
+            <p className="text-xs truncate transition-all duration-200"
+              style={{ color: otherTyping ? "var(--rose)" : "var(--muted)", fontWeight: otherTyping ? 600 : 400 }}>
               {otherTyping ? "En train d'écrire…" : conversation?.projects?.titre}
             </p>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Appel vidéo */}
+            {!isArchived && (
+              <button
+                onClick={() => setShowCallModal(true)}
+                className="flex items-center justify-center rounded-xl transition-all"
+                style={{ width: 34, height: 34, background: "rgba(16,185,129,0.10)", border: "1px solid rgba(16,185,129,0.20)" }}
+                title="Appel vidéo"
+              >
+                <Video size={15} style={{ color: "#10b981" }} />
+              </button>
+            )}
+            {/* Planifier meeting */}
+            {!isArchived && (
+              <button
+                onClick={() => setShowMeetingModal(true)}
+                className="flex items-center justify-center rounded-xl transition-all"
+                style={{ width: 34, height: 34, background: "rgba(99,102,241,0.10)", border: "1px solid rgba(99,102,241,0.20)" }}
+                title="Planifier une réunion"
+              >
+                <Calendar size={15} style={{ color: "#6366f1" }} />
+              </button>
+            )}
             <button
               onClick={() => router.push(`/projets/${conversation?.project_id}/gestion`)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
-              style={{
-                background: "rgba(0,0,0,0.04)",
-                border: "1px solid rgba(0,0,0,0.08)",
-                color: "var(--text-2)",
-              }}
+              style={{ background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.08)", color: "var(--text-2)" }}
             >
               <LayoutDashboard size={12} />
               <span className="hidden sm:inline">Gestion</span>
@@ -446,11 +601,7 @@ export default function ChatPage() {
               <button
                 onClick={() => router.push(`/contrat/${contractId}`)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all"
-                style={{
-                  background: "rgba(0,0,0,0.04)",
-                  border: "1px solid rgba(0,0,0,0.08)",
-                  color: "var(--text-2)",
-                }}
+                style={{ background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.08)", color: "var(--text-2)" }}
               >
                 <ScrollText size={12} />
                 <span className="hidden sm:inline">Contrat</span>
@@ -459,42 +610,24 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Bannière contrat actif */}
         {contractId && !isArchived && (
-          <div
-            className="mx-3 mb-2 rounded-xl px-3 py-2 flex items-center justify-between"
-            style={{ background: "var(--blue-soft)", border: "1px solid var(--blue-border)" }}
-          >
+          <div className="mx-3 mb-2 rounded-xl px-3 py-2 flex items-center justify-between"
+            style={{ background: "var(--blue-soft)", border: "1px solid var(--blue-border)" }}>
             <div className="flex items-center gap-2">
               <ScrollText size={13} style={{ color: "var(--blue)", flexShrink: 0 }} />
-              <span className="text-xs font-semibold" style={{ color: "var(--blue)" }}>
-                Projet en cours — contrat signé
-              </span>
+              <span className="text-xs font-semibold" style={{ color: "var(--blue)" }}>Projet en cours — contrat signé</span>
             </div>
-            <button
-              onClick={() => router.push(`/contrat/${contractId}`)}
-              className="text-xs font-bold"
-              style={{ color: "var(--blue)" }}
-            >
-              Voir →
-            </button>
+            <button onClick={() => router.push(`/contrat/${contractId}`)} className="text-xs font-bold" style={{ color: "var(--blue)" }}>Voir →</button>
           </div>
         )}
       </div>
 
       {/* ── Messages ── */}
-      <div
-        ref={scrollAreaRef}
-        className="flex-1 overflow-y-auto scrollbar-hide"
-        style={{ overscrollBehavior: "contain" }}
-      >
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto scrollbar-hide" style={{ overscrollBehavior: "contain" }}>
         <div className="max-w-2xl mx-auto px-3 py-4">
-
           {messages.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-sm" style={{ color: "var(--muted)" }}>
-                Début de la conversation — dites bonjour 👋
-              </p>
+              <p className="text-sm" style={{ color: "var(--muted)" }}>Début de la conversation — dites bonjour 👋</p>
             </div>
           )}
 
@@ -507,11 +640,13 @@ export default function ChatPage() {
               const isLastInGroup  = !next || next.sender_id !== m.sender_id;
               const showDate = !prev || !isSameDay(prev.created_at, m.created_at);
 
+              const meetingData = parseMeetingContent(m.content);
+              const callData    = parseCallContent(m.content);
+              const callEndMatch = m.content.startsWith("__CALL_END__:") ? m.content.slice(13) : null;
               const isImage = m.file_type?.startsWith("image/");
               const isPdf   = m.file_type === "application/pdf";
               const isFile  = !!m.file_url;
 
-              // Border radius iMessage style
               const r = 18;
               const flat = 5;
               const br = isMe
@@ -520,21 +655,17 @@ export default function ChatPage() {
 
               return (
                 <div key={m.id}>
-                  {/* Séparateur de date */}
                   {showDate && (
                     <div className="flex items-center gap-3 my-4">
                       <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
-                      <span className="text-xs font-semibold px-3 py-1 rounded-full"
-                        style={{ color: "var(--muted)", background: "rgba(0,0,0,0.04)" }}>
+                      <span className="text-xs font-semibold px-3 py-1 rounded-full" style={{ color: "var(--muted)", background: "rgba(0,0,0,0.04)" }}>
                         {formatDateSeparator(m.created_at)}
                       </span>
                       <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
                     </div>
                   )}
 
-                  <div
-                    className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"} ${isFirstInGroup ? "mt-3" : "mt-0.5"}`}
-                  >
+                  <div className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"} ${isFirstInGroup ? "mt-3" : "mt-0.5"}`}>
                     {/* Avatar gauche */}
                     {!isMe && (
                       <div className="w-6 shrink-0 self-end mb-0.5">
@@ -554,15 +685,26 @@ export default function ChatPage() {
                     )}
 
                     {/* Bulle */}
-                    <div className={`flex flex-col ${isMe ? "items-end" : "items-start"} max-w-[72%]`}>
-                      {isFile ? (
+                    <div className={`flex flex-col ${isMe ? "items-end" : "items-start"} max-w-[75%]`}>
+                      {meetingData ? (
+                        <MeetingCard data={meetingData} />
+                      ) : callEndMatch ? (
+                        <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl"
+                          style={{ background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.07)" }}>
+                          <Video size={13} style={{ color: "var(--muted)" }} />
+                          <span className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
+                            Appel terminé · {callEndMatch}
+                          </span>
+                        </div>
+                      ) : callData ? (
+                        <CallCard data={callData} onJoin={(room) => setActiveCall({ room })} />
+                      ) : isFile ? (
                         isImage ? (
                           <a href={m.file_url} target="_blank" rel="noreferrer" style={{ borderRadius: br, overflow: "hidden", display: "block" }}>
                             <img src={m.file_url} alt="img" className="max-w-[240px] object-cover hover:opacity-90 transition-opacity" />
                           </a>
                         ) : (
-                          <a
-                            href={m.file_url} target="_blank" rel="noreferrer"
+                          <a href={m.file_url} target="_blank" rel="noreferrer"
                             className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold"
                             style={{
                               borderRadius: br,
@@ -570,12 +712,8 @@ export default function ChatPage() {
                               color: isMe ? "#fff" : "var(--text)",
                               border: isMe ? "none" : "1px solid var(--border-2)",
                               boxShadow: isMe ? "var(--shadow-rose)" : "var(--shadow-xs)",
-                            }}
-                          >
-                            {isPdf
-                              ? <FileText size={16} style={{ flexShrink: 0 }} />
-                              : <FileArchive size={16} style={{ flexShrink: 0 }} />
-                            }
+                            }}>
+                            {isPdf ? <FileText size={16} style={{ flexShrink: 0 }} /> : <FileArchive size={16} style={{ flexShrink: 0 }} />}
                             <span className="truncate max-w-[160px]">{m.file_url?.split("/").pop()}</span>
                           </a>
                         )
@@ -591,13 +729,13 @@ export default function ChatPage() {
                               ? "0 2px 10px rgba(244,63,94,0.30), inset 0 1px 0 rgba(255,255,255,0.12)"
                               : "0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04)",
                             wordBreak: "break-word",
+                            whiteSpace: "pre-wrap",
                           }}
                         >
                           {m.content}
                         </div>
                       )}
 
-                      {/* Heure sous le dernier message du groupe */}
                       {isLastInGroup && (
                         <span className="text-[10px] mt-1 px-1" style={{ color: "var(--subtle)" }}>
                           {formatMsgTime(m.created_at)}
@@ -638,15 +776,8 @@ export default function ChatPage() {
                     </div>
                   )}
                 </div>
-                <div
-                  className="px-4 py-3 flex gap-1 items-center"
-                  style={{
-                    borderRadius: "18px 18px 18px 5px",
-                    background: "#ffffff",
-                    border: "1px solid rgba(0,0,0,0.07)",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04)",
-                  }}
-                >
+                <div className="px-4 py-3 flex gap-1 items-center"
+                  style={{ borderRadius: "18px 18px 18px 5px", background: "#ffffff", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
                   {[0, 150, 300].map((delay) => (
                     <span key={delay} className="w-2 h-2 rounded-full animate-bounce"
                       style={{ background: "var(--muted)", animationDelay: `${delay}ms` }} />
@@ -659,25 +790,15 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* ── Scroll to bottom ── */}
+      {/* Scroll to bottom */}
       {showScrollBtn && (
         <div className="absolute bottom-24 right-4 z-30">
-          <button
-            onClick={scrollToBottom}
-            className="flex items-center justify-center rounded-full shadow-lg relative"
-            style={{
-              width: 38, height: 38,
-              background: "#ffffff",
-              border: "1px solid rgba(0,0,0,0.10)",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-            }}
-          >
+          <button onClick={scrollToBottom} className="flex items-center justify-center rounded-full shadow-lg relative"
+            style={{ width: 38, height: 38, background: "#ffffff", border: "1px solid rgba(0,0,0,0.10)", boxShadow: "0 4px 16px rgba(0,0,0,0.12)" }}>
             <ChevronDown size={18} style={{ color: "var(--text)" }} />
             {unreadBelow > 0 && (
-              <span
-                className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-white px-1"
-                style={{ background: "var(--rose)", fontSize: 10, fontWeight: 800 }}
-              >
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-white px-1"
+                style={{ background: "var(--rose)", fontSize: 10, fontWeight: 800 }}>
                 {unreadBelow}
               </span>
             )}
@@ -685,89 +806,61 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* ── Archive banner ── */}
+      {/* Archive banner */}
       {isArchived && (
         <div className="shrink-0 px-3 pb-3" style={{ borderTop: "1px solid var(--border)", background: "var(--bg)", paddingTop: 12 }}>
           <div className="max-w-2xl mx-auto">
-            <div
-              className="flex items-center justify-center gap-2 rounded-xl px-4 py-3"
-              style={{ background: "rgba(0,0,0,0.04)", border: "1px solid var(--border-2)" }}
-            >
+            <div className="flex items-center justify-center gap-2 rounded-xl px-4 py-3"
+              style={{ background: "rgba(0,0,0,0.04)", border: "1px solid var(--border-2)" }}>
               <FileArchive size={14} style={{ color: "var(--muted)" }} />
-              <p className="text-xs font-medium" style={{ color: "var(--muted)" }}>
-                Projet terminé — conversation archivée
-              </p>
+              <p className="text-xs font-medium" style={{ color: "var(--muted)" }}>Projet terminé — conversation archivée</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Input bar ── */}
+      {/* Input bar */}
       {!isArchived && (
-        <div
-          className="shrink-0"
-          style={{
-            background: "rgba(240,240,245,0.94)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
-            borderTop: "1px solid rgba(0,0,0,0.07)",
-            paddingBottom: "env(safe-area-inset-bottom, 0px)",
-          }}
-        >
+        <div className="shrink-0"
+          style={{ background: "rgba(240,240,245,0.94)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)", borderTop: "1px solid rgba(0,0,0,0.07)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
           <div className="max-w-2xl mx-auto px-3 py-2.5">
             <form onSubmit={handleSend} className="flex items-end gap-2">
-
-              {/* Inputs cachés */}
               <input ref={mediaInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileChange} />
               <input ref={fileInputRef}  type="file" accept=".pdf,.doc,.docx,.zip,.txt,.xls,.xlsx,.ppt,.pptx" className="hidden" onChange={handleFileChange} />
 
-              {/* Sprint reminder — disparaît quand on tape */}
               {!hasText && role === "founder" && (
-                <button type="button" onClick={openSprintModal}
-                  className="btn-icon shrink-0" style={{ width: 38, height: 38 }}>
+                <button type="button" onClick={openSprintModal} className="btn-icon shrink-0" style={{ width: 38, height: 38 }}>
                   <BellRing size={17} />
                 </button>
               )}
 
-              {/* Attach — disparaît quand on tape */}
               {!hasText && (
                 <div className="relative shrink-0">
                   {showAttach && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setShowAttach(false)} />
-                      <div
-                        className="absolute bottom-12 left-0 z-20 overflow-hidden"
-                        style={{
-                          background: "#fff", borderRadius: 16,
-                          border: "1px solid var(--border-2)",
-                          boxShadow: "var(--shadow-md)", width: 180,
-                        }}
-                      >
+                      <div className="absolute bottom-12 left-0 z-20 overflow-hidden"
+                        style={{ background: "#fff", borderRadius: 16, border: "1px solid var(--border-2)", boxShadow: "var(--shadow-md)", width: 180 }}>
                         <button type="button" onClick={() => { setShowAttach(false); mediaInputRef.current?.click(); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-slate-50 transition-colors"
-                          style={{ color: "var(--text)" }}>
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-slate-50 transition-colors" style={{ color: "var(--text)" }}>
                           <ImageIcon size={16} style={{ color: "var(--blue)" }} /> Photo / Vidéo
                         </button>
                         <div className="mx-3 h-px" style={{ background: "var(--border)" }} />
                         <button type="button" onClick={() => { setShowAttach(false); fileInputRef.current?.click(); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-slate-50 transition-colors"
-                          style={{ color: "var(--text)" }}>
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-slate-50 transition-colors" style={{ color: "var(--text)" }}>
                           <FileText size={16} style={{ color: "var(--violet)" }} /> Fichier
                         </button>
                       </div>
                     </>
                   )}
-                  <button type="button" onClick={() => setShowAttach(!showAttach)} disabled={uploading}
-                    className="btn-icon" style={{ width: 38, height: 38 }}>
+                  <button type="button" onClick={() => setShowAttach(!showAttach)} disabled={uploading} className="btn-icon" style={{ width: 38, height: 38 }}>
                     {uploading
                       ? <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--rose-border)", borderTopColor: "var(--rose)" }} />
-                      : <Paperclip size={17} />
-                    }
+                      : <Paperclip size={17} />}
                   </button>
                 </div>
               )}
 
-              {/* Emoji — disparaît quand on tape */}
               {!hasText && (
                 <div className="relative shrink-0">
                   {showEmoji && (
@@ -776,90 +869,45 @@ export default function ChatPage() {
                       <div className="absolute bottom-12 left-0 z-20">
                         <EmojiPicker
                           onEmojiClick={(e: EmojiClickData) => { setContent((p) => p + e.emoji); setShowEmoji(false); }}
-                          height={360} width={300} searchDisabled={false} skinTonesDisabled
-                          previewConfig={{ showPreview: false }}
+                          height={360} width={300} searchDisabled={false} skinTonesDisabled previewConfig={{ showPreview: false }}
                         />
                       </div>
                     </>
                   )}
-                  <button type="button" onClick={() => setShowEmoji(!showEmoji)}
-                    className="btn-icon" style={{ width: 38, height: 38 }}>
+                  <button type="button" onClick={() => setShowEmoji(!showEmoji)} className="btn-icon" style={{ width: 38, height: 38 }}>
                     <Smile size={17} />
                   </button>
                 </div>
               )}
 
-              {/* Input texte */}
               <input
-                type="text"
-                value={content}
-                onChange={handleInput}
-                placeholder="Message…"
-                className="flex-1 text-sm"
-                autoComplete="off"
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid rgba(0,0,0,0.10)",
-                  borderRadius: 20,
-                  padding: "10px 16px",
-                  outline: "none",
-                  color: "var(--text)",
-                  boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-                  fontFamily: "var(--font-sans)",
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = "var(--rose)";
-                  e.target.style.boxShadow = "0 0 0 3px rgba(244,63,94,0.10)";
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(0,0,0,0.10)";
-                  e.target.style.boxShadow = "0 1px 2px rgba(0,0,0,0.03)";
-                }}
+                type="text" value={content} onChange={handleInput} placeholder="Message…"
+                className="flex-1 text-sm" autoComplete="off"
+                style={{ background: "#ffffff", border: "1px solid rgba(0,0,0,0.10)", borderRadius: 20, padding: "10px 16px", outline: "none", color: "var(--text)", boxShadow: "0 1px 2px rgba(0,0,0,0.03)", fontFamily: "var(--font-sans)" }}
+                onFocus={(e) => { e.target.style.borderColor = "var(--rose)"; e.target.style.boxShadow = "0 0 0 3px rgba(244,63,94,0.10)"; }}
+                onBlur={(e)  => { e.target.style.borderColor = "rgba(0,0,0,0.10)"; e.target.style.boxShadow = "0 1px 2px rgba(0,0,0,0.03)"; }}
               />
 
-              {/* Bouton envoi */}
-              <button
-                type="submit"
-                disabled={!hasText || sending}
-                className="shrink-0 flex items-center justify-center rounded-full transition-all"
-                style={{
-                  width: 38, height: 38,
-                  background: hasText
-                    ? "linear-gradient(145deg, #f43f5e, #d4264b)"
-                    : "rgba(0,0,0,0.08)",
-                  boxShadow: hasText ? "var(--shadow-rose)" : "none",
-                  border: "none",
-                  cursor: hasText ? "pointer" : "default",
-                  transform: hasText ? "scale(1)" : "scale(0.90)",
-                  opacity: sending ? 0.6 : 1,
-                  transition: "all 0.18s cubic-bezier(0.34, 1.26, 0.64, 1)",
-                }}
-              >
+              <button type="submit" disabled={!hasText || sending} className="shrink-0 flex items-center justify-center rounded-full transition-all"
+                style={{ width: 38, height: 38, background: hasText ? "linear-gradient(145deg, #f43f5e, #d4264b)" : "rgba(0,0,0,0.08)", boxShadow: hasText ? "var(--shadow-rose)" : "none", border: "none", cursor: hasText ? "pointer" : "default", transform: hasText ? "scale(1)" : "scale(0.90)", opacity: sending ? 0.6 : 1, transition: "all 0.18s cubic-bezier(0.34, 1.26, 0.64, 1)" }}>
                 <ArrowUp size={17} color={hasText ? "#fff" : "var(--muted)"} strokeWidth={2.5} />
               </button>
-
             </form>
           </div>
         </div>
       )}
-      {/* ── Sprint reminder modal ── */}
+
+      {/* ── Sprint modal ── */}
       {showSprintModal && (
-        <div
-          className="fixed inset-0 flex items-end justify-center px-4"
+        <div className="fixed inset-0 flex items-end justify-center px-4"
           style={{ zIndex: 60, background: "rgba(0,0,0,0.42)", backdropFilter: "blur(4px)", paddingBottom: 24 }}
-          onClick={() => setShowSprintModal(false)}
-        >
-          <div
-            className="w-full max-w-sm flex flex-col"
+          onClick={() => setShowSprintModal(false)}>
+          <div className="w-full max-w-sm flex flex-col"
             style={{ background: "#fff", borderRadius: 24, boxShadow: "0 24px 64px rgba(0,0,0,0.18)", maxHeight: "78vh", overflow: "hidden" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Handle */}
+            onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center pt-3 pb-1 shrink-0">
               <div className="w-8 h-1 rounded-full" style={{ background: "rgba(0,0,0,0.12)" }} />
             </div>
-
-            {/* Header modal */}
             <div className="flex items-center justify-between px-5 pt-2 pb-3 shrink-0" style={{ borderBottom: "1px solid var(--border)" }}>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "var(--rose-soft)" }}>
@@ -874,8 +922,6 @@ export default function ChatPage() {
                 <X size={14} />
               </button>
             </div>
-
-            {/* Contenu scrollable */}
             <div className="overflow-y-auto flex-1 px-5 py-4">
               {sprintLoading ? (
                 <div className="flex justify-center py-8"><div className="spinner" /></div>
@@ -883,13 +929,10 @@ export default function ChatPage() {
                 <div className="text-center py-8">
                   <p className="text-sm" style={{ color: "var(--muted)" }}>Aucun sprint créé sur ce projet.</p>
                   <button onClick={() => { setShowSprintModal(false); router.push(`/projets/${conversation?.project_id}/gestion`); }}
-                    className="text-sm font-semibold mt-2" style={{ color: "var(--rose)" }}>
-                    Créer un sprint →
-                  </button>
+                    className="text-sm font-semibold mt-2" style={{ color: "var(--rose)" }}>Créer un sprint →</button>
                 </div>
               ) : (
                 <>
-                  {/* Sélecteur de sprint */}
                   <p className="label mb-2">Sprint</p>
                   <div className="flex flex-col gap-1.5 mb-4">
                     {sprints.map((s) => {
@@ -898,83 +941,146 @@ export default function ChatPage() {
                       return (
                         <button key={s.id} onClick={() => setSelectedSprint(s)}
                           className="flex items-center justify-between px-3.5 py-3 rounded-xl text-left transition-all"
-                          style={{
-                            background: isSelected ? "var(--rose-soft)" : "rgba(0,0,0,0.03)",
-                            border: isSelected ? "1px solid var(--rose-border)" : "1px solid transparent",
-                          }}
-                        >
+                          style={{ background: isSelected ? "var(--rose-soft)" : "rgba(0,0,0,0.03)", border: isSelected ? "1px solid var(--rose-border)" : "1px solid transparent" }}>
                           <div>
-                            <p className="text-sm font-semibold" style={{ color: isSelected ? "var(--rose-hover)" : "var(--text)" }}>
-                              {s.nom}
-                            </p>
+                            <p className="text-sm font-semibold" style={{ color: isSelected ? "var(--rose-hover)" : "var(--text)" }}>{s.nom}</p>
                             <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
                               {new Date(s.date_fin).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}
                               {daysLeft > 0 ? ` · J-${daysLeft}` : daysLeft === 0 ? " · aujourd'hui" : " · terminé"}
                             </p>
                           </div>
                           <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                            style={{
-                              background: s.statut === "en_cours" ? "var(--green-soft)" : s.statut === "termine" ? "var(--blue-soft)" : "var(--amber-soft)",
-                              color: s.statut === "en_cours" ? "var(--green)" : s.statut === "termine" ? "var(--blue)" : "var(--amber)",
-                            }}>
+                            style={{ background: s.statut === "en_cours" ? "var(--green-soft)" : s.statut === "termine" ? "var(--blue-soft)" : "var(--amber-soft)", color: s.statut === "en_cours" ? "var(--green)" : s.statut === "termine" ? "var(--blue)" : "var(--amber)" }}>
                             {s.statut === "en_cours" ? "En cours" : s.statut === "termine" ? "Terminé" : "À venir"}
                           </span>
                         </button>
                       );
                     })}
                   </div>
-
-                  {/* Aperçu tâches du sprint sélectionné */}
                   {selectedSprint && (() => {
                     const tasks = sprintTasks.filter((t) => t.sprint_id === selectedSprint.id);
                     const done   = tasks.filter((t) => t.statut === "done");
                     const inProg = tasks.filter((t) => t.statut === "en_cours" || t.statut === "review");
                     const todo   = tasks.filter((t) => t.statut === "todo");
-
                     const Section = ({ label, items, icon, color }: { label: string; items: SprintTask[]; icon: React.ReactNode; color: string }) =>
                       items.length > 0 ? (
                         <div className="mb-3">
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            {icon}
-                            <span className="text-xs font-bold" style={{ color }}>{label} ({items.length})</span>
-                          </div>
-                          {items.map((t) => (
-                            <div key={t.id} className="flex items-center gap-2 py-1">
-                              <div className="w-1 h-1 rounded-full shrink-0" style={{ background: color }} />
-                              <span className="text-xs truncate" style={{ color: "var(--text-2)" }}>{t.titre}</span>
-                            </div>
-                          ))}
+                          <div className="flex items-center gap-1.5 mb-1.5">{icon}<span className="text-xs font-bold" style={{ color }}>{label} ({items.length})</span></div>
+                          {items.map((t) => (<div key={t.id} className="flex items-center gap-2 py-1"><div className="w-1 h-1 rounded-full shrink-0" style={{ background: color }} /><span className="text-xs truncate" style={{ color: "var(--text-2)" }}>{t.titre}</span></div>))}
                         </div>
                       ) : null;
-
                     return tasks.length === 0 ? (
                       <p className="text-xs text-center py-4" style={{ color: "var(--muted)" }}>Aucune tâche dans ce sprint.</p>
                     ) : (
                       <div className="rounded-xl p-3.5" style={{ background: "rgba(0,0,0,0.03)", border: "1px solid var(--border)" }}>
                         <p className="label mb-3">Aperçu du message</p>
-                        <Section label="Terminé" items={done}   icon={<CheckCircle2 size={12} style={{ color: "var(--green)" }} />}  color="var(--green)" />
-                        <Section label="En cours" items={inProg} icon={<RotateCcw    size={12} style={{ color: "var(--blue)" }} />}   color="var(--blue)" />
-                        <Section label="À faire"  items={todo}   icon={<Circle       size={12} style={{ color: "var(--muted)" }} />}  color="var(--muted)" />
+                        <Section label="Terminé" items={done}   icon={<CheckCircle2 size={12} style={{ color: "var(--green)" }} />} color="var(--green)" />
+                        <Section label="En cours" items={inProg} icon={<RotateCcw    size={12} style={{ color: "var(--blue)" }} />}  color="var(--blue)" />
+                        <Section label="À faire"  items={todo}   icon={<Circle       size={12} style={{ color: "var(--muted)" }} />} color="var(--muted)" />
                       </div>
                     );
                   })()}
                 </>
               )}
             </div>
-
-            {/* Bouton envoi */}
             {!sprintLoading && sprints.length > 0 && (
               <div className="px-5 pb-5 pt-3 shrink-0" style={{ borderTop: "1px solid var(--border)" }}>
-                <button
-                  onClick={sendSprintReminder}
-                  disabled={!selectedSprint}
-                  className="btn-primary w-full"
-                  style={{ padding: "13px 0", fontSize: 14 }}
-                >
+                <button onClick={sendSprintReminder} disabled={!selectedSprint} className="btn-primary w-full" style={{ padding: "13px 0", fontSize: 14 }}>
                   <BellRing size={14} /> Envoyer le rappel
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Call modal ── */}
+      {showCallModal && (
+        <div className="fixed inset-0 z-60 flex items-end justify-center bg-black/50 px-4 pb-8"
+          onClick={() => setShowCallModal(false)}>
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: "rgba(16,185,129,0.10)" }}>
+                  <Video size={20} style={{ color: "#10b981" }} />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900">Appel vidéo</p>
+                  <p className="text-xs text-slate-400">via Jitsi Meet</p>
+                </div>
+              </div>
+              <button onClick={() => setShowCallModal(false)} className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-lg">×</button>
+            </div>
+            <p className="text-sm text-slate-500 mb-5">
+              Un appel va être démarré avec <strong>{otherNom}</strong>. Les deux participants doivent cliquer sur "Rejoindre" pour se connecter.
+            </p>
+            <button onClick={startCall}
+              className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
+              style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
+              <Video size={16} /> Démarrer l'appel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Meeting modal ── */}
+      {showMeetingModal && (
+        <div className="fixed inset-0 z-60 flex items-end justify-center bg-black/50 px-4 pb-6"
+          onClick={() => setShowMeetingModal(false)}>
+          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: "rgba(99,102,241,0.10)" }}>
+                  <Calendar size={18} style={{ color: "#6366f1" }} />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900">Planifier une réunion</p>
+                  <p className="text-xs text-slate-400">Lien Jitsi généré automatiquement</p>
+                </div>
+              </div>
+              <button onClick={() => setShowMeetingModal(false)} className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-lg">×</button>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Titre</label>
+              <input value={meetingTitle} onChange={(e) => setMeetingTitle(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-indigo-400 transition-colors"
+                placeholder="Réunion hebdo, Demo, Stand-up..." />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 mb-1 block">Date *</label>
+                <input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-indigo-400 transition-colors" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 mb-1 block">Heure *</label>
+                <input type="time" value={meetingTime} onChange={(e) => setMeetingTime(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-indigo-400 transition-colors" />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-2 block">Durée</label>
+              <div className="flex gap-2">
+                {[30, 60, 90].map((d) => (
+                  <button key={d} onClick={() => setMeetingDuration(d)}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold border transition-colors"
+                    style={{ background: meetingDuration === d ? "#6366f1" : "white", color: meetingDuration === d ? "white" : "#64748b", borderColor: meetingDuration === d ? "#6366f1" : "#e2e8f0" }}>
+                    {d} min
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button onClick={scheduleMeeting} disabled={meetingCreating || !meetingDate || !meetingTime}
+              className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
+              style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+              {meetingCreating
+                ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                : <><Calendar size={15} /> Planifier la réunion</>}
+            </button>
           </div>
         </div>
       )}
