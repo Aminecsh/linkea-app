@@ -421,7 +421,7 @@ export default function ContratPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => router.push(`/paiement/${contract?.project_id}`)}
+                    onClick={() => router.push(`/projets/${contract?.project_id}/paiement`)}
                     className="btn-primary w-full py-3.5 flex items-center justify-center gap-2"
                     style={{ fontSize: 14 }}
                   >
