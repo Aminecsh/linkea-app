@@ -101,7 +101,24 @@ type ActiveBan = {
   role?: string;
 };
 
-type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support" | "analytics";
+type Dispute = {
+  id: string;
+  project_id: string;
+  payment_id: string;
+  founder_user_id: string;
+  dev_user_id: string;
+  reason: string;
+  status: string;
+  admin_note: string | null;
+  created_at: string;
+  resolved_at: string | null;
+  projects: { titre: string } | null;
+  payments: { amount: number; dev_amount: number } | null;
+  founder_profile?: { nom: string };
+  dev_profile?: { nom: string };
+};
+
+type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support" | "analytics" | "litiges";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -119,6 +136,9 @@ export default function AdminDashboard() {
   const [activeBans, setActiveBans] = useState<ActiveBan[]>([]);
   const [liftingBan, setLiftingBan] = useState<string | null>(null);
   const [supportConvs, setSupportConvs] = useState<SupportConv[]>([]);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [resolvingDispute, setResolvingDispute] = useState<string | null>(null);
+  const [disputeNote, setDisputeNote] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function load() {
@@ -182,6 +202,27 @@ export default function AdminDashboard() {
         setSupportConvs(enriched as SupportConv[]);
       }
 
+      // Litiges
+      const { data: disputesData } = await supabase
+        .from("disputes")
+        .select("*, projects(titre), payments(amount, dev_amount)")
+        .order("created_at", { ascending: false });
+
+      if (disputesData && disputesData.length > 0) {
+        const raw = disputesData as Dispute[];
+        const founderIds = raw.map((d) => d.founder_user_id);
+        const devIds = raw.map((d) => d.dev_user_id);
+        const [{ data: fProfiles }, { data: dProfiles }] = await Promise.all([
+          supabase.from("profiles_founder").select("user_id, nom").in("user_id", founderIds),
+          supabase.from("profiles_developer").select("user_id, nom").in("user_id", devIds),
+        ]);
+        const fMap: Record<string, string> = {};
+        const dMap: Record<string, string> = {};
+        (fProfiles ?? []).forEach((p: { user_id: string; nom: string }) => { fMap[p.user_id] = p.nom; });
+        (dProfiles ?? []).forEach((p: { user_id: string; nom: string }) => { dMap[p.user_id] = p.nom; });
+        setDisputes(raw.map((d) => ({ ...d, founder_profile: { nom: fMap[d.founder_user_id] ?? "?" }, dev_profile: { nom: dMap[d.dev_user_id] ?? "?" } })));
+      }
+
       setLoading(false);
     }
     load();
@@ -215,6 +256,22 @@ export default function AdminDashboard() {
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/connexion");
+  }
+
+  async function resolveDispute(disputeId: string, decision: "dev" | "founder") {
+    setResolvingDispute(disputeId);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) { setResolvingDispute(null); return; }
+    await fetch("/api/disputes/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ disputeId, decision, adminNote: disputeNote[disputeId] ?? null }),
+    });
+    setDisputes((prev) => prev.map((d) => d.id === disputeId
+      ? { ...d, status: decision === "dev" ? "resolved_dev" : "resolved_founder", resolved_at: new Date().toISOString() }
+      : d
+    ));
+    setResolvingDispute(null);
   }
 
   if (loading) {
@@ -260,12 +317,15 @@ export default function AdminDashboard() {
   ];
   const maxFunnel = Math.max(totalUsers, 1);
 
+  const openDisputes = disputes.filter((d) => d.status === "open");
+
   const tabs: { key: Tab; label: string; count?: number; urgent?: boolean }[] = [
     { key: "analytics",     label: "📊 Analytics" },
     { key: "projets",       label: "Projets",       count: projects.length },
     { key: "founders",      label: "Founders",      count: founders.length },
     { key: "developers",    label: "Developers",    count: developers.length },
     { key: "matchings",     label: "Matchings",     count: matches.length },
+    { key: "litiges",       label: "⚠️ Litiges",    count: openDisputes.length, urgent: openDisputes.length > 0 },
     { key: "signalements",  label: "Signalements",  count: pendingReports.length, urgent: pendingReports.length > 0 },
     { key: "bans",          label: "Bans actifs",   count: activeBans.length, urgent: activeBans.length > 0 },
     { key: "support",       label: "Support",       count: supportConvs.length, urgent: supportConvs.some((c) => c.unreadCount > 0) },
@@ -528,6 +588,104 @@ export default function AdminDashboard() {
                 </span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Litiges */}
+        {tab === "litiges" && (
+          <div className="flex flex-col gap-4">
+            {disputes.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+                <p className="text-4xl mb-3">⚖️</p>
+                <p className="font-semibold text-slate-700">Aucun litige</p>
+                <p className="text-sm text-slate-400 mt-1">Tout se passe bien côté paiements.</p>
+              </div>
+            ) : disputes.map((d) => {
+              const isOpen = d.status === "open";
+              const resolvedDev = d.status === "resolved_dev";
+              const resolvedFounder = d.status === "resolved_founder";
+              return (
+                <div key={d.id} className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-4">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          isOpen ? "bg-red-50 text-red-600 border border-red-200" :
+                          resolvedDev ? "bg-blue-50 text-blue-600 border border-blue-200" :
+                          "bg-green-50 text-green-600 border border-green-200"
+                        }`}>
+                          {isOpen ? "⚠️ Ouvert" : resolvedDev ? "✅ Résolu → Dev" : "✅ Résolu → Founder"}
+                        </span>
+                        <span className="text-xs text-slate-400">{new Date(d.created_at).toLocaleDateString("fr-FR")}</span>
+                      </div>
+                      <p className="font-bold text-slate-900">{(d.projects as { titre: string } | null)?.titre ?? "Projet"}</p>
+                    </div>
+                    {d.payments && (
+                      <div className="text-right shrink-0">
+                        <p className="text-lg font-black text-slate-900">{(d.payments as { amount: number }).amount.toFixed(2)}€</p>
+                        <p className="text-xs text-slate-400">Dev reçoit {(d.payments as { dev_amount: number }).dev_amount.toFixed(2)}€</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Parties */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-purple-50 border border-purple-100 px-3 py-2">
+                      <p className="text-xs font-bold text-purple-400 mb-0.5">FOUNDER</p>
+                      <p className="text-sm font-semibold text-slate-800">{d.founder_profile?.nom ?? "?"}</p>
+                    </div>
+                    <div className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2">
+                      <p className="text-xs font-bold text-blue-400 mb-0.5">DÉVELOPPEUR</p>
+                      <p className="text-sm font-semibold text-slate-800">{d.dev_profile?.nom ?? "?"}</p>
+                    </div>
+                  </div>
+
+                  {/* Motif */}
+                  <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+                    <p className="text-xs font-bold text-slate-400 mb-1">MOTIF DU LITIGE</p>
+                    <p className="text-sm text-slate-700">{d.reason}</p>
+                  </div>
+
+                  {/* Décision admin (seulement si ouvert) */}
+                  {isOpen && (
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-slate-500 mb-1 block">Note admin (optionnel)</label>
+                        <input
+                          value={disputeNote[d.id] ?? ""}
+                          onChange={(e) => setDisputeNote((prev) => ({ ...prev, [d.id]: e.target.value }))}
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-indigo-400 transition-colors"
+                          placeholder="Raison de la décision…"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => resolveDispute(d.id, "dev")}
+                          disabled={resolvingDispute === d.id}
+                          className="py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
+                          style={{ background: "linear-gradient(135deg,#3b82f6,#6366f1)" }}
+                        >
+                          {resolvingDispute === d.id
+                            ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            : "💸 Libérer au dev"}
+                        </button>
+                        <button
+                          onClick={() => resolveDispute(d.id, "founder")}
+                          disabled={resolvingDispute === d.id}
+                          className="py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
+                          style={{ background: "linear-gradient(135deg,#f59e0b,#ef4444)" }}
+                        >
+                          {resolvingDispute === d.id
+                            ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            : "↩️ Rembourser founder"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 

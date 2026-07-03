@@ -33,6 +33,7 @@ type Withdrawal = {
 type PendingPayment = {
   id: string;
   dev_amount: number;
+  status: string;
   created_at: string;
   projects: { titre: string } | null;
 };
@@ -81,7 +82,7 @@ export default function WalletPage() {
         const [{ data: txs }, { data: wds }, { data: pending }] = await Promise.all([
           supabase.from("wallet_transactions").select("*").eq("wallet_id", w.id).order("created_at", { ascending: false }),
           supabase.from("withdrawals").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-          supabase.from("payments").select("id, dev_amount, created_at, projects(titre)").eq("dev_user_id", user.id).eq("status", "held").order("created_at", { ascending: false }),
+          supabase.from("payments").select("id, dev_amount, status, created_at, projects(titre)").eq("dev_user_id", user.id).in("status", ["held", "disputed"]).order("created_at", { ascending: false }),
         ]);
         setTransactions((txs as Transaction[]) ?? []);
         setWithdrawals((wds as Withdrawal[]) ?? []);
@@ -198,31 +199,37 @@ export default function WalletPage() {
           <ArrowDownToLine size={16} /> Retirer vers mon IBAN
         </button>
 
-        {/* Paiements en attente */}
+        {/* Paiements en attente / bloqués */}
         {pendingPayments.length > 0 && (
           <div>
             <p className="label mb-2 mt-2">Paiements en attente</p>
             <div className="flex flex-col gap-2">
-              {pendingPayments.map((p) => (
-                <div key={p.id} className="card px-4 py-3.5 flex items-center gap-3"
-                  style={{ border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.04)" }}>
-                  <div className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0"
-                    style={{ background: "rgba(245,158,11,0.12)" }}>
-                    <Lock size={15} style={{ color: "#f59e0b" }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>
-                      {p.projects?.titre ?? "Projet"}
+              {pendingPayments.map((p) => {
+                const isDisputed = p.status === "disputed";
+                return (
+                  <div key={p.id} className="card px-4 py-3.5 flex items-center gap-3"
+                    style={{
+                      border: isDisputed ? "1px solid rgba(239,68,68,0.25)" : "1px solid rgba(245,158,11,0.2)",
+                      background: isDisputed ? "rgba(239,68,68,0.04)" : "rgba(245,158,11,0.04)",
+                    }}>
+                    <div className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0"
+                      style={{ background: isDisputed ? "rgba(239,68,68,0.12)" : "rgba(245,158,11,0.12)" }}>
+                      <Lock size={15} style={{ color: isDisputed ? "#ef4444" : "#f59e0b" }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>
+                        {p.projects?.titre ?? "Projet"}
+                      </p>
+                      <p className="text-xs" style={{ color: isDisputed ? "#ef4444" : "var(--muted)" }}>
+                        {isDisputed ? "Bloqué · litige en cours de traitement" : "En attente · sera débloqué à la livraison"}
+                      </p>
+                    </div>
+                    <p className="text-sm font-black shrink-0" style={{ color: isDisputed ? "#ef4444" : "#f59e0b" }}>
+                      +{p.dev_amount.toFixed(2)}€
                     </p>
-                    <p className="text-xs" style={{ color: "var(--muted)" }}>
-                      En attente · sera débloqué à la livraison
-                    </p>
                   </div>
-                  <p className="text-sm font-black shrink-0" style={{ color: "#f59e0b" }}>
-                    +{p.dev_amount.toFixed(2)}€
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

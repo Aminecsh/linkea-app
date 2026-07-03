@@ -46,7 +46,11 @@ export default function ContratPage() {
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [payment, setPayment] = useState<{ id: string; status: string; amount: number; dev_amount: number } | null>(null);
+  const [payment, setPayment] = useState<{ id: string; status: string; amount: number; dev_amount: number; dev_user_id: string | null } | null>(null);
+  const [dispute, setDispute] = useState<{ id: string; status: string; reason: string } | null>(null);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [openingDispute, setOpeningDispute] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -70,10 +74,15 @@ export default function ContratPage() {
       // Vérifier si un paiement existe pour ce projet
       const { data: pay } = await supabase
         .from("payments")
-        .select("id, status, amount, dev_amount")
+        .select("id, status, amount, dev_amount, dev_user_id")
         .eq("project_id", (c as Contract).project_id)
         .maybeSingle();
-      if (pay) setPayment(pay as { id: string; status: string; amount: number; dev_amount: number });
+      if (pay) {
+        setPayment(pay as { id: string; status: string; amount: number; dev_amount: number; dev_user_id: string | null });
+        // Vérifier si un litige est déjà ouvert
+        const { data: disp } = await supabase.from("disputes").select("id, status, reason").eq("payment_id", pay.id).maybeSingle();
+        if (disp) setDispute(disp as { id: string; status: string; reason: string });
+      }
 
       setLoading(false);
     }
@@ -118,6 +127,30 @@ export default function ContratPage() {
 
     setSigning(false);
     setShowConfirm(false);
+  }
+
+  async function openDispute() {
+    if (!payment || !disputeReason.trim() || openingDispute) return;
+    setOpeningDispute(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) { setOpeningDispute(false); return; }
+    const res = await fetch("/api/disputes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({
+        projectId: contract!.project_id,
+        paymentId: payment.id,
+        devUserId: payment.dev_user_id,
+        reason: disputeReason.trim(),
+      }),
+    });
+    if (res.ok) {
+      const { dispute: d } = await res.json();
+      setDispute(d);
+      setPayment((prev) => prev ? { ...prev, status: "disputed" } : prev);
+    }
+    setOpeningDispute(false);
+    setShowDisputeModal(false);
   }
 
   if (loading) {
@@ -215,20 +248,40 @@ export default function ContratPage() {
         )}
 
         {bothSigned && payment && (
-          <div className="rounded-2xl px-5 py-4 flex items-center gap-3"
-            style={{
-              background: payment.status === "released" ? "rgba(16,185,129,0.06)" : "rgba(245,158,11,0.06)",
-              border: `1px solid ${payment.status === "released" ? "rgba(16,185,129,0.20)" : "rgba(245,158,11,0.20)"}`,
-            }}>
-            <span className="text-xl">{payment.status === "released" ? "✅" : "🔒"}</span>
-            <div>
-              <p className="font-bold text-sm" style={{ color: payment.status === "released" ? "#065f46" : "#92400e" }}>
-                {payment.status === "released" ? `${payment.dev_amount.toFixed(2)}€ débloqués au dev` : `${payment.amount.toFixed(2)}€ sécurisés chez Linkea`}
-              </p>
-              <p className="text-xs" style={{ color: payment.status === "released" ? "#6ee7b7" : "#fcd34d", opacity: 0.9 }}>
-                {payment.status === "released" ? "Paiement libéré à la livraison" : "En attente de livraison"}
-              </p>
+          <div className="flex flex-col gap-3">
+            <div className="rounded-2xl px-5 py-4 flex items-center gap-3"
+              style={{
+                background: payment.status === "released" ? "rgba(16,185,129,0.06)" : payment.status === "disputed" ? "rgba(239,68,68,0.06)" : "rgba(245,158,11,0.06)",
+                border: `1px solid ${payment.status === "released" ? "rgba(16,185,129,0.20)" : payment.status === "disputed" ? "rgba(239,68,68,0.20)" : "rgba(245,158,11,0.20)"}`,
+              }}>
+              <span className="text-xl">{payment.status === "released" ? "✅" : payment.status === "disputed" ? "⚠️" : "🔒"}</span>
+              <div>
+                <p className="font-bold text-sm" style={{ color: payment.status === "released" ? "#065f46" : payment.status === "disputed" ? "#991b1b" : "#92400e" }}>
+                  {payment.status === "released" ? `${payment.dev_amount.toFixed(2)}€ débloqués au dev` : payment.status === "disputed" ? `Litige en cours — ${payment.amount.toFixed(2)}€ bloqués` : `${payment.amount.toFixed(2)}€ sécurisés chez Linkea`}
+                </p>
+                <p className="text-xs" style={{ opacity: 0.8, color: payment.status === "released" ? "#6ee7b7" : payment.status === "disputed" ? "#f87171" : "#fcd34d" }}>
+                  {payment.status === "released" ? "Paiement libéré à la livraison" : payment.status === "disputed" ? "En cours de traitement par l'équipe Linkea" : "En attente de livraison"}
+                </p>
+              </div>
             </div>
+
+            {/* Bouton litige — founder uniquement, paiement held et pas de litige existant */}
+            {isFounder && payment.status === "held" && !dispute && (
+              <button
+                onClick={() => setShowDisputeModal(true)}
+                className="w-full py-3 rounded-xl text-sm font-semibold border transition-all flex items-center justify-center gap-2"
+                style={{ borderColor: "rgba(239,68,68,0.3)", color: "#ef4444", background: "rgba(239,68,68,0.04)" }}
+              >
+                ⚠️ Ouvrir un litige
+              </button>
+            )}
+
+            {dispute && dispute.status === "open" && (
+              <div className="rounded-xl px-4 py-3 text-sm" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)" }}>
+                <p className="font-semibold" style={{ color: "#991b1b" }}>Litige ouvert · en attente de traitement</p>
+                <p className="text-xs mt-0.5" style={{ color: "#f87171" }}>{dispute.reason}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -378,6 +431,42 @@ export default function ContratPage() {
         )}
 
       </div>
+
+      {/* Modal litige */}
+      {showDisputeModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-end justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <div className="text-center">
+              <p className="text-3xl mb-2">⚠️</p>
+              <h2 className="text-lg font-black text-slate-900">Ouvrir un litige</h2>
+              <p className="text-sm text-slate-500 mt-1">
+                Le paiement sera bloqué jusqu'à résolution par l'équipe Linkea.
+              </p>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Motif du litige *</label>
+              <textarea
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                rows={4}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-red-300 resize-none transition-colors"
+                placeholder="Décris le problème (travail non livré, qualité insuffisante, désaccord sur le périmètre…)"
+              />
+            </div>
+            <button
+              onClick={openDispute}
+              disabled={!disputeReason.trim() || openingDispute}
+              className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-40 flex items-center justify-center gap-2"
+              style={{ background: "linear-gradient(135deg,#ef4444,#dc2626)" }}
+            >
+              {openingDispute
+                ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                : "Confirmer le litige"}
+            </button>
+            <button onClick={() => setShowDisputeModal(false)} className="btn-ghost w-full py-3">Annuler</button>
+          </div>
+        </div>
+      )}
 
       {/* Modal confirmation signature */}
       {showConfirm && (
