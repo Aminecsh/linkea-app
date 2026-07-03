@@ -3,20 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import React from "react";
 import { ArrowLeft, ArrowRight, AlertCircle, Plus, X, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const STACKS = ["React", "Node.js", "Flutter", "Python", "Vue.js", "Laravel", "Swift", "Kotlin", "Next.js", "TypeScript"];
 
-const DEADLINES: { value: string; label: string; sub: string }[] = [
-  { value: "2 semaines", label: "2 semaines", sub: "Sprint court" },
-  { value: "1 mois",     label: "1 mois",     sub: "MVP ciblé"   },
-  { value: "2 mois",     label: "2 mois",     sub: "Projet solide" },
-  { value: "3 mois",     label: "3 mois",     sub: "Ambitieux"   },
-  { value: "Flexible",   label: "Flexible",   sub: "À définir"   },
-];
-
 const DESC_MAX = 500;
+
+function formatDateFR(iso: string): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  const months = ["jan.", "fév.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+  return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`;
+}
+
+function todayISO(): string {
+  return new Date().toISOString().split("T")[0];
+}
 
 export default function NouveauProjet() {
   const router = useRouter();
@@ -36,7 +39,9 @@ export default function NouveauProjet() {
   const [selectedStacks, setSelectedStacks] = useState<string[]>([]);
   const [customStack, setCustomStack]   = useState("");
   const [showCustom, setShowCustom]     = useState(false);
-  const [deadline, setDeadline]         = useState("");
+  const [dateDebut, setDateDebut]       = useState("");
+  const [dateFin, setDateFin]           = useState("");
+  const [budget, setBudget]             = useState("");
 
   useEffect(() => {
     async function checkAccess() {
@@ -82,17 +87,22 @@ export default function NouveauProjet() {
   }
 
   async function handleSubmit() {
-    if (!founderId || !deadline) return;
+    if (!founderId || !dateFin) return;
     setSaving(true);
     setError("");
+
+    const deadlineStr = dateDebut
+      ? `Du ${formatDateFR(dateDebut)} au ${formatDateFR(dateFin)}`
+      : `Avant le ${formatDateFR(dateFin)}`;
 
     const { error: dbError } = await supabase.from("projects").insert({
       founder_id: founderId,
       titre: titre.trim(),
       description: description.trim(),
       stack_souhaitee: selectedStacks.join(", "),
-      deadline,
+      deadline: deadlineStr,
       statut: "pending",
+      budget: budget ? Number(budget) : null,
     });
 
     if (dbError) {
@@ -106,312 +116,245 @@ export default function NouveauProjet() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
-        <span className="spinner" />
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAF8F4" }}>
+        <div style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid #1A2138", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
+  const sInput: React.CSSProperties = { width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 500, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
+  const sNavy:  React.CSSProperties = { width: "100%", padding: "13px 0", borderRadius: 12, background: "#1A2138", color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
+  const sLabel: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", display: "block", marginBottom: 10 };
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12" style={{ background: "var(--bg)" }}>
+    <div style={{ minHeight: "100vh", background: "#FAF8F4", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .lk-n-input:focus { outline: 2px solid #D4537E; outline-offset: -1px; border-color: #D4537E !important; }
+        .lk-n-navy:hover:not(:disabled) { background: #2A3252 !important; }
+        .lk-n-navy:disabled { opacity: 0.4; }
+        .lk-n-chip:focus-visible { outline: 2px solid #D4537E; outline-offset: 2px; }
+        .lk-n-deadline:focus-visible { outline: 2px solid #D4537E; outline-offset: 2px; border-radius: 14px; }
+      `}</style>
 
-      {/* Ambient blob */}
-      <div
-        className="fixed -top-20 -right-20 w-80 h-80 rounded-full pointer-events-none opacity-20"
-        style={{ background: "radial-gradient(circle, rgba(244,63,94,0.20) 0%, transparent 70%)", filter: "blur(60px)" }}
-        aria-hidden
-      />
-
-      <div className="w-full max-w-md relative z-10">
+      <div style={{ width: "100%", maxWidth: 440 }}>
 
         {/* Top nav */}
-        <div className="flex items-center justify-between mb-8">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
           <button
             onClick={() => step === 1 ? router.push("/profil") : setStep(1)}
-            className="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-60"
-            style={{ color: "var(--muted)" }}
+            style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#8A8579", padding: 0 }}
           >
             <ArrowLeft size={14} strokeWidth={2} />
             {step === 1 ? "Retour" : "Étape précédente"}
           </button>
 
-          {/* Progress */}
-          <div className="flex items-center gap-2">
+          {/* Progress dots */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             {[1, 2].map((n) => (
-              <div
-                key={n}
-                className="transition-all duration-300"
-                style={{
-                  height: 4,
-                  borderRadius: 99,
-                  width: step >= n ? 24 : 12,
-                  background: step >= n ? "var(--rose)" : "rgba(0,0,0,0.10)",
-                }}
-              />
+              <div key={n} style={{ height: 4, borderRadius: 99, width: step >= n ? 24 : 10, background: step >= n ? "#D4537E" : "#ECE7DD", transition: "width 0.2s, background 0.2s" }} />
             ))}
-            <span className="text-xs font-semibold ml-1" style={{ color: "var(--muted)" }}>
-              {step}/2
-            </span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#8A8579", marginLeft: 4 }}>{step}/2</span>
           </div>
         </div>
 
-        <div className="card p-8">
+        {/* Card */}
+        <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 20, padding: "32px 28px" }}>
 
-          {/* ── STEP 1 ────────────────────────────────────── */}
+          {/* ── STEP 1 ── */}
           {step === 1 && (
             <>
-              <div className="mb-7">
-                <span className="tag tag-rose mb-4 inline-flex">Étape 1 · Le projet</span>
-                <h1 className="text-2xl font-black tracking-tight leading-tight mb-1.5" style={{ color: "var(--text)" }}>
+              <div style={{ marginBottom: 28 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", display: "block", marginBottom: 12 }}>Étape 1 · Le projet</span>
+                <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 26, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", letterSpacing: "-0.03em", lineHeight: 1.15 }}>
                   Décris ton projet
                 </h1>
-                <p className="text-sm" style={{ color: "var(--muted)" }}>
-                  Sois précis — les meilleurs devs lisent chaque mot.
-                </p>
+                <p style={{ fontSize: 13, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Sois précis — les meilleurs devs lisent chaque mot.</p>
               </div>
 
-              <div className="flex flex-col gap-4">
+              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                 <div>
-                  <label className="label mb-1.5 block">Titre du projet</label>
+                  <label style={sLabel}>Titre du projet</label>
                   <input
                     value={titre}
                     onChange={(e) => setTitre(e.target.value)}
                     placeholder="Ex : App de mise en relation étudiants"
-                    className="input-field"
                     maxLength={80}
                     autoFocus
+                    className="lk-n-input"
+                    style={sInput}
                   />
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="label">Description</label>
-                    <span
-                      className="text-[11px] font-semibold tabular-nums"
-                      style={{ color: description.length > DESC_MAX * 0.85 ? "var(--rose)" : "var(--subtle)" }}
-                    >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <label style={{ ...sLabel, margin: 0 }}>Description</label>
+                    <span style={{ fontSize: 11, fontWeight: 600, fontVariantNumeric: "tabular-nums", color: description.length > DESC_MAX * 0.85 ? "#D4537E" : "#8A8579" }}>
                       {description.length}/{DESC_MAX}
                     </span>
                   </div>
                   <textarea
                     value={description}
-                    onChange={(e) => {
-                      if (e.target.value.length <= DESC_MAX) setDescription(e.target.value);
-                    }}
+                    onChange={(e) => { if (e.target.value.length <= DESC_MAX) setDescription(e.target.value); }}
                     placeholder="Décris ton projet, le problème qu'il résout, les fonctionnalités clés..."
                     rows={5}
-                    className="input-field resize-none"
+                    className="lk-n-input"
+                    style={{ ...sInput, resize: "none" }}
                   />
-                  {/* Progress bar description */}
-                  <div className="mt-1.5 h-0.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.06)" }}>
-                    <div
-                      className="h-full rounded-full transition-all duration-200"
-                      style={{
-                        width: `${(description.length / DESC_MAX) * 100}%`,
-                        background: description.length > DESC_MAX * 0.85 ? "var(--rose)" : "var(--blue)",
-                      }}
-                    />
+                  <div style={{ marginTop: 6, height: 3, borderRadius: 99, background: "#ECE7DD", overflow: "hidden" }}>
+                    <div style={{ height: "100%", borderRadius: 99, transition: "width 0.2s", width: `${(description.length / DESC_MAX) * 100}%`, background: description.length > DESC_MAX * 0.85 ? "#D4537E" : "#1A2138" }} />
                   </div>
                 </div>
 
-                <button
-                  onClick={handleStep1Next}
-                  disabled={!titre.trim() || !description.trim()}
-                  className="btn-primary w-full mt-2"
-                >
-                  Suivant <ArrowRight size={15} strokeWidth={2.2} />
+                <button onClick={handleStep1Next} disabled={!titre.trim() || !description.trim()} className="lk-n-navy" style={{ ...sNavy, marginTop: 4 }}>
+                  Suivant <ArrowRight size={15} strokeWidth={2} />
                 </button>
               </div>
             </>
           )}
 
-          {/* ── STEP 2 ────────────────────────────────────── */}
+          {/* ── STEP 2 ── */}
           {step === 2 && (
             <>
-              <div className="mb-7">
-                <span className="tag tag-blue mb-4 inline-flex">Étape 2 · Les besoins</span>
-                <h1 className="text-2xl font-black tracking-tight leading-tight mb-1.5" style={{ color: "var(--text)" }}>
+              <div style={{ marginBottom: 28 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", display: "block", marginBottom: 12 }}>Étape 2 · Les besoins</span>
+                <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 26, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", letterSpacing: "-0.03em", lineHeight: 1.15 }}>
                   Stack & deadline
                 </h1>
-                <p className="text-sm" style={{ color: "var(--muted)" }}>
-                  Les devs filtrent par stack — choisis bien.
-                </p>
+                <p style={{ fontSize: 13, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Les devs filtrent par stack — choisis bien.</p>
               </div>
 
-              <div className="flex flex-col gap-6">
+              <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
                 {/* Stack chips */}
                 <div>
-                  <label className="label mb-3 block">Stack souhaitée</label>
-                  <div className="flex flex-wrap gap-2">
+                  <label style={sLabel}>Stack souhaitée</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {STACKS.map((s) => {
                       const active = selectedStacks.includes(s);
                       return (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => toggleStack(s)}
-                          className="transition-all duration-150"
-                          style={{
-                            padding: "6px 13px",
-                            borderRadius: 99,
-                            fontSize: 13,
-                            fontWeight: 600,
-                            border: active ? "1px solid var(--blue-border)" : "1px solid rgba(0,0,0,0.09)",
-                            background: active ? "var(--blue-soft)" : "#fff",
-                            color: active ? "var(--blue)" : "var(--muted)",
-                            boxShadow: active ? "none" : "var(--shadow-xs)",
-                          }}
-                        >
-                          {active && <Check size={11} strokeWidth={2.5} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />}
+                        <button key={s} type="button" onClick={() => toggleStack(s)} className="lk-n-chip"
+                          style={{ padding: "6px 13px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: active ? "1.5px solid #1A2138" : "1px solid #ECE7DD", background: active ? "#1A2138" : "#fff", color: active ? "#fff" : "#8A8579", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, transition: "all 0.12s" }}>
+                          {active && <Check size={10} strokeWidth={2.5} />}
                           {s}
                         </button>
                       );
                     })}
 
-                    {/* Stacks custom ajoutées */}
-                    {selectedStacks
-                      .filter((s) => !STACKS.includes(s))
-                      .map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => removeStack(s)}
-                          className="flex items-center gap-1.5 transition-all duration-150"
-                          style={{
-                            padding: "6px 12px",
-                            borderRadius: 99,
-                            fontSize: 13,
-                            fontWeight: 600,
-                            border: "1px solid var(--blue-border)",
-                            background: "var(--blue-soft)",
-                            color: "var(--blue)",
-                          }}
-                        >
-                          {s} <X size={11} strokeWidth={2.5} />
-                        </button>
-                      ))
-                    }
+                    {/* Stacks custom */}
+                    {selectedStacks.filter((s) => !STACKS.includes(s)).map((s) => (
+                      <button key={s} type="button" onClick={() => removeStack(s)} className="lk-n-chip"
+                        style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1.5px solid #1A2138", background: "#1A2138", color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        {s} <X size={10} strokeWidth={2.5} />
+                      </button>
+                    ))}
 
-                    {/* Bouton + Autre */}
                     {!showCustom && (
-                      <button
-                        type="button"
-                        onClick={() => { setShowCustom(true); setTimeout(() => customInputRef.current?.focus(), 50); }}
-                        className="flex items-center gap-1 transition-all duration-150"
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: 99,
-                          fontSize: 13,
-                          fontWeight: 600,
-                          border: "1px dashed rgba(0,0,0,0.15)",
-                          background: "transparent",
-                          color: "var(--muted)",
-                        }}
-                      >
-                        <Plus size={12} strokeWidth={2.5} /> Autre
+                      <button type="button" onClick={() => { setShowCustom(true); setTimeout(() => customInputRef.current?.focus(), 50); }} className="lk-n-chip"
+                        style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1px dashed #ECE7DD", background: "transparent", color: "#8A8579", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        <Plus size={11} strokeWidth={2.5} /> Autre
                       </button>
                     )}
                   </div>
 
-                  {/* Input custom stack */}
                   {showCustom && (
-                    <div className="flex gap-2 mt-3">
-                      <input
-                        ref={customInputRef}
-                        value={customStack}
-                        onChange={(e) => setCustomStack(e.target.value)}
+                    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                      <input ref={customInputRef} value={customStack} onChange={(e) => setCustomStack(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomStack(); } if (e.key === "Escape") setShowCustom(false); }}
-                        placeholder="Ex : Supabase, GraphQL..."
-                        className="input-field"
-                        style={{ padding: "9px 14px", fontSize: 13 }}
-                      />
-                      <button
-                        type="button"
-                        onClick={addCustomStack}
-                        className="btn-primary shrink-0"
-                        style={{ padding: "0 16px", fontSize: 13 }}
-                      >
+                        placeholder="Ex : Supabase, GraphQL…" className="lk-n-input" style={{ ...sInput, flex: 1 }} />
+                      <button type="button" onClick={addCustomStack} className="lk-n-navy"
+                        style={{ ...sNavy, width: "auto", padding: "0 18px", borderRadius: 10, flexShrink: 0 }}>
                         Ajouter
                       </button>
                     </div>
                   )}
                 </div>
 
-                {/* Deadline radio cards */}
-                <div>
-                  <label className="label mb-3 block">Deadline souhaitée</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {DEADLINES.map((d) => {
-                      const active = deadline === d.value;
-                      return (
-                        <button
-                          key={d.value}
-                          type="button"
-                          onClick={() => setDeadline(d.value)}
-                          className={cn("text-left transition-all duration-150", d.value === "Flexible" && "col-span-2")}
-                          style={{
-                            padding: "12px 14px",
-                            borderRadius: 14,
-                            border: active ? "1.5px solid var(--rose-border)" : "1px solid rgba(0,0,0,0.09)",
-                            background: active ? "var(--rose-soft)" : "#fff",
-                            boxShadow: active ? "none" : "var(--shadow-xs)",
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span
-                              className="font-bold text-sm"
-                              style={{ color: active ? "var(--rose-hover)" : "var(--text)" }}
-                            >
-                              {d.label}
-                            </span>
-                            {active && (
-                              <span
-                                className="w-4 h-4 rounded-full flex items-center justify-center"
-                                style={{ background: "var(--rose)" }}
-                              >
-                                <Check size={9} strokeWidth={3} color="white" />
-                              </span>
-                            )}
-                          </div>
-                          <span
-                            className="text-xs font-medium"
-                            style={{ color: active ? "var(--rose)" : "var(--muted)" }}
-                          >
-                            {d.sub}
-                          </span>
-                        </button>
-                      );
-                    })}
+                {/* Dates */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <label style={sLabel}>Calendrier du projet</label>
+
+                  {/* Début souhaité */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: "#8A8579", margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Début souhaité</p>
+                      <input
+                        type="date"
+                        value={dateDebut}
+                        min={todayISO()}
+                        onChange={(e) => {
+                          setDateDebut(e.target.value);
+                          if (dateFin && e.target.value > dateFin) setDateFin("");
+                        }}
+                        className="lk-n-input"
+                        style={{ ...sInput, colorScheme: "light" }}
+                      />
+                      <p style={{ fontSize: 11, color: "#8A8579", margin: "5px 0 0" }}>Optionnel</p>
+                    </div>
+
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.8px" }}>Date de rendu <span style={{ color: "#D4537E" }}>*</span></p>
+                      <input
+                        type="date"
+                        value={dateFin}
+                        min={dateDebut || todayISO()}
+                        onChange={(e) => setDateFin(e.target.value)}
+                        className="lk-n-input"
+                        style={{ ...sInput, colorScheme: "light", borderColor: !dateFin ? "#ECE7DD" : "#1A2138" }}
+                      />
+                      <p style={{ fontSize: 11, color: "#8A8579", margin: "5px 0 0" }}>Requis</p>
+                    </div>
                   </div>
+
+                  {/* Aperçu */}
+                  {dateFin && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#FAF8F4" }}>
+                      <Check size={13} strokeWidth={2.5} style={{ color: "#1A2138", flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#1A2138" }}>
+                        {dateDebut
+                          ? `Du ${formatDateFR(dateDebut)} au ${formatDateFR(dateFin)}`
+                          : `Avant le ${formatDateFR(dateFin)}`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Budget */}
+                <div>
+                  <label style={sLabel}>Budget (€)</label>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      type="number"
+                      min={0}
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                      placeholder="Ex : 500"
+                      className="lk-n-input"
+                      style={{ ...sInput, paddingRight: 32 }}
+                    />
+                    <span style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", fontSize: 13, fontWeight: 600, color: "#8A8579" }}>€</span>
+                  </div>
+                  <p style={{ fontSize: 11, color: "#8A8579", margin: "5px 0 0" }}>Optionnel — le dev reçoit 90 % du montant</p>
                 </div>
 
                 {error && (
-                  <div
-                    className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl text-sm"
-                    style={{ background: "var(--red-soft)", border: "1px solid var(--red-border)", color: "var(--red)" }}
-                  >
-                    <AlertCircle size={15} strokeWidth={2} className="shrink-0 mt-0.5" />
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(212,83,126,0.3)", background: "rgba(212,83,126,0.05)", color: "#D4537E", fontSize: 13 }}>
+                    <AlertCircle size={14} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
                     {error}
                   </div>
                 )}
 
-                <button
-                  onClick={handleSubmit}
-                  disabled={saving || !deadline}
-                  className="btn-primary w-full"
-                >
+                <button onClick={handleSubmit} disabled={saving || !dateFin} className="lk-n-navy" style={sNavy}>
                   {saving
-                    ? <span className="spinner" style={{ width: 17, height: 17, borderWidth: 2 }} />
-                    : <>Soumettre mon projet <ArrowRight size={15} strokeWidth={2.2} /></>
+                    ? <div style={{ width: 17, height: 17, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} />
+                    : <>Soumettre mon projet <ArrowRight size={15} strokeWidth={2} /></>
                   }
                 </button>
               </div>
             </>
           )}
-
         </div>
-
       </div>
     </div>
   );

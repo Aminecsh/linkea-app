@@ -142,19 +142,19 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
-        <div className="px-5 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-5 pt-5 pb-4 border-b border-[#ECE7DD] flex items-center justify-between">
           <div>
-            <h2 className="text-base font-black text-slate-900">Sanctionner</h2>
-            <p className="text-xs text-slate-400 mt-0.5">{targetNom}</p>
+            <h2 className="text-base font-black text-[#1A2138]">Sanctionner</h2>
+            <p className="text-xs text-[#8A8579] mt-0.5">{targetNom}</p>
           </div>
-          <button onClick={close} className="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100">✕</button>
+          <button onClick={close} className="text-[#8A8579] hover:text-[#1A2138] w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#FAF8F4]">✕</button>
         </div>
 
         {done ? (
           <div className="px-5 py-10 text-center flex flex-col items-center gap-3">
-            <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center text-2xl">🚫</div>
-            <p className="font-bold text-slate-900">Sanction appliquée</p>
-            <p className="text-sm text-slate-400">{targetNom} a été notifié(e).</p>
+            <div className="w-14 h-14 rounded-2xl bg-[#FAF8F4] border border-[#ECE7DD] flex items-center justify-center text-xl text-[#D4537E]">✕</div>
+            <p className="font-bold text-[#1A2138]">Sanction appliquée</p>
+            <p className="text-sm text-[#8A8579]">{targetNom} a été notifié(e).</p>
             <button onClick={close} className="btn-pink mt-2 px-8 py-2.5">Fermer</button>
           </div>
         ) : (
@@ -162,16 +162,16 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
 
             {/* Type */}
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Type de sanction</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-[#8A8579] mb-2">Type de sanction</p>
               <div className="grid grid-cols-2 gap-2">
                 {([["temp", "⏸ Suspension", "Durée limitée"], ["permanent", "🚫 Ban définitif", "Accès permanent bloqué"]] as const).map(([val, label, desc]) => (
-                  <label key={val} className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${type === val ? val === "permanent" ? "border-red-500 bg-red-50" : "border-amber-400 bg-amber-50" : "border-slate-100 hover:border-slate-200"}`}>
+                  <label key={val} className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${type === val ? "border-[#D4537E] bg-[#FAF8F4]" : "border-[#ECE7DD] hover:border-[#8A8579]"}`}>
                     <input type="radio" name="type" value={val} checked={type === val} onChange={() => {
                       setType(val);
                       if (raison) setMessage(getTemplate(raison, val, val === "permanent" ? 0 : dureeJours));
                     }} className="hidden" />
-                    <p className={`text-sm font-bold ${type === val ? val === "permanent" ? "text-red-600" : "text-amber-600" : "text-slate-700"}`}>{label}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{desc}</p>
+                    <p className={`text-sm font-bold ${type === val ? "text-[#D4537E]" : "text-[#1A2138]"}`}>{label}</p>
+                    <p className="text-xs text-[#8A8579] mt-0.5">{desc}</p>
                   </label>
                 ))}
               </div>
@@ -180,14 +180,14 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
             {/* Durée (temp seulement) */}
             {type === "temp" && (
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Durée</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-[#8A8579] mb-2">Durée</p>
                 <div className="flex flex-wrap gap-2">
                   {DUREES.map((d) => (
                     <button key={d.days} onClick={() => {
                       setDureePreset(d.days);
                       if (raison && d.days > 0) setMessage(getTemplate(raison, "temp", d.days));
                     }}
-                      className={`text-sm font-semibold px-3 py-1.5 rounded-full border transition-all ${dureePreset === d.days ? "bg-amber-500 text-white border-amber-500" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}>
+                      className={`text-sm font-semibold px-3 py-1.5 rounded-full border transition-all ${dureePreset === d.days ? "bg-[#1A2138] text-white border-[#1A2138]" : "bg-white text-[#8A8579] border-[#ECE7DD] hover:border-[#8A8579]"}`}>
                       {d.label}
                     </button>
                   ))}
@@ -195,7 +195,7 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
                 {dureePreset === 0 && (
                   <div className="flex items-center gap-2 mt-2">
                     <input type="number" value={dureeCustom} onChange={(e) => setDureeCustom(e.target.value)} min={1} placeholder="Nombre de jours" className="input-field flex-1 text-sm py-2" />
-                    <span className="text-sm text-slate-400 shrink-0">jours</span>
+                    <span className="text-sm text-[#8A8579] shrink-0">jours</span>
                   </div>
                 )}
               </div>
@@ -203,15 +203,15 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
 
             {/* Raison */}
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Raison</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-[#8A8579] mb-2">Raison</p>
               <div className="flex flex-col gap-1.5">
                 {RAISONS.map((r) => (
-                  <label key={r} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${raison === r ? "border-red-400 bg-red-50" : "border-slate-100 hover:border-slate-200"}`}>
+                  <label key={r} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${raison === r ? "border-[#D4537E] bg-[#FAF8F4]" : "border-[#ECE7DD] hover:border-[#8A8579]"}`}>
                     <input type="radio" name="raison" value={r} checked={raison === r} onChange={() => {
                       setRaison(r);
                       setMessage(getTemplate(r, type, dureeJours));
-                    }} className="accent-red-500 shrink-0" />
-                    <span className="text-sm text-slate-800">{r}</span>
+                    }} className="accent-[#D4537E] shrink-0" />
+                    <span className="text-sm text-[#1A2138]">{r}</span>
                   </label>
                 ))}
               </div>
@@ -220,8 +220,8 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
             {/* Message personnalisé */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Message à l'utilisateur</p>
-                {raison && <button type="button" onClick={() => setMessage(getTemplate(raison, type, dureeJours))} className="text-xs text-indigo-500 hover:text-indigo-700 font-semibold">↺ Réinitialiser</button>}
+                <p className="text-xs font-bold uppercase tracking-widest text-[#8A8579]">Message à l'utilisateur</p>
+                {raison && <button type="button" onClick={() => setMessage(getTemplate(raison, type, dureeJours))} className="text-xs text-[#8A8579] hover:text-[#1A2138] font-semibold">↺ Réinitialiser</button>}
               </div>
               <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={5} maxLength={800}
                 placeholder="Choisir une raison pour générer le message automatique..."
@@ -229,7 +229,7 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
             </div>
 
             <button onClick={submit} disabled={!raison || saving || (type === "temp" && dureeJours <= 0)}
-              className="w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-40 bg-red-500 hover:bg-red-600 text-white">
+              className="w-full py-3 rounded-xl font-bold text-sm transition-all disabled:opacity-40 bg-[#D4537E] hover:bg-[#c04070] text-white">
               {saving ? "Application..." : type === "permanent" ? "🚫 Bannir définitivement" : `⏸ Suspendre ${dureeJours > 0 ? dureeJours + " jour" + (dureeJours > 1 ? "s" : "") : ""}`}
             </button>
             <button onClick={close} className="btn-ghost w-full py-2.5 text-sm -mt-2">Annuler</button>

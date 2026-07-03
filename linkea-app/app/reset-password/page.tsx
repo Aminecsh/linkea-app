@@ -52,8 +52,8 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-4">
         <div className="text-center">
-          <div className="w-6 h-6 rounded-full border-2 border-pink-400 border-t-transparent animate-spin mx-auto mb-4" />
-          <p className="text-slate-500 text-sm">Vérification du lien en cours...</p>
+          <div className="w-6 h-6 rounded-full border-2 border-[#ECE7DD] border-t-[#1A2138] animate-spin mx-auto mb-4" />
+          <p className="text-[#8A8579] text-sm">Vérification du lien en cours...</p>
         </div>
       </div>
     );
@@ -63,13 +63,13 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-white px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8">
-          <span className="label-tag bg-pink-50 text-pink-600 mb-4 inline-flex">
+          <span className="label-tag bg-white border border-[#ECE7DD] text-[#8A8579] mb-4 inline-flex">
             Nouveau mot de passe
           </span>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-3xl font-black text-[#1A2138] tracking-tight">
             Choisis un mot de passe
           </h1>
-          <p className="text-slate-500 mt-2">Minimum 8 caractères.</p>
+          <p className="text-[#8A8579] mt-2">Minimum 8 caractères.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -85,7 +85,7 @@ export default function ResetPasswordPage() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8A8579] hover:text-[#1A2138] transition-colors"
             >
               {showPassword ? "🙈" : "👁"}
             </button>
@@ -101,7 +101,7 @@ export default function ResetPasswordPage() {
           />
 
           {error && (
-            <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-xl">
+            <p className="text-sm text-[#D4537E] bg-white border border-[#D4537E] px-4 py-3 rounded-xl">
               {error}
             </p>
           )}

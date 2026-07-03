@@ -1,18 +1,42 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AIPanel, { type RoadmapSprint } from "@/components/AIPanel";
+import { sendNotif } from "@/lib/notifications";
 import {
-  ArrowLeft, Plus, Upload, LayoutGrid, List, Map, FolderOpen,
-  ChevronLeft, ChevronRight, X, Calendar, AlertCircle,
-  CheckSquare, Send, Download, Paperclip, FileText,
-  Play, CheckCircle2, Clock, Trash2, Zap,
-  Check, Image as ImageIcon, SlidersHorizontal,
-  Sparkles, MoreHorizontal, GripVertical, ChevronDown,
-  Brain, Lightbulb, BarChart3, MessageSquare,
+  ArrowLeft, Plus, Upload, LayoutGrid, List, CalendarRange, Folder,
+  Paperclip, Image as ImageIcon, FileText, FileArchive, Film, FileSpreadsheet,
+  Calendar, AlertTriangle, Check, X, Download, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+
+// ── Tokens ────────────────────────────────────────────────────────────────────
+
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
+
+const inp: React.CSSProperties = {
+  width: "100%", padding: "10px 13px", borderRadius: 11,
+  border: `1px solid ${C.hairline}`, background: C.surface,
+  fontSize: 13, color: C.ink, outline: "none",
+};
+
+const lbl: React.CSSProperties = {
+  display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase",
+  letterSpacing: "1.2px", color: C.muted, marginBottom: 6,
+};
+
+const btnInk: React.CSSProperties = {
+  padding: "9px 16px", borderRadius: 11, background: C.ink, color: "#fff",
+  border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer",
+  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+};
+
+const btnGhost: React.CSSProperties = {
+  padding: "9px 16px", borderRadius: 11, background: C.surface, color: C.muted,
+  border: `1px solid ${C.hairline}`, fontSize: 13, fontWeight: 600, cursor: "pointer",
+  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -29,51 +53,63 @@ type Task = {
   assigne_a: string | null; due_date?: string | null;
 };
 
-type TaskComment   = { id: string; task_id: string; user_id: string; content: string; created_at: string; };
+type TaskComment = { id: string; task_id: string; user_id: string; content: string; created_at: string; };
 type TaskChecklist = { id: string; task_id: string; titre: string; done: boolean; ordre: number; };
-type Member        = { user_id: string; nom: string; role: "founder" | "developer"; };
-type Deliverable   = {
+type Member = { user_id: string; nom: string; role: "founder" | "developer"; };
+type Deliverable = {
   id: string; project_id: string; sprint_id: string | null; uploaded_by: string;
   nom: string; file_url: string; file_type: string | null; file_size: number | null;
   description: string | null; created_at: string;
 };
 
-type AIMessage = { role: "user" | "assistant"; content: string; };
-
 // ── Constantes ────────────────────────────────────────────────────────────────
 
-const COLONNES: { key: Task["statut"]; label: string; desc: string; color: string; dot: string }[] = [
-  { key: "todo",     label: "À faire",      desc: "Tâches à démarrer",  color: "#6b7280", dot: "#d1d5db" },
-  { key: "en_cours", label: "En cours",     desc: "Actuellement en cours", color: "#3b82f6", dot: "#93c5fd" },
-  { key: "review",   label: "À valider",    desc: "En attente de validation", color: "#f59e0b", dot: "#fcd34d" },
-  { key: "done",     label: "Terminé",      desc: "Tâches accomplies",  color: "#10b981", dot: "#6ee7b7" },
+const COLONNES: { key: Task["statut"]; label: string; dot: string }[] = [
+  { key: "todo",      label: "À faire",  dot: C.hairline },
+  { key: "en_cours",  label: "En cours", dot: C.rose },
+  { key: "review",    label: "Review",   dot: C.muted },
+  { key: "done",      label: "Terminé",  dot: C.ink },
 ];
 
-const PRIO: Record<Task["priorite"], { dot: string; label: string }> = {
-  haute:   { dot: "#f43f5e", label: "Haute"   },
-  normale: { dot: "#94a3b8", label: "Normale" },
-  basse:   { dot: "#10b981", label: "Basse"   },
-};
+function prioStyle(p: Task["priorite"]): React.CSSProperties {
+  return {
+    fontSize: 11, fontWeight: p === "haute" ? 700 : 600, padding: "2px 8px", borderRadius: 6,
+    border: p === "haute" ? `1px solid ${C.ink}` : `1px solid ${C.hairline}`,
+    background: C.surface, color: p === "haute" ? C.ink : C.muted,
+    textTransform: "capitalize",
+  };
+}
+
+function statutBadge(s: Sprint["statut"] | Task["statut"]): React.CSSProperties {
+  return {
+    fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
+    border: `1px solid ${C.hairline}`, background: C.surface,
+    color: s === "en_cours" || s === "done" || s === "termine" ? C.ink : C.muted,
+  };
+}
 
 const TABS = ["kanban", "liste", "roadmap", "fichiers"] as const;
 type Tab = typeof TABS[number];
 
-const TAB_LABELS: Record<Tab, string> = {
-  kanban:   "Tableau",
-  liste:    "Liste",
-  roadmap:  "Planning",
-  fichiers: "Fichiers",
+const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
+  kanban:   { label: "Kanban",   icon: <LayoutGrid    size={12} strokeWidth={2} /> },
+  liste:    { label: "Liste",    icon: <List          size={12} strokeWidth={2} /> },
+  roadmap:  { label: "Roadmap",  icon: <CalendarRange size={12} strokeWidth={2} /> },
+  fichiers: { label: "Fichiers", icon: <Folder        size={12} strokeWidth={2} /> },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
-}
-
-function isOverdue(due: string | null | undefined) {
-  if (!due) return false;
-  return new Date(due) < new Date(new Date().toDateString());
+function FileIcon({ t, size = 20 }: { t: string | null; size?: number }) {
+  const style = { color: C.ink };
+  if (!t) return <Paperclip size={size} strokeWidth={1.5} style={style} />;
+  if (t.startsWith("image/")) return <ImageIcon size={size} strokeWidth={1.5} style={style} />;
+  if (t === "application/pdf") return <FileText size={size} strokeWidth={1.5} style={style} />;
+  if (t.includes("zip") || t.includes("rar")) return <FileArchive size={size} strokeWidth={1.5} style={style} />;
+  if (t.includes("word") || t.includes("document")) return <FileText size={size} strokeWidth={1.5} style={style} />;
+  if (t.includes("sheet") || t.includes("excel")) return <FileSpreadsheet size={size} strokeWidth={1.5} style={style} />;
+  if (t.includes("video")) return <Film size={size} strokeWidth={1.5} style={style} />;
+  return <Paperclip size={size} strokeWidth={1.5} style={style} />;
 }
 
 function fileSize(b: number | null) {
@@ -83,26 +119,13 @@ function fileSize(b: number | null) {
   return `${(b / 1024 / 1024).toFixed(1)} Mo`;
 }
 
-function fileIcon(t: string | null) {
-  if (!t) return Paperclip;
-  if (t.startsWith("image/")) return ImageIcon;
-  if (t === "application/pdf") return FileText;
-  return Paperclip;
+function isOverdue(due: string | null | undefined) {
+  if (!due) return false;
+  return new Date(due) < new Date(new Date().toDateString());
 }
 
-function Avatar({ member, size = 20 }: { member: Member; size?: number }) {
-  const bg = member.role === "founder"
-    ? "linear-gradient(135deg,#f43f5e,#8b5cf6)"
-    : "linear-gradient(135deg,#3b82f6,#6366f1)";
-  return (
-    <div
-      className="rounded-full flex items-center justify-center text-white font-bold shrink-0"
-      style={{ width: size, height: size, fontSize: size * 0.42, background: bg,
-        border: "1.5px solid #fff", boxShadow: "0 1px 3px rgba(0,0,0,0.15)" }}
-    >
-      {member.nom[0].toUpperCase()}
-    </div>
-  );
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -110,44 +133,43 @@ function Avatar({ member, size = 20 }: { member: Member; size?: number }) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 export default function GestionPage() {
-  const router   = useRouter();
+  const router = useRouter();
   const { id: projectId } = useParams<{ id: string }>();
 
-  const [role, setRole]     = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [role, setRole]               = useState<string | null>(null);
+  const [userId, setUserId]           = useState<string | null>(null);
   const [projectTitre, setProjectTitre] = useState("");
-  const [members, setMembers]   = useState<Member[]>([]);
-  const [sprints, setSprints]   = useState<Sprint[]>([]);
-  const [tasks, setTasks]       = useState<Task[]>([]);
+  const [members, setMembers]         = useState<Member[]>([]);
+  const [sprints, setSprints]         = useState<Sprint[]>([]);
+  const [tasks, setTasks]             = useState<Task[]>([]);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [selectedSprintId, setSelectedSprintId] = useState<string | "all">("all");
-  const [activeTab, setActiveTab] = useState<Tab>("kanban");
-  const [loading, setLoading]   = useState(true);
-  const [sprintCollapsed, setSprintCollapsed] = useState(false);
+  const [activeTab, setActiveTab]     = useState<Tab>("kanban");
+  const [loading, setLoading]         = useState(true);
 
+  // Filtres kanban / liste
   const [filterAssigne, setFilterAssigne] = useState<string>("all");
   const [filterPrio, setFilterPrio]       = useState<string>("all");
 
-  // Panel
-  const [panelTask, setPanelTask]         = useState<Task | null>(null);
+  // Panel détail tâche
+  const [panelTask, setPanelTask]     = useState<Task | null>(null);
   const [panelComments, setPanelComments] = useState<TaskComment[]>([]);
   const [panelChecklist, setPanelChecklist] = useState<TaskChecklist[]>([]);
-  const [newComment, setNewComment]       = useState("");
-  const [newCheckItem, setNewCheckItem]   = useState("");
-  const [panelLoading, setPanelLoading]   = useState(false);
-  const [savingPanel, setSavingPanel]     = useState(false);
-  const [editTitle, setEditTitle]         = useState("");
-  const [editDesc, setEditDesc]           = useState("");
-  const [editDue, setEditDue]             = useState("");
-  const [editPrio, setEditPrio]           = useState<Task["priorite"]>("normale");
-  const [editSprint, setEditSprint]       = useState("");
-  const [editAssigne, setEditAssigne]     = useState("");
+  const [newComment, setNewComment]   = useState("");
+  const [newCheckItem, setNewCheckItem] = useState("");
+  const [panelLoading, setPanelLoading] = useState(false);
+  const [savingPanel, setSavingPanel] = useState(false);
 
-  // Inline quick-add
-  const [quickAddCol, setQuickAddCol] = useState<Task["statut"] | null>(null);
-  const [quickAddTitle, setQuickAddTitle] = useState("");
+  // Édition inline dans le panel
+  const [editTitle, setEditTitle]     = useState("");
+  const [editDesc, setEditDesc]       = useState("");
+  const [editDue, setEditDue]         = useState("");
+  const [editPrio, setEditPrio]       = useState<Task["priorite"]>("normale");
+  const [editSprint, setEditSprint]   = useState("");
+  const [editAssigne, setEditAssigne] = useState("");
 
   // Modal sprint
+  const [showAIPanel, setShowAIPanel] = useState(false);
   const [showSprintModal, setShowSprintModal] = useState(false);
   const [sprintNom, setSprintNom]     = useState("");
   const [sprintObj, setSprintObj]     = useState("");
@@ -155,58 +177,23 @@ export default function GestionPage() {
   const [sprintFin, setSprintFin]     = useState("");
   const [savingSprint, setSavingSprint] = useState(false);
 
-  // Modal tâche (pleine)
+  // Modal nouvelle tâche rapide
   const [showTaskModal, setShowTaskModal] = useState(false);
-  const [taskTitre, setTaskTitre]   = useState("");
-  const [taskDesc, setTaskDesc]     = useState("");
-  const [taskPrio, setTaskPrio]     = useState<Task["priorite"]>("normale");
-  const [taskSprint, setTaskSprint] = useState("");
+  const [taskTitre, setTaskTitre]     = useState("");
+  const [taskDesc, setTaskDesc]       = useState("");
+  const [taskPrio, setTaskPrio]       = useState<Task["priorite"]>("normale");
+  const [taskSprint, setTaskSprint]   = useState("");
   const [taskAssigne, setTaskAssigne] = useState("");
-  const [taskDue, setTaskDue]       = useState("");
-  const [savingTask, setSavingTask] = useState(false);
+  const [taskDue, setTaskDue]         = useState("");
+  const [savingTask, setSavingTask]   = useState(false);
 
   // Fichiers
   const [showFileModal, setShowFileModal] = useState(false);
-  const [pendingFile, setPendingFile]     = useState<File | null>(null);
-  const [fileDesc, setFileDesc]           = useState("");
-  const [fileSprint, setFileSprint]       = useState("");
-  const [uploading, setUploading]         = useState(false);
-  const [uploadError, setUploadError]     = useState<string | null>(null);
-
-  // ── AI Agent Panel ──────────────────────────────────────────────────────────
-  // Amine connecte ici son agent IA
-  const [showAI, setShowAI]             = useState(false);
-  const [aiMessages, setAiMessages]     = useState<AIMessage[]>([]);
-  const [aiInput, setAiInput]           = useState("");
-  const [aiLoading, setAiLoading]       = useState(false);
-  const aiScrollRef = useRef<HTMLDivElement>(null);
-
-  async function aiSend(message?: string) {
-    const text = message ?? aiInput.trim();
-    if (!text || aiLoading) return;
-    setAiMessages((prev) => [...prev, { role: "user", content: text }]);
-    setAiInput("");
-    setAiLoading(true);
-
-    // ── TODO Amine: connecter l'agent IA ici ──────────────────────────────
-    // Contexte disponible: tasks, sprints, members, selectedSprintId, projectTitre
-    // Remplacer le setTimeout par l'appel à l'API de l'agent
-    await new Promise((r) => setTimeout(r, 800));
-    setAiMessages((prev) => [...prev, {
-      role: "assistant",
-      content: "Agent IA en cours d'intégration par Amine. Les données du projet sont disponibles : " +
-        `${tasks.length} tâches, ${sprints.length} sprints, ${members.length} membres.`,
-    }]);
-    // ─────────────────────────────────────────────────────────────────────
-
-    setAiLoading(false);
-  }
-
-  useEffect(() => {
-    if (aiScrollRef.current) {
-      aiScrollRef.current.scrollTop = aiScrollRef.current.scrollHeight;
-    }
-  }, [aiMessages]);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [fileDesc, setFileDesc]       = useState("");
+  const [fileSprint, setFileSprint]   = useState("");
+  const [uploading, setUploading]     = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // ── Chargement ──────────────────────────────────────────────────────────────
 
@@ -261,14 +248,18 @@ export default function GestionPage() {
     load();
   }, [projectId, router]);
 
-  // ── Panel ────────────────────────────────────────────────────────────────────
+  // ── Panel détail ────────────────────────────────────────────────────────────
 
   async function openPanel(task: Task) {
     setPanelTask(task);
-    setEditTitle(task.titre); setEditDesc(task.description ?? "");
-    setEditDue(task.due_date ?? ""); setEditPrio(task.priorite);
-    setEditSprint(task.sprint_id ?? ""); setEditAssigne(task.assigne_a ?? "");
+    setEditTitle(task.titre);
+    setEditDesc(task.description ?? "");
+    setEditDue(task.due_date ?? "");
+    setEditPrio(task.priorite);
+    setEditSprint(task.sprint_id ?? "");
+    setEditAssigne(task.assigne_a ?? "");
     setPanelLoading(true);
+
     const [{ data: comments }, { data: checklist }] = await Promise.all([
       supabase.from("task_comments").select("*").eq("task_id", task.id).order("created_at"),
       supabase.from("task_checklists").select("*").eq("task_id", task.id).order("ordre"),
@@ -281,9 +272,11 @@ export default function GestionPage() {
   async function savePanelTask() {
     if (!panelTask) return;
     setSavingPanel(true);
-    const update = { titre: editTitle, description: editDesc || null,
+    const update = {
+      titre: editTitle, description: editDesc || null,
       due_date: editDue || null, priorite: editPrio,
-      sprint_id: editSprint || null, assigne_a: editAssigne || null };
+      sprint_id: editSprint || null, assigne_a: editAssigne || null,
+    };
     await supabase.from("tasks").update(update).eq("id", panelTask.id);
     setTasks((prev) => prev.map((t) => t.id === panelTask.id ? { ...t, ...update } : t));
     setPanelTask((prev) => prev ? { ...prev, ...update } : null);
@@ -307,7 +300,8 @@ export default function GestionPage() {
   async function addCheckItem() {
     if (!newCheckItem.trim() || !panelTask) return;
     const { data } = await supabase.from("task_checklists").insert({
-      task_id: panelTask.id, titre: newCheckItem.trim(), done: false, ordre: panelChecklist.length,
+      task_id: panelTask.id, titre: newCheckItem.trim(),
+      done: false, ordre: panelChecklist.length,
     }).select().maybeSingle();
     if (data) setPanelChecklist((prev) => [...prev, data as TaskChecklist]);
     setNewCheckItem("");
@@ -323,29 +317,37 @@ export default function GestionPage() {
     setPanelChecklist((prev) => prev.filter((c) => c.id !== id));
   }
 
-  async function quickAddTask(statut: Task["statut"]) {
-    if (!quickAddTitle.trim()) { setQuickAddCol(null); return; }
-    const payload = {
-      project_id: projectId,
-      sprint_id: selectedSprintId !== "all" ? selectedSprintId : null,
-      titre: quickAddTitle.trim(), statut, priorite: "normale" as Task["priorite"],
-      assigne_a: null, description: null, due_date: null,
-    };
-    const { data } = await supabase.from("tasks").insert(payload).select().maybeSingle();
-    if (data) setTasks((prev) => [...prev, data as Task]);
-    setQuickAddTitle(""); setQuickAddCol(null);
-  }
+  // ── Tâches ──────────────────────────────────────────────────────────────────
 
   async function handleCreateTask() {
     if (!taskTitre.trim()) return;
     setSavingTask(true);
-    const { data } = await supabase.from("tasks").insert({
+    const payload = {
       project_id: projectId, sprint_id: taskSprint || null,
       titre: taskTitre.trim(), description: taskDesc || null,
-      statut: "todo", priorite: taskPrio,
+      statut: "todo" as Task["statut"], priorite: taskPrio,
       assigne_a: taskAssigne || null, due_date: taskDue || null,
-    }).select().maybeSingle();
+    };
+    const { data } = await supabase.from("tasks").insert(payload).select().maybeSingle();
     if (data) setTasks((prev) => [...prev, data as Task]);
+
+    // Notifier tous les autres membres du projet
+    const assigneeName = taskAssigne ? members.find((m) => m.user_id === taskAssigne)?.nom : null;
+    for (const member of members.filter((m) => m.user_id !== userId)) {
+      const isAssignee = member.user_id === taskAssigne;
+      sendNotif({
+        userId: member.user_id,
+        projectId,
+        type: "task_assigned",
+        title: isAssignee
+          ? `Tâche assignée : "${taskTitre.trim()}"`
+          : `Nouvelle tâche : "${taskTitre.trim()}"`,
+        body: isAssignee
+          ? `${projectTitre} · Tu es assigné(e) à cette tâche${taskPrio === "haute" ? " — priorité haute" : ""}.`
+          : `${projectTitre} · Créée${assigneeName ? ` et assignée à ${assigneeName}` : ""}${taskPrio === "haute" ? " — priorité haute" : ""}.`,
+      });
+    }
+
     setTaskTitre(""); setTaskDesc(""); setTaskPrio("normale");
     setTaskSprint(""); setTaskAssigne(""); setTaskDue("");
     setShowTaskModal(false); setSavingTask(false);
@@ -353,11 +355,25 @@ export default function GestionPage() {
 
   async function moveTask(task: Task, dir: "next" | "prev") {
     const order: Task["statut"][] = ["todo","en_cours","review","done"];
-    const newStatut = order[order.indexOf(task.statut) + (dir === "next" ? 1 : -1)];
-    if (!newStatut) return;
+    const idx = order.indexOf(task.statut);
+    const newIdx = dir === "next" ? idx + 1 : idx - 1;
+    if (newIdx < 0 || newIdx >= order.length) return;
+    const newStatut = order[newIdx];
     await supabase.from("tasks").update({ statut: newStatut }).eq("id", task.id);
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, statut: newStatut } : t));
     if (panelTask?.id === task.id) setPanelTask((p) => p ? { ...p, statut: newStatut } : null);
+
+    const other = members.find((m) => m.user_id !== userId);
+    if (other) {
+      const labels: Record<string, string> = { todo: "À faire", en_cours: "En cours", review: "En review", done: "Terminé" };
+      sendNotif({
+        userId: other.user_id,
+        projectId,
+        type: "task_status",
+        title: `Tâche "${task.titre}" → ${labels[newStatut]}`,
+        body: `${projectTitre} · Passage de "${labels[task.statut]}" à "${labels[newStatut]}"`,
+      });
+    }
   }
 
   async function deleteTask(id: string) {
@@ -365,6 +381,8 @@ export default function GestionPage() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     if (panelTask?.id === id) setPanelTask(null);
   }
+
+  // ── Sprints ─────────────────────────────────────────────────────────────────
 
   async function createSprint() {
     if (!sprintNom || !sprintDebut || !sprintFin) return;
@@ -381,7 +399,38 @@ export default function GestionPage() {
   async function updateSprintStatut(sprint: Sprint, statut: Sprint["statut"]) {
     await supabase.from("sprints").update({ statut }).eq("id", sprint.id);
     setSprints((prev) => prev.map((s) => s.id === sprint.id ? { ...s, statut } : s));
+
+    const other = members.find((m) => m.user_id !== userId);
+    if (other) {
+      const labels: Record<string, string> = { a_venir: "À venir", en_cours: "En cours", termine: "Terminé" };
+      sendNotif({
+        userId: other.user_id,
+        projectId,
+        type: "sprint_status",
+        title: `Sprint "${sprint.nom}" — ${labels[statut]}`,
+        body: `${projectTitre} · Le sprint est maintenant "${labels[statut]}".`,
+      });
+    }
   }
+
+  // ── Roadmap IA ───────────────────────────────────────────────────────────────
+
+  async function handleRoadmapGenerated(aiSprints: RoadmapSprint[]) {
+    const today = new Date();
+    const cursor = new Date(today);
+    for (const s of aiSprints) {
+      const debut = cursor.toISOString().slice(0, 10);
+      cursor.setDate(cursor.getDate() + (s.duree_jours || 14));
+      const fin = cursor.toISOString().slice(0, 10);
+      const { data: newSprint } = await supabase.from("sprints").insert({
+        project_id: projectId, nom: s.nom, objectif: s.objectif,
+        date_debut: debut, date_fin: fin, statut: "a_venir",
+      }).select().maybeSingle();
+      if (newSprint) setSprints(prev => [...prev, newSprint as Sprint]);
+    }
+  }
+
+  // ── Fichiers ─────────────────────────────────────────────────────────────────
 
   function onFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
@@ -396,27 +445,25 @@ export default function GestionPage() {
     setUploadError(null);
     const ext = pendingFile.name.split(".").pop();
     const path = `${projectId}/${crypto.randomUUID()}.${ext}`;
-    const { error: storageError } = await supabase.storage.from("project-files").upload(path, pendingFile);
-    if (storageError) {
-      console.error("Storage upload error:", storageError);
-      setUploadError(storageError.message || "Erreur lors de l'upload. Vérifie les permissions du bucket.");
+    const { error: storageErr } = await supabase.storage.from("project-files").upload(path, pendingFile);
+    if (storageErr) {
+      setUploadError(storageErr.message);
       setUploading(false);
       return;
     }
     const { data: urlData } = supabase.storage.from("project-files").getPublicUrl(path);
-    const { data, error: dbError } = await supabase.from("deliverables").insert({
+    const { data, error: dbErr } = await supabase.from("deliverables").insert({
       project_id: projectId, sprint_id: fileSprint || null, uploaded_by: userId,
       nom: pendingFile.name, file_url: urlData.publicUrl,
       file_type: pendingFile.type, file_size: pendingFile.size, description: fileDesc || null,
     }).select().maybeSingle();
-    if (dbError) {
-      console.error("DB insert error:", dbError);
-      setUploadError(dbError.message || "Erreur lors de l'enregistrement.");
+    if (dbErr) {
+      setUploadError(dbErr.message);
       setUploading(false);
       return;
     }
     if (data) setDeliverables((prev) => [data as Deliverable, ...prev]);
-    setPendingFile(null); setShowFileModal(false); setUploading(false); setUploadError(null);
+    setPendingFile(null); setShowFileModal(false); setUploading(false);
   }
 
   async function deleteFile(d: Deliverable) {
@@ -425,10 +472,11 @@ export default function GestionPage() {
     setDeliverables((prev) => prev.filter((f) => f.id !== d.id));
   }
 
-  // ── Computed ─────────────────────────────────────────────────────────────────
+  // ── Filtrage ─────────────────────────────────────────────────────────────────
 
   const sprintFiltered = selectedSprintId === "all"
-    ? tasks : tasks.filter((t) => t.sprint_id === selectedSprintId);
+    ? tasks
+    : tasks.filter((t) => t.sprint_id === selectedSprintId);
 
   const filtered = sprintFiltered
     .filter((t) => filterAssigne === "all" || t.assigne_a === filterAssigne)
@@ -440,339 +488,197 @@ export default function GestionPage() {
   const daysLeft = selectedSprint
     ? Math.ceil((new Date(selectedSprint.date_fin).getTime() - Date.now()) / 86400000) : null;
 
+  // ── Loading ──────────────────────────────────────────────────────────────────
+
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
-      <div className="spinner" style={{ width: 24, height: 24, borderWidth: 2 }} />
+    <div style={{ minHeight: "100vh", background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${C.hairline}`, borderTopColor: C.ink, animation: "lk-spin 0.8s linear infinite" }} />
+      <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 
   // ══════════════════════════════════════════════════════════════════════════════
+  // Rendu
+  // ══════════════════════════════════════════════════════════════════════════════
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: "#f9f9fb" }}>
+    <div style={{ minHeight: "100vh", background: C.canvas }}>
+      <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div
-        className="sticky top-0 z-20"
-        style={{
-          background: "rgba(249,249,251,0.92)",
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          borderBottom: "1px solid rgba(0,0,0,0.07)",
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center gap-3 h-11">
-            <button onClick={() => router.push("/messages")} className="btn-icon" style={{ width: 30, height: 30 }}>
-              <ArrowLeft size={14} strokeWidth={2} />
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-20 px-4 py-3" style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderBottom: `1px solid ${C.hairline}` }}>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center gap-3 mb-3">
+            <button onClick={() => router.push("/messages")}
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.muted, padding: 0, flexShrink: 0 }}>
+              <ArrowLeft size={14} strokeWidth={2} /> Messages
             </button>
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              <span className="text-xs font-medium" style={{ color: "var(--muted)" }}>Projets</span>
-              <ChevronRight size={11} style={{ color: "var(--subtle)" }} />
-              <span className="text-xs font-semibold truncate" style={{ color: "var(--text)" }}>{projectTitre}</span>
+            <div className="flex-1 min-w-0">
+              <h1 className="truncate" style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 700, color: C.ink, margin: 0 }}>{projectTitre}</h1>
+              <p style={{ fontSize: 11, color: C.muted, margin: 0 }}>Gestion de projet</p>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => setShowAI(!showAI)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all duration-200"
-                style={{
-                  background: showAI ? "linear-gradient(135deg,#8b5cf6,#6366f1)" : "rgba(139,92,246,0.08)",
-                  color: showAI ? "#fff" : "var(--violet)",
-                  border: "1px solid rgba(139,92,246,0.2)",
-                  boxShadow: showAI ? "0 2px 8px rgba(139,92,246,0.3)" : "none",
-                }}
-              >
-                <Sparkles size={11} strokeWidth={2} /> Assistant IA
-              </button>
-              {activeTab !== "fichiers" && activeTab !== "roadmap" && (
-                <button onClick={() => setShowTaskModal(true)} className="btn-primary text-xs" style={{ padding: "6px 12px", gap: 4 }}>
-                  <Plus size={12} strokeWidth={2.5} /> Nouvelle tâche
-                </button>
-              )}
-              {activeTab === "fichiers" && (
-                <label className="btn-primary text-xs cursor-pointer" style={{ padding: "6px 12px", gap: 4, display: "flex", alignItems: "center" }}>
-                  <Upload size={12} strokeWidth={2.5} /> Ajouter un fichier
-                  <input type="file" className="hidden" onChange={onFileSelect} />
-                </label>
-              )}
-              {role === "founder" && activeTab !== "fichiers" && (
-                <button
-                  onClick={() => setShowSprintModal(true)}
-                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all"
-                  style={{ background: "rgba(0,0,0,0.05)", color: "var(--muted)", border: "1px solid rgba(0,0,0,0.08)" }}
-                >
-                  <Plus size={11} strokeWidth={2.5} /> Phase
-                </button>
-              )}
-            </div>
+            {activeTab !== "fichiers" && activeTab !== "roadmap" && (
+              <button onClick={() => setShowTaskModal(true)} style={{ ...btnInk, flexShrink: 0 }}><Plus size={13} strokeWidth={2.5} /> Tâche</button>
+            )}
+            {activeTab === "fichiers" && (
+              <label style={{ ...btnInk, flexShrink: 0 }}>
+                <Upload size={13} strokeWidth={2} /> Fichier <input type="file" className="hidden" onChange={onFileSelect} />
+              </label>
+            )}
+            {role === "founder" && activeTab !== "fichiers" && (
+              <button onClick={() => setShowSprintModal(true)} style={{ ...btnGhost, flexShrink: 0 }}><Plus size={13} strokeWidth={2} /> Sprint</button>
+            )}
+            <button
+              onClick={() => setShowAIPanel(true)}
+              style={{ flexShrink: 0, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 11, background: C.ink, color: "#fff", fontSize: 15, border: "none", cursor: "pointer" }}
+              title="Assistant IA"
+            >
+              ✦
+            </button>
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-0 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            {TABS.map((tab) => {
-              const active = activeTab === tab;
-              return (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className="shrink-0 text-xs font-semibold px-4 py-2.5 transition-all relative"
-                  style={{
-                    color: active ? "var(--text)" : "var(--muted)",
-                    borderBottom: active ? "2px solid var(--text)" : "2px solid transparent",
-                  }}
-                >
-                  {TAB_LABELS[tab]}
-                </button>
-              );
-            })}
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+            {TABS.map((tab) => (
+              <button key={tab} onClick={() => setActiveTab(tab)}
+                style={{
+                  flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 5,
+                  fontSize: 12, fontWeight: 600, padding: "6px 14px", borderRadius: 9, cursor: "pointer",
+                  background: activeTab === tab ? C.ink : "transparent",
+                  color: activeTab === tab ? "#fff" : C.muted,
+                  border: activeTab === tab ? `1px solid ${C.ink}` : "1px solid transparent",
+                }}>
+                {TAB_META[tab].icon}{TAB_META[tab].label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 pt-4">
+      <div className="max-w-7xl mx-auto px-4 py-5">
 
-        {/* ── Sprint bar ──────────────────────────────────────────────────── */}
+        {/* ── Sprint selector + info ─────────────────────────────────────── */}
         {activeTab !== "fichiers" && (
           <>
-            {/* Sprint pills + actions */}
-            <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
-              <button
-                onClick={() => setSelectedSprintId("all")}
-                className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-md transition-all"
+            <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
+              <button onClick={() => setSelectedSprintId("all")}
                 style={{
-                  background: selectedSprintId === "all" ? "var(--text)" : "transparent",
-                  color: selectedSprintId === "all" ? "#fff" : "var(--muted)",
-                }}
-              >
-                Tout
-              </button>
-              {sprints.map((s) => {
-                const active = selectedSprintId === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelectedSprintId(s.id)}
-                    className="shrink-0 flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-md transition-all"
-                    style={{
-                      background: active ? "#fff" : "transparent",
-                      color: active ? "var(--text)" : "var(--muted)",
-                      border: active ? "1px solid rgba(0,0,0,0.1)" : "1px solid transparent",
-                      boxShadow: active ? "0 1px 4px rgba(0,0,0,0.06)" : "none",
-                    }}
-                  >
-                    {s.statut === "en_cours" && <Zap size={10} style={{ color: "var(--rose)" }} />}
-                    {s.statut === "termine"  && <Check size={10} style={{ color: "var(--green)" }} />}
-                    {s.statut === "a_venir"  && <Clock size={10} style={{ color: "var(--muted)" }} />}
-                    {s.nom}
-                  </button>
-                );
-              })}
-              <div className="h-4 w-px shrink-0" style={{ background: "rgba(0,0,0,0.1)" }} />
-              {/* Filtres inline */}
-              <select
-                value={filterAssigne}
-                onChange={(e) => setFilterAssigne(e.target.value)}
-                className="shrink-0 text-xs font-semibold px-2 py-1.5 rounded-md bg-transparent"
-                style={{ color: filterAssigne !== "all" ? "var(--rose)" : "var(--muted)", border: "none", cursor: "pointer" }}
-              >
-                <option value="all">Tous les membres</option>
-                {members.map((m) => <option key={m.user_id} value={m.user_id}>{m.nom}</option>)}
-              </select>
-              <select
-                value={filterPrio}
-                onChange={(e) => setFilterPrio(e.target.value)}
-                className="shrink-0 text-xs font-semibold px-2 py-1.5 rounded-md bg-transparent"
-                style={{ color: filterPrio !== "all" ? "var(--rose)" : "var(--muted)", border: "none", cursor: "pointer" }}
-              >
-                <option value="all">Toutes les priorités</option>
-                <option value="haute">🔴 Haute priorité</option>
-                <option value="normale">⚪ Priorité normale</option>
-                <option value="basse">🟢 Basse priorité</option>
-              </select>
-              <span className="ml-auto text-xs shrink-0" style={{ color: "var(--subtle)" }}>{filtered.length} tâche{filtered.length > 1 ? "s" : ""}</span>
+                  flexShrink: 0, fontSize: 12, fontWeight: 600, padding: "7px 15px", borderRadius: 9, cursor: "pointer",
+                  background: selectedSprintId === "all" ? C.ink : C.surface,
+                  color: selectedSprintId === "all" ? "#fff" : C.muted,
+                  border: selectedSprintId === "all" ? `1px solid ${C.ink}` : `1px solid ${C.hairline}`,
+                }}>Tout</button>
+              {sprints.map((s) => (
+                <button key={s.id} onClick={() => setSelectedSprintId(s.id)}
+                  style={{
+                    flexShrink: 0, fontSize: 12, fontWeight: 600, padding: "7px 15px", borderRadius: 9, cursor: "pointer",
+                    background: selectedSprintId === s.id ? C.ink : C.surface,
+                    color: selectedSprintId === s.id ? "#fff" : C.muted,
+                    border: selectedSprintId === s.id ? `1px solid ${C.ink}` : `1px solid ${C.hairline}`,
+                  }}>{s.nom}</button>
+              ))}
             </div>
 
-            {/* Sprint info (collapsible) */}
             {selectedSprint && (
-              <div
-                className="rounded-xl mb-4 overflow-hidden transition-all duration-300"
-                style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}
-              >
-                <button
-                  onClick={() => setSprintCollapsed(!sprintCollapsed)}
-                  className="w-full flex items-center gap-3 px-4 py-3"
-                >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
-                      background: selectedSprint.statut === "en_cours" ? "var(--rose)"
-                        : selectedSprint.statut === "termine" ? "var(--green)" : "var(--muted)"
-                    }} />
-                    <span className="text-xs font-bold truncate" style={{ color: "var(--text)" }}>{selectedSprint.nom}</span>
-                    {selectedSprint.objectif && (
-                      <span className="text-xs truncate hidden sm:block" style={{ color: "var(--muted)" }}>
-                        — {selectedSprint.objectif}
-                      </span>
-                    )}
+              <div className="flex flex-wrap gap-4 items-center" style={{ background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 16, padding: 16, marginBottom: 16 }}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 700, color: C.ink, margin: 0 }}>{selectedSprint.nom}</h2>
+                    <span style={statutBadge(selectedSprint.statut)}>
+                      {selectedSprint.statut === "en_cours" ? "En cours" : selectedSprint.statut === "termine" ? "Terminé" : "À venir"}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.06)" }}>
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${donePct}%`,
-                            background: donePct === 100 ? "var(--green)" : "var(--rose)",
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-semibold" style={{ color: "var(--muted)" }}>{donePct}%</span>
-                    </div>
+                  {selectedSprint.objectif && <p style={{ fontSize: 13, color: C.muted, margin: "0 0 4px" }}>{selectedSprint.objectif}</p>}
+                  <div className="flex gap-3" style={{ fontSize: 11, color: C.muted }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <Calendar size={10} strokeWidth={2} /> {fmtDate(selectedSprint.date_debut)} → {fmtDate(selectedSprint.date_fin)}
+                    </span>
                     {daysLeft !== null && selectedSprint.statut !== "termine" && (
-                      <span className="text-xs font-semibold hidden sm:block"
-                        style={{ color: daysLeft < 3 ? "var(--rose)" : "var(--subtle)" }}>
-                        J-{Math.max(0, daysLeft)}
+                      <span style={{ color: daysLeft < 3 ? C.rose : C.muted, fontWeight: daysLeft < 3 ? 700 : 400, fontVariantNumeric: "tabular-nums" }}>
+                        {daysLeft > 0 ? `${daysLeft}j restants` : "Expiré"}
                       </span>
                     )}
-                    <ChevronDown
-                      size={14}
-                      style={{ color: "var(--subtle)", transform: sprintCollapsed ? "rotate(-90deg)" : "rotate(0deg)", transition: "transform 0.2s" }}
-                    />
                   </div>
-                </button>
-
-                {!sprintCollapsed && (
-                  <div className="px-4 pb-3 flex items-center gap-3 flex-wrap" style={{ borderTop: "1px solid rgba(0,0,0,0.05)" }}>
-                    <div className="flex items-center gap-1 pt-2">
-                      <span className="text-xs" style={{ color: "var(--subtle)" }}>
-                        {fmtDate(selectedSprint.date_debut)} → {fmtDate(selectedSprint.date_fin)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 pt-2">
-                      {COLONNES.map((col) => {
-                        const count = sprintFiltered.filter((t) => t.statut === col.key).length;
-                        return (
-                          <span key={col.key} className="flex items-center gap-1 text-xs" style={{ color: "var(--muted)" }}>
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: col.dot }} />
-                            {count}
-                          </span>
-                        );
-                      })}
-                    </div>
-                    {role === "founder" && (
-                      <div className="flex gap-1.5 ml-auto pt-2">
-                        {selectedSprint.statut === "a_venir" && (
-                          <button
-                            onClick={() => updateSprintStatut(selectedSprint, "en_cours")}
-                            className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
-                            style={{ background: "rgba(59,130,246,0.07)", color: "var(--blue)", border: "1px solid rgba(59,130,246,0.15)" }}
-                          >
-                            <Play size={10} strokeWidth={2.5} /> Démarrer
-                          </button>
-                        )}
-                        {selectedSprint.statut === "en_cours" && (
-                          <button
-                            onClick={() => updateSprintStatut(selectedSprint, "termine")}
-                            className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg"
-                            style={{ background: "rgba(16,185,129,0.07)", color: "var(--green)", border: "1px solid rgba(16,185,129,0.15)" }}
-                          >
-                            <CheckCircle2 size={10} strokeWidth={2.5} /> Terminer
-                          </button>
-                        )}
-                      </div>
+                </div>
+                <div className="w-full sm:w-44">
+                  <div className="flex justify-between mb-1" style={{ fontSize: 11, color: C.muted }}>
+                    <span>Avancement</span><span style={{ fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{donePct}%</span>
+                  </div>
+                  <div style={{ height: 5, background: C.hairline, borderRadius: 99, overflow: "hidden" }}>
+                    <div style={{ height: "100%", background: C.ink, borderRadius: 99, transition: "width 0.3s", width: `${donePct}%` }} />
+                  </div>
+                  <p style={{ fontSize: 11, color: C.muted, margin: "4px 0 0", fontVariantNumeric: "tabular-nums" }}>{sprintFiltered.filter((t) => t.statut === "done").length}/{sprintFiltered.length} tâches</p>
+                </div>
+                {role === "founder" && (
+                  <div className="flex gap-2">
+                    {selectedSprint.statut === "a_venir" && (
+                      <button onClick={() => updateSprintStatut(selectedSprint, "en_cours")}
+                        style={{ fontSize: 12, fontWeight: 700, color: "#fff", background: C.ink, border: "none", padding: "7px 14px", borderRadius: 9, cursor: "pointer" }}>Démarrer</button>
+                    )}
+                    {selectedSprint.statut === "en_cours" && (
+                      <button onClick={() => updateSprintStatut(selectedSprint, "termine")}
+                        style={{ fontSize: 12, fontWeight: 700, color: C.ink, background: C.surface, border: `1px solid ${C.ink}`, padding: "7px 14px", borderRadius: 9, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        <Check size={12} strokeWidth={2.5} /> Terminer
+                      </button>
                     )}
                   </div>
                 )}
               </div>
             )}
+
+            {/* Filtres */}
+            {activeTab !== "roadmap" && (
+              <div className="flex gap-2 mb-4 flex-wrap">
+                <select value={filterAssigne} onChange={(e) => setFilterAssigne(e.target.value)}
+                  style={{ fontSize: 12, fontWeight: 600, border: `1px solid ${C.hairline}`, borderRadius: 9, padding: "6px 12px", background: C.surface, color: C.muted, outline: "none" }}>
+                  <option value="all">Tous les membres</option>
+                  {members.map((m) => <option key={m.user_id} value={m.user_id}>{m.nom}</option>)}
+                </select>
+                <select value={filterPrio} onChange={(e) => setFilterPrio(e.target.value)}
+                  style={{ fontSize: 12, fontWeight: 600, border: `1px solid ${C.hairline}`, borderRadius: 9, padding: "6px 12px", background: C.surface, color: C.muted, outline: "none" }}>
+                  <option value="all">Priorité</option>
+                  <option value="haute">Haute</option>
+                  <option value="normale">Normale</option>
+                  <option value="basse">Basse</option>
+                </select>
+                {(filterAssigne !== "all" || filterPrio !== "all") && (
+                  <button onClick={() => { setFilterAssigne("all"); setFilterPrio("all"); }}
+                    style={{ fontSize: 12, fontWeight: 600, color: C.rose, background: "none", border: "none", cursor: "pointer", padding: "6px 12px" }}>✕ Réinitialiser</button>
+                )}
+                <span className="self-center ml-auto" style={{ fontSize: 11, color: C.muted, fontVariantNumeric: "tabular-nums" }}>{filtered.length} tâche{filtered.length > 1 ? "s" : ""}</span>
+              </div>
+            )}
           </>
         )}
 
-        {/* ══ Kanban ══════════════════════════════════════════════════════════ */}
+        {/* ══ Vue Kanban ══════════════════════════════════════════════════════ */}
         {activeTab === "kanban" && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {COLONNES.map((col) => {
               const colTasks = filtered.filter((t) => t.statut === col.key);
               return (
-                <div key={col.key}>
-                  {/* En-tête colonne */}
-                  <div className="flex items-center gap-2 px-1 mb-2">
-                    <div className="w-2 h-2 rounded-sm" style={{ background: col.dot }} />
-                    <span className="text-xs font-semibold flex-1" style={{ color: col.color }}>{col.label}</span>
-                    <span className="text-xs font-semibold" style={{ color: "var(--subtle)" }}>{colTasks.length}</span>
-                    <button
-                      onClick={() => { setQuickAddCol(col.key); setQuickAddTitle(""); }}
-                      className="w-5 h-5 rounded flex items-center justify-center transition-all"
-                      style={{ color: "var(--subtle)" }}
-                      onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.color = "var(--text)"}
-                      onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.color = "var(--subtle)"}
-                    >
-                      <Plus size={13} strokeWidth={2} />
-                    </button>
+                <div key={col.key} className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: col.dot }} />
+                      <span style={{ fontSize: 12, fontWeight: 700, color: C.ink }}>{col.label}</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{colTasks.length}</span>
                   </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    {/* Quick-add input */}
-                    {quickAddCol === col.key && (
-                      <div
-                        className="rounded-lg p-2"
-                        style={{ background: "#fff", border: "1.5px solid rgba(139,92,246,0.3)", boxShadow: "0 0 0 3px rgba(139,92,246,0.06)" }}
-                      >
-                        <input
-                          autoFocus
-                          value={quickAddTitle}
-                          onChange={(e) => setQuickAddTitle(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") quickAddTask(col.key);
-                            if (e.key === "Escape") setQuickAddCol(null);
-                          }}
-                          placeholder="Titre de la tâche..."
-                          className="w-full text-xs bg-transparent focus:outline-none"
-                          style={{ color: "var(--text)" }}
-                        />
-                        <div className="flex gap-1.5 mt-1.5">
-                          <button onClick={() => quickAddTask(col.key)} className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-1"
-                            style={{ background: "var(--text)", color: "#fff" }}>
-                            Créer
-                          </button>
-                          <button onClick={() => setQuickAddCol(null)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center"
-                            style={{ background: "rgba(0,0,0,0.05)", color: "var(--muted)" }}>
-                            <X size={12} strokeWidth={2} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
+                  <div className="flex flex-col gap-2 min-h-[100px]">
                     {colTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        members={members}
-                        sprints={sprints}
+                      <KanbanCard key={task.id} task={task} members={members} sprints={sprints}
                         showSprint={selectedSprintId === "all"}
                         onOpen={() => openPanel(task)}
                         onMove={(dir) => moveTask(task, dir)}
                         onDelete={() => deleteTask(task.id)}
+                        checklistCount={0}
                       />
                     ))}
-
-                    {colTasks.length === 0 && quickAddCol !== col.key && (
-                      <button
-                        onClick={() => { setQuickAddCol(col.key); setQuickAddTitle(""); }}
-                        className="w-full text-xs py-3 rounded-lg transition-all duration-200 text-left px-3"
-                        style={{ color: "var(--subtle)", border: "1.5px dashed rgba(0,0,0,0.08)" }}
-                        onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.15)";
-                          (e.currentTarget as HTMLElement).style.color = "var(--muted)";
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.08)";
-                          (e.currentTarget as HTMLElement).style.color = "var(--subtle)";
-                        }}
-                      >
-                        + Ajouter une tâche
-                      </button>
-                    )}
+                    <button onClick={() => setShowTaskModal(true)}
+                      style={{ fontSize: 12, color: C.muted, padding: "8px 0", border: `2px dashed ${C.hairline}`, borderRadius: 11, background: "none", cursor: "pointer" }}>
+                      + Ajouter
+                    </button>
                   </div>
                 </div>
               );
@@ -780,28 +686,18 @@ export default function GestionPage() {
           </div>
         )}
 
-        {/* ══ Liste ════════════════════════════════════════════════════════════ */}
+        {/* ══ Vue Liste ════════════════════════════════════════════════════════ */}
         {activeTab === "liste" && (
-          <div className="rounded-xl overflow-hidden" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}>
+          <div style={{ background: C.surface, borderRadius: 16, border: `1px solid ${C.hairline}`, overflow: "hidden" }}>
             {filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-2"
-                  style={{ background: "var(--rose-soft)" }}>
-                  <CheckSquare size={20} style={{ color: "var(--rose)" }} />
-                </div>
-                <p className="text-sm font-semibold mb-0.5" style={{ color: "var(--text)" }}>Aucune tâche</p>
-                <p className="text-xs" style={{ color: "var(--muted)" }}>Commence par créer une tâche.</p>
-              </div>
+              <div className="text-center py-16" style={{ color: C.muted, fontSize: 13 }}>Aucune tâche.</div>
             ) : (
-              <table className="w-full">
+              <table className="w-full text-sm">
                 <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+                  <tr style={{ borderBottom: `1px solid ${C.hairline}` }}>
                     {["Tâche","Statut","Priorité","Assigné","Échéance",""].map((h, i) => (
-                      <th key={i}
-                        className={cn("text-left px-4 py-2.5 text-xs font-semibold uppercase tracking-wider",
-                          i > 1 ? "hidden md:table-cell" : i === 1 ? "hidden sm:table-cell" : "")}
-                        style={{ color: "var(--subtle)" }}
-                      >{h}</th>
+                      <th key={i} className={`text-left px-4 py-3 ${i===1?"hidden sm:table-cell":i===2||i===3?"hidden md:table-cell":i===4?"hidden lg:table-cell":""}`}
+                        style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -811,42 +707,41 @@ export default function GestionPage() {
                     const member = members.find((m) => m.user_id === task.assigne_a);
                     const overdue = isOverdue(task.due_date) && task.statut !== "done";
                     return (
-                      <tr key={task.id} onClick={() => openPanel(task)} className="group cursor-pointer"
-                        style={{ borderBottom: "1px solid rgba(0,0,0,0.04)" }}
-                        onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.015)"}
-                        onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.background = "transparent"}
-                      >
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: PRIO[task.priorite].dot }} />
-                            <span className="text-sm font-medium" style={{ color: "var(--text)" }}>{task.titre}</span>
-                          </div>
+                      <tr key={task.id}
+                        onClick={() => openPanel(task)}
+                        className="cursor-pointer transition-colors group"
+                        style={{ borderBottom: `1px solid ${C.hairline}` }}>
+                        <td className="px-4 py-3">
+                          <p style={{ fontWeight: 600, color: C.ink, margin: 0 }}>{task.titre}</p>
+                          {task.description && <p className="line-clamp-1" style={{ fontSize: 11, color: C.muted, margin: "2px 0 0" }}>{task.description}</p>}
                         </td>
-                        <td className="px-4 py-2.5 hidden sm:table-cell">
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded"
-                            style={{ background: `${col.dot}20`, color: col.color }}>
-                            {col.label}
-                          </span>
+                        <td className="px-4 py-3 hidden sm:table-cell">
+                          <span style={statutBadge(task.statut)}>{col.label}</span>
                         </td>
-                        <td className="px-4 py-2.5 hidden md:table-cell">
-                          <span className="text-xs" style={{ color: "var(--muted)" }}>{PRIO[task.priorite].label}</span>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          <span style={prioStyle(task.priorite)}>{task.priorite}</span>
                         </td>
-                        <td className="px-4 py-2.5 hidden md:table-cell">
-                          {member ? <Avatar member={member} size={20} /> : <span style={{ color: "var(--subtle)" }}>—</span>}
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          {member ? (
+                            <div className="flex items-center gap-1.5">
+                              <div style={{ width: 20, height: 20, borderRadius: 7, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{member.nom[0].toUpperCase()}</span>
+                              </div>
+                              <span style={{ fontSize: 12, color: C.ink }}>{member.nom}</span>
+                            </div>
+                          ) : <span style={{ fontSize: 12, color: C.hairline }}>—</span>}
                         </td>
-                        <td className="px-4 py-2.5 hidden lg:table-cell">
+                        <td className="px-4 py-3 hidden lg:table-cell">
                           {task.due_date ? (
-                            <span className="text-xs font-medium" style={{ color: overdue ? "var(--rose)" : "var(--subtle)" }}>
-                              {overdue && "⚠ "}{fmtDate(task.due_date)}
+                            <span style={{ fontSize: 12, fontWeight: 600, color: overdue ? C.rose : C.muted, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              {overdue && <AlertTriangle size={11} strokeWidth={2} />}{fmtDate(task.due_date)}
                             </span>
-                          ) : <span style={{ color: "var(--subtle)" }}>—</span>}
+                          ) : <span style={{ fontSize: 12, color: C.hairline }}>—</span>}
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-4 py-3">
                           <button onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                            className="opacity-0 group-hover:opacity-100 btn-icon transition-opacity"
-                            style={{ width: 24, height: 24, color: "var(--rose)" }}>
-                            <X size={11} strokeWidth={2.5} />
-                          </button>
+                            className="opacity-0 group-hover:opacity-100 transition-all"
+                            style={{ fontSize: 12, color: C.muted, background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>✕</button>
                         </td>
                       </tr>
                     );
@@ -857,86 +752,84 @@ export default function GestionPage() {
           </div>
         )}
 
-        {/* ══ Roadmap ══════════════════════════════════════════════════════════ */}
+        {/* ══ Vue Roadmap ══════════════════════════════════════════════════════ */}
         {activeTab === "roadmap" && (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             {sprints.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 rounded-xl"
-                style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}>
-                <p className="text-sm font-semibold mb-1" style={{ color: "var(--text)" }}>Aucun sprint</p>
+              <div className="text-center py-20" style={{ background: C.surface, borderRadius: 16, border: `1px solid ${C.hairline}` }}>
+                <p style={{ color: C.muted, fontSize: 13, margin: "0 0 12px" }}>Aucun sprint créé.</p>
                 {role === "founder" && (
-                  <button onClick={() => setShowSprintModal(true)} className="btn-primary text-sm mt-3" style={{ padding: "8px 16px" }}>
-                    Créer le premier sprint
-                  </button>
+                  <button onClick={() => setShowSprintModal(true)} style={btnInk}>Créer le premier sprint</button>
                 )}
               </div>
             ) : (() => {
               const allDates = sprints.flatMap((s) => [new Date(s.date_debut), new Date(s.date_fin)]);
-              const minDate  = new Date(Math.min(...allDates.map((d) => d.getTime())));
-              const maxDate  = new Date(Math.max(...allDates.map((d) => d.getTime())));
+              const minDate = new Date(Math.min(...allDates.map((d) => d.getTime())));
+              const maxDate = new Date(Math.max(...allDates.map((d) => d.getTime())));
               const totalDays = Math.max((maxDate.getTime() - minDate.getTime()) / 86400000, 1);
               return (
                 <>
-                  <div className="flex justify-between px-1 mb-1">
-                    <span className="text-xs" style={{ color: "var(--subtle)" }}>{fmtDate(minDate.toISOString())}</span>
-                    <span className="text-xs" style={{ color: "var(--subtle)" }}>{fmtDate(maxDate.toISOString())}</span>
+                  {/* Légende dates */}
+                  <div className="flex justify-between px-1" style={{ fontSize: 11, color: C.muted, fontVariantNumeric: "tabular-nums" }}>
+                    <span>{fmtDate(minDate.toISOString())}</span>
+                    <span>{fmtDate(maxDate.toISOString())}</span>
                   </div>
                   {sprints.map((s) => {
-                    const start    = (new Date(s.date_debut).getTime() - minDate.getTime()) / 86400000;
+                    const start = (new Date(s.date_debut).getTime() - minDate.getTime()) / 86400000;
                     const duration = (new Date(s.date_fin).getTime() - new Date(s.date_debut).getTime()) / 86400000;
-                    const leftPct  = (start / totalDays) * 100;
+                    const leftPct = (start / totalDays) * 100;
                     const widthPct = Math.max((duration / totalDays) * 100, 5);
                     const sprintTasks = tasks.filter((t) => t.sprint_id === s.id);
-                    const pct = sprintTasks.length > 0
-                      ? Math.round(sprintTasks.filter((t) => t.statut === "done").length / sprintTasks.length * 100) : 0;
+                    const doneTasks = sprintTasks.filter((t) => t.statut === "done").length;
+                    const pct = sprintTasks.length > 0 ? Math.round(doneTasks / sprintTasks.length * 100) : 0;
+                    const barBg = s.statut === "en_cours" ? C.ink : s.statut === "termine" ? C.muted : C.hairline;
+                    const barText = s.statut === "a_venir" ? C.ink : "#fff";
                     return (
-                      <div key={s.id} className="rounded-xl p-4"
-                        style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}>
+                      <div key={s.id} style={{ background: C.surface, borderRadius: 16, border: `1px solid ${C.hairline}`, padding: 20 }}>
                         <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full" style={{
-                              background: s.statut === "en_cours" ? "var(--rose)"
-                                : s.statut === "termine" ? "var(--green)" : "var(--muted)"
-                            }} />
-                            <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>{s.nom}</span>
-                            {s.objectif && <span className="text-xs" style={{ color: "var(--muted)" }}>— {s.objectif}</span>}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 15, fontWeight: 700, color: C.ink, margin: 0 }}>{s.nom}</h3>
+                              <span style={statutBadge(s.statut)}>{s.statut === "en_cours" ? "En cours" : s.statut === "termine" ? "Terminé" : "À venir"}</span>
+                            </div>
+                            {s.objectif && <p style={{ fontSize: 11, color: C.muted, margin: "2px 0 0" }}>{s.objectif}</p>}
                           </div>
-                          <span className="text-xs font-bold" style={{ color: "var(--muted)" }}>
-                            {pct}% · {fmtDate(s.date_debut)} → {fmtDate(s.date_fin)}
-                          </span>
+                          <div className="text-right">
+                            <p style={{ fontSize: 11, color: C.muted, margin: 0, fontVariantNumeric: "tabular-nums" }}>{fmtDate(s.date_debut)} → {fmtDate(s.date_fin)}</p>
+                            <p style={{ fontSize: 11, fontWeight: 600, color: C.ink, margin: "2px 0 0", fontVariantNumeric: "tabular-nums" }}>{doneTasks}/{sprintTasks.length} tâches · {pct}%</p>
+                          </div>
                         </div>
-                        <div className="relative h-6 rounded-full overflow-hidden mb-3"
-                          style={{ background: "rgba(0,0,0,0.05)" }}>
-                          <div className="absolute h-full rounded-full flex items-center px-2"
-                            style={{
-                              left: `${leftPct}%`, width: `${widthPct}%`,
-                              background: s.statut === "en_cours"
-                                ? "linear-gradient(90deg,#f43f5e,#8b5cf6)"
-                                : s.statut === "termine"
-                                ? "linear-gradient(90deg,#10b981,#34d399)"
-                                : "linear-gradient(90deg,#cbd5e1,#e2e8f0)",
-                            }}>
-                            <span className="text-white font-bold truncate" style={{ fontSize: 10 }}>{s.nom}</span>
+
+                        {/* Barre timeline */}
+                        <div className="relative overflow-hidden mb-3" style={{ height: 32, background: C.canvas, border: `1px solid ${C.hairline}`, borderRadius: 99 }}>
+                          <div
+                            className="absolute h-full flex items-center px-3"
+                            style={{ left: `${leftPct}%`, width: `${widthPct}%`, background: barBg, borderRadius: 99 }}
+                          >
+                            <span className="truncate" style={{ fontSize: 11, fontWeight: 700, color: barText }}>{s.nom}</span>
                           </div>
+                          {/* Marqueur aujourd'hui */}
                           {(() => {
                             const todayPct = ((Date.now() - minDate.getTime()) / 86400000 / totalDays) * 100;
                             if (todayPct < 0 || todayPct > 100) return null;
-                            return <div className="absolute top-0 bottom-0 w-0.5 z-10"
-                              style={{ left: `${todayPct}%`, background: "rgba(244,63,94,0.6)" }} />;
+                            return <div className="absolute top-0 bottom-0 z-10" style={{ left: `${todayPct}%`, width: 2, background: C.rose }} />;
                           })()}
                         </div>
+
+                        {/* Tâches du sprint */}
                         {sprintTasks.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {sprintTasks.map((t) => {
-                              const col = COLONNES.find((c) => c.key === t.statut)!;
-                              return (
-                                <button key={t.id} onClick={() => openPanel(t)}
-                                  className="text-xs px-2 py-0.5 rounded font-medium"
-                                  style={{ background: `${col.dot}25`, color: col.color }}>
-                                  {t.titre}
-                                </button>
-                              );
-                            })}
+                          <div className="flex flex-wrap gap-1.5">
+                            {sprintTasks.map((t) => (
+                              <button key={t.id} onClick={() => openPanel(t)}
+                                style={{
+                                  fontSize: 11, fontWeight: 500, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
+                                  border: `1px solid ${C.hairline}`, background: t.statut === "done" ? C.canvas : C.surface,
+                                  color: t.statut === "done" ? C.muted : C.ink,
+                                  textDecoration: t.statut === "done" ? "line-through" : "none",
+                                }}>
+                                {t.titre}
+                              </button>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -948,42 +841,39 @@ export default function GestionPage() {
           </div>
         )}
 
-        {/* ══ Fichiers ═════════════════════════════════════════════════════════ */}
+        {/* ══ Vue Fichiers ═════════════════════════════════════════════════════ */}
         {activeTab === "fichiers" && (
           <div className="flex flex-col gap-4">
             {deliverables.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 rounded-xl"
-                style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-2"
-                  style={{ background: "var(--rose-soft)" }}>
-                  <FolderOpen size={20} style={{ color: "var(--rose)" }} />
+              <div className="text-center py-20" style={{ background: C.surface, borderRadius: 16, border: `1px solid ${C.hairline}` }}>
+                <div style={{ width: 56, height: 56, borderRadius: 16, border: `1px solid ${C.hairline}`, background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+                  <Folder size={24} strokeWidth={1.5} style={{ color: C.muted }} />
                 </div>
-                <p className="text-sm font-semibold mb-0.5" style={{ color: "var(--text)" }}>Aucun fichier</p>
-                <label className="btn-primary text-sm mt-3 cursor-pointer" style={{ padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <Upload size={13} /> Uploader
-                  <input type="file" className="hidden" onChange={onFileSelect} />
+                <p style={{ color: C.muted, fontSize: 13, margin: "0 0 16px" }}>Aucun fichier partagé.</p>
+                <label style={{ ...btnInk, cursor: "pointer" }}>
+                  <Upload size={13} strokeWidth={2} /> Uploader un fichier <input type="file" className="hidden" onChange={onFileSelect} />
                 </label>
               </div>
             ) : (
               <>
                 {sprints.filter((s) => deliverables.some((d) => d.sprint_id === s.id)).map((s) => (
                   <div key={s.id}>
-                    <p className="label mb-2">{s.nom}</p>
-                    <div className="flex flex-col gap-1.5">
+                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, margin: "0 0 8px" }}>{s.nom}</p>
+                    <div className="flex flex-col gap-2">
                       {deliverables.filter((d) => d.sprint_id === s.id).map((d) => (
-                        <FileRow key={d.id} d={d} members={members} userId={userId} role={role}
-                          onDelete={() => deleteFile(d)} />
+                        <FileCard key={d.id} d={d} members={members} userId={userId} role={role}
+                          onDelete={() => deleteFile(d)} sprints={sprints} />
                       ))}
                     </div>
                   </div>
                 ))}
                 {deliverables.filter((d) => !d.sprint_id).length > 0 && (
                   <div>
-                    <p className="label mb-2">Général</p>
-                    <div className="flex flex-col gap-1.5">
+                    <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, margin: "0 0 8px" }}>Général</p>
+                    <div className="flex flex-col gap-2">
                       {deliverables.filter((d) => !d.sprint_id).map((d) => (
-                        <FileRow key={d.id} d={d} members={members} userId={userId} role={role}
-                          onDelete={() => deleteFile(d)} />
+                        <FileCard key={d.id} d={d} members={members} userId={userId} role={role}
+                          onDelete={() => deleteFile(d)} sprints={sprints} />
                       ))}
                     </div>
                   </div>
@@ -994,201 +884,167 @@ export default function GestionPage() {
         )}
       </div>
 
-      {/* ══ Panel tâche ══════════════════════════════════════════════════════ */}
+      {/* ══ Panel détail tâche ════════════════════════════════════════════════ */}
       {panelTask && (
         <>
-          <div className="fixed inset-0 z-30 bg-black/20" onClick={() => setPanelTask(null)} />
-          <div
-            className="fixed right-0 top-0 bottom-0 w-full max-w-sm z-40 flex flex-col"
-            style={{
-              background: "#fff",
-              borderLeft: "1px solid rgba(0,0,0,0.08)",
-              boxShadow: "-4px 0 32px rgba(0,0,0,0.08)",
-            }}
-          >
+          <div className="fixed inset-0 z-30" style={{ background: "rgba(26,33,56,0.25)" }} onClick={() => setPanelTask(null)} />
+          <div className="fixed right-0 top-0 bottom-0 w-full max-w-md z-40 flex flex-col overflow-hidden" style={{ background: C.surface, borderLeft: `1px solid ${C.hairline}` }}>
+
             {/* Panel header */}
-            <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
-              <div className="flex gap-1.5">
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.hairline}` }}>
+              <div className="flex gap-2">
                 <button onClick={() => moveTask(panelTask, "prev")} disabled={panelTask.statut === "todo"}
-                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-30"
-                  style={{ background: "rgba(0,0,0,0.05)", color: "var(--muted)" }}>
+                  style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 9, background: C.canvas, color: C.muted, border: `1px solid ${C.hairline}`, cursor: "pointer", opacity: panelTask.statut === "todo" ? 0.3 : 1, display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <ChevronLeft size={12} strokeWidth={2} /> Reculer
                 </button>
                 <button onClick={() => moveTask(panelTask, "next")} disabled={panelTask.statut === "done"}
-                  className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-30"
-                  style={{ background: "rgba(0,0,0,0.05)", color: "var(--muted)" }}>
+                  style={{ fontSize: 12, fontWeight: 700, padding: "6px 12px", borderRadius: 9, background: C.ink, color: "#fff", border: "none", cursor: "pointer", opacity: panelTask.statut === "done" ? 0.3 : 1, display: "inline-flex", alignItems: "center", gap: 4 }}>
                   Avancer <ChevronRight size={12} strokeWidth={2} />
                 </button>
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => deleteTask(panelTask.id)} className="btn-icon" style={{ width: 28, height: 28, color: "var(--rose)" }}>
-                  <Trash2 size={12} strokeWidth={2} />
-                </button>
-                <button onClick={() => setPanelTask(null)} className="btn-icon" style={{ width: 28, height: 28 }}>
-                  <X size={13} strokeWidth={2} />
+              <div className="flex gap-2">
+                <button onClick={() => deleteTask(panelTask.id)}
+                  style={{ fontSize: 12, color: C.muted, background: "none", border: "none", cursor: "pointer", padding: "6px 8px" }}>Supprimer</button>
+                <button onClick={() => setPanelTask(null)}
+                  style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 9, background: C.canvas, border: `1px solid ${C.hairline}`, cursor: "pointer", color: C.muted }}>
+                  <X size={14} />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
-              {/* Statut */}
+            <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
+
+              {/* Statut badge */}
               {(() => {
                 const col = COLONNES.find((c) => c.key === panelTask.statut)!;
-                return (
-                  <span className="text-xs font-semibold px-2 py-1 rounded self-start"
-                    style={{ background: `${col.dot}25`, color: col.color }}>
-                    {col.label}
-                  </span>
-                );
+                return <span className="self-start" style={statutBadge(panelTask.statut)}>{col.label}</span>;
               })()}
 
               {/* Titre */}
-              <input
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                className="text-lg font-bold bg-transparent w-full focus:outline-none"
-                style={{ color: "var(--text)", letterSpacing: "-0.02em", borderBottom: "2px solid rgba(0,0,0,0.07)", paddingBottom: 6 }}
-                placeholder="Titre"
-              />
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+                style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, fontWeight: 700, color: C.ink, background: "transparent", border: "none", borderBottom: `2px solid transparent`, outline: "none", paddingBottom: 4, width: "100%" }}
+                onFocus={(e) => { e.target.style.borderBottomColor = C.rose; }}
+                onBlur={(e) => { e.target.style.borderBottomColor = "transparent"; }}
+                placeholder="Titre de la tâche" />
 
               {/* Description */}
-              <textarea
-                value={editDesc}
-                onChange={(e) => setEditDesc(e.target.value)}
-                rows={2}
-                className="text-sm resize-none focus:outline-none rounded-lg p-2.5"
-                style={{ background: "rgba(0,0,0,0.025)", border: "1px solid rgba(0,0,0,0.07)", color: "var(--text-2)" }}
-                placeholder="Description..."
-              />
+              <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={3}
+                style={{ ...inp, resize: "none", background: C.canvas, lineHeight: 1.5 }}
+                placeholder="Description..." />
 
-              {/* Métadonnées 2 cols */}
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Priorité", el: (
-                    <select value={editPrio} onChange={(e) => setEditPrio(e.target.value as Task["priorite"])} className="input-field text-xs py-1.5">
-                      <option value="basse">Basse</option>
-                      <option value="normale">Normale</option>
-                      <option value="haute">Haute</option>
-                    </select>
-                  )},
-                  { label: "Échéance", el: (
-                    <input type="date" value={editDue} onChange={(e) => setEditDue(e.target.value)} className="input-field text-xs py-1.5" />
-                  )},
-                  { label: "Sprint", el: (
-                    <select value={editSprint} onChange={(e) => setEditSprint(e.target.value)} className="input-field text-xs py-1.5">
-                      <option value="">Aucun</option>
-                      {sprints.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
-                    </select>
-                  )},
-                  { label: "Assigné", el: (
-                    <select value={editAssigne} onChange={(e) => setEditAssigne(e.target.value)} className="input-field text-xs py-1.5">
-                      <option value="">Personne</option>
-                      {members.map((m) => <option key={m.user_id} value={m.user_id}>{m.nom}</option>)}
-                    </select>
-                  )},
-                ].map(({ label, el }) => (
-                  <div key={label}>
-                    <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--subtle)" }}>{label}</label>
-                    {el}
-                  </div>
-                ))}
+              {/* Métadonnées */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={lbl}>Priorité</label>
+                  <select value={editPrio} onChange={(e) => setEditPrio(e.target.value as Task["priorite"])} style={inp}>
+                    <option value="basse">Basse</option>
+                    <option value="normale">Normale</option>
+                    <option value="haute">Haute</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={lbl}>Échéance</label>
+                  <input type="date" value={editDue} onChange={(e) => setEditDue(e.target.value)} style={{ ...inp, fontVariantNumeric: "tabular-nums" }} />
+                </div>
+                <div>
+                  <label style={lbl}>Sprint</label>
+                  <select value={editSprint} onChange={(e) => setEditSprint(e.target.value)} style={inp}>
+                    <option value="">— Aucun —</option>
+                    {sprints.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={lbl}>Assigné à</label>
+                  <select value={editAssigne} onChange={(e) => setEditAssigne(e.target.value)} style={inp}>
+                    <option value="">— Personne —</option>
+                    {members.map((m) => <option key={m.user_id} value={m.user_id}>{m.nom}</option>)}
+                  </select>
+                </div>
               </div>
 
-              <button onClick={savePanelTask} disabled={savingPanel} className="btn-primary w-full py-2 text-sm">
-                {savingPanel ? "Enregistrement..." : "Enregistrer"}
+              <button onClick={savePanelTask} disabled={savingPanel}
+                style={{ ...btnInk, width: "100%", padding: "11px 0", opacity: savingPanel ? 0.6 : 1 }}>
+                {savingPanel ? "Enregistrement..." : "Enregistrer les modifications"}
               </button>
 
               {/* Checklist */}
               <div>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <CheckSquare size={12} style={{ color: "var(--subtle)" }} />
-                  <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--subtle)" }}>
-                    Checklist {panelChecklist.length > 0 && `(${panelChecklist.filter((c) => c.done).length}/${panelChecklist.length})`}
-                  </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, margin: 0 }}>Checklist</p>
+                  {panelChecklist.length > 0 && (
+                    <span style={{ fontSize: 11, color: C.muted, fontVariantNumeric: "tabular-nums" }}>{panelChecklist.filter((c) => c.done).length}/{panelChecklist.length}</span>
+                  )}
                 </div>
                 {panelChecklist.length > 0 && (
-                  <div className="h-1 rounded-full overflow-hidden mb-2.5" style={{ background: "rgba(0,0,0,0.06)" }}>
-                    <div className="h-full rounded-full" style={{
-                      width: `${Math.round(panelChecklist.filter((c) => c.done).length / panelChecklist.length * 100)}%`,
-                      background: "var(--green)",
-                    }} />
+                  <div className="overflow-hidden mb-3" style={{ height: 5, background: C.hairline, borderRadius: 99 }}>
+                    <div style={{ height: "100%", background: C.ink, borderRadius: 99, transition: "width 0.3s", width: `${Math.round(panelChecklist.filter((c) => c.done).length / panelChecklist.length * 100)}%` }} />
                   </div>
                 )}
-                <div className="flex flex-col gap-1 mb-2">
+                <div className="flex flex-col gap-1.5 mb-2">
                   {panelChecklist.map((item) => (
                     <div key={item.id} className="flex items-center gap-2 group">
                       <button onClick={() => toggleCheckItem(item)}
-                        className="w-3.5 h-3.5 rounded flex items-center justify-center shrink-0"
-                        style={{ background: item.done ? "var(--green)" : "transparent", border: `1.5px solid ${item.done ? "var(--green)" : "rgba(0,0,0,0.2)"}` }}>
-                        {item.done && <Check size={8} strokeWidth={3} color="white" />}
+                        style={{ width: 16, height: 16, borderRadius: 5, border: item.done ? `1px solid ${C.ink}` : `1px solid ${C.hairline}`, background: item.done ? C.ink : C.surface, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", padding: 0 }}>
+                        {item.done && <Check size={10} strokeWidth={3} style={{ color: "#fff" }} />}
                       </button>
-                      <span className="text-sm flex-1" style={{
-                        color: item.done ? "var(--subtle)" : "var(--text)",
-                        textDecoration: item.done ? "line-through" : "none" }}>
-                        {item.titre}
-                      </span>
+                      <span className="flex-1" style={{ fontSize: 13, color: item.done ? C.muted : C.ink, textDecoration: item.done ? "line-through" : "none" }}>{item.titre}</span>
                       <button onClick={() => deleteCheckItem(item.id)}
-                        className="opacity-0 group-hover:opacity-100 btn-icon transition-opacity"
-                        style={{ width: 18, height: 18, color: "var(--rose)" }}>
-                        <X size={9} strokeWidth={2.5} />
-                      </button>
+                        className="opacity-0 group-hover:opacity-100 transition-all"
+                        style={{ fontSize: 11, color: C.muted, background: "none", border: "none", cursor: "pointer" }}>✕</button>
                     </div>
                   ))}
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex gap-2">
                   <input value={newCheckItem} onChange={(e) => setNewCheckItem(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && addCheckItem()}
-                    placeholder="Ajouter..." className="input-field text-xs py-1.5 flex-1" />
-                  <button onClick={addCheckItem} disabled={!newCheckItem.trim()} className="btn-ghost px-2.5 py-1.5 text-xs">+</button>
+                    placeholder="Ajouter un élément..."
+                    style={{ ...inp, flex: 1 }} />
+                  <button onClick={addCheckItem} disabled={!newCheckItem.trim()}
+                    style={{ ...btnGhost, flexShrink: 0, padding: "9px 13px", opacity: !newCheckItem.trim() ? 0.4 : 1 }}>+</button>
                 </div>
               </div>
 
               {/* Commentaires */}
               <div>
-                <div className="flex items-center gap-1.5 mb-2">
-                  <MessageSquare size={12} style={{ color: "var(--subtle)" }} />
-                  <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--subtle)" }}>
-                    Commentaires {panelComments.length > 0 && `(${panelComments.length})`}
-                  </p>
-                </div>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, margin: "0 0 12px" }}>
+                  Commentaires {panelComments.length > 0 && `(${panelComments.length})`}
+                </p>
                 {panelLoading ? (
-                  <div className="flex justify-center py-3"><div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} /></div>
+                  <div className="text-center py-4" style={{ fontSize: 11, color: C.muted }}>Chargement...</div>
                 ) : (
-                  <div className="flex flex-col gap-2.5 mb-2">
+                  <div className="flex flex-col gap-3 mb-3">
                     {panelComments.map((c) => {
                       const author = members.find((m) => m.user_id === c.user_id);
+                      const isMe = c.user_id === userId;
                       return (
-                        <div key={c.id} className="flex gap-2 group">
-                          {author && <Avatar member={author} size={24} />}
-                          <div className="flex-1">
-                            <div className="flex items-baseline gap-1.5 mb-0.5">
-                              <span className="text-xs font-semibold" style={{ color: "var(--text)" }}>{author?.nom ?? "—"}</span>
-                              <span className="text-xs" style={{ color: "var(--subtle)" }}>{fmtDate(c.created_at)}</span>
-                            </div>
-                            <div className="text-xs px-2.5 py-2 rounded-lg"
-                              style={{ background: "rgba(0,0,0,0.03)", border: "1px solid rgba(0,0,0,0.06)", color: "var(--text-2)" }}>
-                              {c.content}
-                            </div>
+                        <div key={c.id} className="flex gap-2.5 group">
+                          <div style={{ width: 28, height: 28, borderRadius: 9, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{author?.nom?.[0]?.toUpperCase() ?? "?"}</span>
                           </div>
-                          {c.user_id === userId && (
+                          <div className="flex-1">
+                            <div className="flex items-baseline gap-2 mb-0.5">
+                              <span style={{ fontSize: 12, fontWeight: 700, color: C.ink }}>{author?.nom ?? "—"}</span>
+                              <span style={{ fontSize: 11, color: C.muted }}>{fmtDate(c.created_at)}</span>
+                            </div>
+                            <div style={{ background: C.canvas, borderRadius: 11, padding: "8px 12px", fontSize: 13, color: C.ink }}>{c.content}</div>
+                          </div>
+                          {isMe && (
                             <button onClick={() => deleteComment(c.id)}
-                              className="btn-icon opacity-0 group-hover:opacity-100 transition-opacity self-start mt-4"
-                              style={{ width: 18, height: 18, color: "var(--rose)" }}>
-                              <X size={9} strokeWidth={2.5} />
-                            </button>
+                              className="opacity-0 group-hover:opacity-100 transition-all self-start mt-4"
+                              style={{ fontSize: 11, color: C.muted, background: "none", border: "none", cursor: "pointer" }}>✕</button>
                           )}
                         </div>
                       );
                     })}
                   </div>
                 )}
-                <div className="flex gap-1.5">
+                <div className="flex gap-2">
                   <input value={newComment} onChange={(e) => setNewComment(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && addComment()}
-                    placeholder="Commenter..." className="input-field text-xs py-1.5 flex-1" />
-                  <button onClick={addComment} disabled={!newComment.trim()} className="btn-primary px-3 py-1.5">
-                    <Send size={12} strokeWidth={2} />
-                  </button>
+                    placeholder="Laisser un commentaire..."
+                    style={{ ...inp, flex: 1 }} />
+                  <button onClick={addComment} disabled={!newComment.trim()}
+                    style={{ ...btnInk, flexShrink: 0, opacity: !newComment.trim() ? 0.4 : 1 }}>Envoyer</button>
                 </div>
               </div>
             </div>
@@ -1196,242 +1052,116 @@ export default function GestionPage() {
         </>
       )}
 
-      {/* ══ AI Agent Panel ═══════════════════════════════════════════════════ */}
-      {showAI && (
-        <>
-          <div className="fixed inset-0 z-30 bg-black/10" onClick={() => setShowAI(false)} />
-          <div
-            className="fixed bottom-20 right-4 z-40 w-80 max-w-[calc(100vw-2rem)] flex flex-col rounded-2xl overflow-hidden"
-            style={{
-              background: "#fff",
-              border: "1px solid rgba(139,92,246,0.2)",
-              boxShadow: "0 8px 32px rgba(139,92,246,0.15), 0 2px 8px rgba(0,0,0,0.08)",
-              maxHeight: "60vh",
-            }}
-          >
-            {/* AI Header */}
-            <div className="flex items-center gap-2.5 px-4 py-3"
-              style={{ background: "linear-gradient(135deg,rgba(139,92,246,0.07),rgba(99,102,241,0.05))", borderBottom: "1px solid rgba(139,92,246,0.12)" }}>
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg,#8b5cf6,#6366f1)" }}>
-                <Brain size={14} color="white" strokeWidth={2} />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs font-bold" style={{ color: "var(--text)" }}>Agent IA Linkea</p>
-                <p className="text-xs" style={{ color: "var(--muted)" }}>Analyse ton projet en temps réel</p>
-              </div>
-              <button onClick={() => setShowAI(false)} className="btn-icon" style={{ width: 24, height: 24 }}>
-                <X size={12} strokeWidth={2} />
-              </button>
-            </div>
-
-            {/* Quick actions */}
-            {aiMessages.length === 0 && (
-              <div className="p-3 flex flex-col gap-1.5">
-                <p className="text-xs font-semibold mb-1" style={{ color: "var(--subtle)" }}>Actions rapides</p>
-                {[
-                  { icon: BarChart3, label: "Où en est-on ?", sub: "Résumé de l'avancement", prompt: "Analyse l'avancement du sprint actuel et donne-moi un résumé clair." },
-                  { icon: Lightbulb, label: "Que faire ensuite ?", sub: "Suggestions de tâches", prompt: "Quelles tâches devrais-je créer maintenant pour avancer sur ce projet ?" },
-                  { icon: Brain,     label: "Bilan du projet", sub: "Vue d'ensemble complète", prompt: "Fais-moi un bilan complet de l'état actuel du projet, les points positifs et les risques." },
-                ].map(({ icon: Icon, label, sub, prompt }) => (
-                  <button
-                    key={label}
-                    onClick={() => aiSend(prompt)}
-                    className="flex items-center gap-2.5 text-left px-3 py-2.5 rounded-xl transition-all"
-                    style={{ border: "1px solid rgba(0,0,0,0.07)" }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.05)";
-                      (e.currentTarget as HTMLElement).style.borderColor = "rgba(139,92,246,0.2)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = "transparent";
-                      (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.07)";
-                    }}
-                  >
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ background: "rgba(139,92,246,0.08)" }}>
-                      <Icon size={12} style={{ color: "var(--violet)" }} strokeWidth={2} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold" style={{ color: "var(--text)" }}>{label}</p>
-                      <p className="text-xs" style={{ color: "var(--muted)" }}>{sub}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Messages */}
-            {aiMessages.length > 0 && (
-              <div ref={aiScrollRef} className="flex-1 overflow-y-auto p-3 flex flex-col gap-2.5" style={{ maxHeight: "35vh" }}>
-                {aiMessages.map((msg, i) => (
-                  <div key={i} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
-                    <div
-                      className="text-xs px-3 py-2 rounded-xl max-w-[85%] leading-relaxed"
-                      style={{
-                        background: msg.role === "user"
-                          ? "linear-gradient(135deg,#8b5cf6,#6366f1)"
-                          : "rgba(0,0,0,0.04)",
-                        color: msg.role === "user" ? "#fff" : "var(--text-2)",
-                        border: msg.role === "assistant" ? "1px solid rgba(0,0,0,0.07)" : "none",
-                      }}
-                    >
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
-                {aiLoading && (
-                  <div className="flex justify-start">
-                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
-                      style={{ background: "rgba(0,0,0,0.04)", border: "1px solid rgba(0,0,0,0.07)" }}>
-                      {[0,1,2].map((i) => (
-                        <div key={i} className="w-1.5 h-1.5 rounded-full"
-                          style={{ background: "var(--violet)", opacity: 0.5, animation: `pulse ${0.8 + i * 0.2}s ease-in-out infinite` }} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Input */}
-            <div className="p-3 pt-2" style={{ borderTop: "1px solid rgba(0,0,0,0.06)" }}>
-              <div className="flex gap-1.5">
-                <input
-                  value={aiInput}
-                  onChange={(e) => setAiInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && aiSend()}
-                  placeholder="Demande quelque chose..."
-                  className="input-field text-xs py-2 flex-1"
-                  style={{ borderColor: "rgba(139,92,246,0.2)" }}
-                />
-                <button
-                  onClick={() => aiSend()}
-                  disabled={!aiInput.trim() || aiLoading}
-                  className="px-3 py-2 rounded-xl text-white flex items-center justify-center disabled:opacity-40 transition-all"
-                  style={{ background: "linear-gradient(135deg,#8b5cf6,#6366f1)", minWidth: 36 }}
-                >
-                  <Send size={12} strokeWidth={2} />
-                </button>
-              </div>
-              {aiMessages.length > 0 && (
-                <button onClick={() => setAiMessages([])} className="text-xs mt-1.5 w-full text-center" style={{ color: "var(--subtle)" }}>
-                  Effacer la conversation
-                </button>
-              )}
-            </div>
-          </div>
-        </>
+      {/* ── Panel IA ────────────────────────────────────────────────────────── */}
+      {showAIPanel && (
+        <AIPanel
+          projectId={projectId}
+          projectTitre={projectTitre}
+          onClose={() => setShowAIPanel(false)}
+          onRoadmapGenerated={handleRoadmapGenerated}
+        />
       )}
 
-      {/* ══ Modal Upload ════════════════════════════════════════════════════════ */}
+      {/* ── Modal Upload ────────────────────────────────────────────────────── */}
       {showFileModal && pendingFile && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}>
-          <div className="card w-full max-w-sm p-5 flex flex-col gap-3">
-            <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>Partager un fichier</h2>
-            <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "var(--bg)", border: "1px solid rgba(0,0,0,0.07)" }}>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--rose-soft)" }}>
-                <Paperclip size={14} style={{ color: "var(--rose)" }} />
-              </div>
+        <div className="fixed inset-0 flex items-end justify-center z-50 p-4" style={{ background: "rgba(26,33,56,0.35)" }}>
+          <div className="w-full max-w-sm flex flex-col gap-4" style={{ background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 24 }}>
+            <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 700, color: C.ink, margin: 0 }}>Partager un fichier</h2>
+            <div className="flex items-center gap-3" style={{ background: C.canvas, border: `1px solid ${C.hairline}`, borderRadius: 12, padding: "12px 16px" }}>
+              <FileIcon t={pendingFile.type} size={22} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>{pendingFile.name}</p>
-                <p className="text-xs" style={{ color: "var(--muted)" }}>{fileSize(pendingFile.size)}</p>
+                <p className="truncate" style={{ fontSize: 13, fontWeight: 600, color: C.ink, margin: 0 }}>{pendingFile.name}</p>
+                <p style={{ fontSize: 11, color: C.muted, margin: 0 }}>{fileSize(pendingFile.size)}</p>
               </div>
             </div>
             <textarea placeholder="Description (optionnel)" value={fileDesc} onChange={(e) => setFileDesc(e.target.value)}
-              rows={2} className="input-field resize-none text-sm" />
+              rows={2} style={{ ...inp, resize: "none" }} />
             {sprints.length > 0 && (
-              <select value={fileSprint} onChange={(e) => setFileSprint(e.target.value)} className="input-field">
+              <select value={fileSprint} onChange={(e) => setFileSprint(e.target.value)} style={inp}>
                 <option value="">— Aucun sprint —</option>
                 {sprints.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
               </select>
             )}
             {uploadError && (
-              <div className="rounded-xl px-3 py-2.5 text-xs font-medium"
-                style={{ background: "var(--rose-soft)", color: "var(--rose)", border: "1px solid var(--rose-border)" }}>
-                ⚠ {uploadError}
-              </div>
+              <p style={{ fontSize: 12, color: C.rose, background: C.surface, border: `1px solid ${C.rose}`, borderRadius: 11, padding: "8px 12px", margin: 0 }}>
+                {uploadError}
+              </p>
             )}
-            <button onClick={uploadFile} disabled={uploading} className="btn-primary w-full py-2.5">
-              {uploading ? "Envoi en cours..." : "Envoyer le fichier"}
+            <button onClick={uploadFile} disabled={uploading} style={{ ...btnInk, width: "100%", padding: "12px 0", opacity: uploading ? 0.6 : 1 }}>
+              {uploading ? "Upload en cours..." : <><Upload size={13} strokeWidth={2} /> Envoyer</>}
             </button>
-            <button onClick={() => { setShowFileModal(false); setPendingFile(null); setUploadError(null); }} className="btn-ghost w-full py-2.5">Annuler</button>
+            <button onClick={() => { setShowFileModal(false); setPendingFile(null); setUploadError(null); }} style={{ ...btnGhost, width: "100%", padding: "12px 0" }}>Annuler</button>
           </div>
         </div>
       )}
 
-      {/* ══ Modal Sprint ════════════════════════════════════════════════════════ */}
+      {/* ── Modal Sprint ────────────────────────────────────────────────────── */}
       {showSprintModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}>
-          <div className="card w-full max-w-sm p-5 flex flex-col gap-3">
-            <div>
-              <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>Nouvelle phase</h2>
-              <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Une phase regroupe un ensemble de tâches sur une période donnée.</p>
+        <div className="fixed inset-0 flex items-end justify-center z-50 p-4" style={{ background: "rgba(26,33,56,0.35)" }}>
+          <div className="w-full max-w-sm flex flex-col gap-4" style={{ background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 24 }}>
+            <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 700, color: C.ink, margin: 0 }}>Nouveau sprint</h2>
+            <input placeholder="Nom (ex: Sprint 1 – Auth)" value={sprintNom} onChange={(e) => setSprintNom(e.target.value)} style={inp} />
+            <input placeholder="Objectif (optionnel)" value={sprintObj} onChange={(e) => setSprintObj(e.target.value)} style={inp} />
+            <div className="grid grid-cols-2 gap-3">
+              <div><label style={lbl}>Début</label>
+                <input type="date" value={sprintDebut} onChange={(e) => setSprintDebut(e.target.value)} style={{ ...inp, fontVariantNumeric: "tabular-nums" }} /></div>
+              <div><label style={lbl}>Fin</label>
+                <input type="date" value={sprintFin} onChange={(e) => setSprintFin(e.target.value)} style={{ ...inp, fontVariantNumeric: "tabular-nums" }} /></div>
             </div>
-            <input placeholder="Nom (ex: Phase 1 — Connexion)" value={sprintNom} onChange={(e) => setSprintNom(e.target.value)} className="input-field" />
-            <input placeholder="Objectif (optionnel)" value={sprintObj} onChange={(e) => setSprintObj(e.target.value)} className="input-field" />
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--subtle)" }}>Début</label>
-                <input type="date" value={sprintDebut} onChange={(e) => setSprintDebut(e.target.value)} className="input-field" />
-              </div>
-              <div>
-                <label className="text-xs font-semibold mb-1 block" style={{ color: "var(--subtle)" }}>Fin</label>
-                <input type="date" value={sprintFin} onChange={(e) => setSprintFin(e.target.value)} className="input-field" />
-              </div>
-            </div>
-            <button onClick={createSprint} disabled={savingSprint || !sprintNom || !sprintDebut || !sprintFin} className="btn-primary w-full py-2.5">
-              {savingSprint ? "Création..." : "Créer cette phase"}
+            <button onClick={createSprint} disabled={savingSprint || !sprintNom || !sprintDebut || !sprintFin}
+              style={{ ...btnInk, width: "100%", padding: "12px 0", opacity: (savingSprint || !sprintNom || !sprintDebut || !sprintFin) ? 0.4 : 1 }}>
+              {savingSprint ? "Création..." : "Créer le sprint"}
             </button>
-            <button onClick={() => setShowSprintModal(false)} className="btn-ghost w-full py-2.5">Annuler</button>
+            <button onClick={() => setShowSprintModal(false)} style={{ ...btnGhost, width: "100%", padding: "12px 0" }}>Annuler</button>
           </div>
         </div>
       )}
 
-      {/* ══ Modal Tâche ═════════════════════════════════════════════════════════ */}
+      {/* ── Modal Nouvelle tâche ────────────────────────────────────────────── */}
       {showTaskModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-4" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}>
-          <div className="card w-full max-w-sm p-5 flex flex-col gap-3 max-h-[85vh] overflow-y-auto">
-            <h2 className="font-bold text-base" style={{ color: "var(--text)" }}>Nouvelle tâche</h2>
-            <input placeholder="Ex : Créer la page d'accueil" value={taskTitre} onChange={(e) => setTaskTitre(e.target.value)} className="input-field" autoFocus />
-            <textarea placeholder="Description (optionnel)" value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)}
-              rows={2} className="input-field resize-none text-sm" />
-            <div>
-              <label className="text-xs font-semibold mb-1.5 block" style={{ color: "var(--subtle)" }}>Priorité</label>
-              <div className="flex gap-1.5">
-                {(["basse","normale","haute"] as Task["priorite"][]).map((p) => (
-                  <button key={p} onClick={() => setTaskPrio(p)}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-xl transition-all capitalize"
-                    style={{
-                      background: taskPrio === p ? (p === "haute" ? "var(--rose-soft)" : p === "basse" ? "rgba(16,185,129,0.08)" : "rgba(0,0,0,0.05)") : "rgba(0,0,0,0.03)",
-                      color: taskPrio === p ? (p === "haute" ? "var(--rose)" : p === "basse" ? "var(--green)" : "var(--text)") : "var(--muted)",
-                      border: `1.5px solid ${taskPrio === p ? (p === "haute" ? "var(--rose-border)" : p === "basse" ? "rgba(16,185,129,0.2)" : "rgba(0,0,0,0.1)") : "rgba(0,0,0,0.06)"}`,
-                    }}>
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: PRIO[p].dot }} />
-                    {PRIO[p].label}
-                  </button>
-                ))}
+        <div className="fixed inset-0 flex items-end justify-center z-50 p-4" style={{ background: "rgba(26,33,56,0.35)" }}>
+          <div className="w-full max-w-sm flex flex-col gap-4 max-h-[90vh] overflow-y-auto" style={{ background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 24 }}>
+            <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 700, color: C.ink, margin: 0 }}>Nouvelle tâche</h2>
+            <input placeholder="Titre" value={taskTitre} onChange={(e) => setTaskTitre(e.target.value)} style={inp} />
+            <textarea placeholder="Description (optionnel)" value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} rows={2} style={{ ...inp, resize: "none" }} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label style={lbl}>Priorité</label>
+                <div className="flex gap-1">
+                  {(["basse","normale","haute"] as Task["priorite"][]).map((p) => (
+                    <button key={p} onClick={() => setTaskPrio(p)}
+                      className="flex-1 capitalize"
+                      style={{
+                        fontSize: 11, fontWeight: 600, padding: "8px 0", borderRadius: 9, cursor: "pointer",
+                        background: taskPrio === p ? C.ink : C.surface,
+                        color: taskPrio === p ? "#fff" : C.muted,
+                        border: taskPrio === p ? `1px solid ${C.ink}` : `1px solid ${C.hairline}`,
+                      }}>{p}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Échéance</label>
+                <input type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} style={{ ...inp, fontVariantNumeric: "tabular-nums" }} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {sprints.length > 0 && (
-                <select value={taskSprint} onChange={(e) => setTaskSprint(e.target.value)} className="input-field text-sm">
-                  <option value="">Sprint</option>
-                  {sprints.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
-                </select>
-              )}
-              {members.length > 0 && (
-                <select value={taskAssigne} onChange={(e) => setTaskAssigne(e.target.value)} className="input-field text-sm">
-                  <option value="">Assigner</option>
-                  {members.map((m) => <option key={m.user_id} value={m.user_id}>{m.nom}</option>)}
-                </select>
-              )}
-            </div>
-            <input type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} className="input-field" />
-            <button onClick={handleCreateTask} disabled={savingTask || !taskTitre.trim()} className="btn-primary w-full py-2.5">
+            {sprints.length > 0 && (
+              <select value={taskSprint} onChange={(e) => setTaskSprint(e.target.value)} style={inp}>
+                <option value="">— Sprint —</option>
+                {sprints.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
+              </select>
+            )}
+            {members.length > 0 && (
+              <select value={taskAssigne} onChange={(e) => setTaskAssigne(e.target.value)} style={inp}>
+                <option value="">— Assigné à —</option>
+                {members.map((m) => <option key={m.user_id} value={m.user_id}>{m.nom} ({m.role})</option>)}
+              </select>
+            )}
+            <button onClick={handleCreateTask} disabled={savingTask || !taskTitre.trim()}
+              style={{ ...btnInk, width: "100%", padding: "12px 0", opacity: (savingTask || !taskTitre.trim()) ? 0.4 : 1 }}>
               {savingTask ? "Création..." : "Créer la tâche"}
             </button>
-            <button onClick={() => setShowTaskModal(false)} className="btn-ghost w-full py-2.5">Annuler</button>
+            <button onClick={() => setShowTaskModal(false)} style={{ ...btnGhost, width: "100%", padding: "12px 0" }}>Annuler</button>
           </div>
         </div>
       )}
@@ -1443,109 +1173,84 @@ export default function GestionPage() {
 // Composants
 // ══════════════════════════════════════════════════════════════════════════════
 
-function TaskCard({ task, members, sprints, showSprint, onOpen, onMove, onDelete }: {
-  task: Task; members: Member[]; sprints: Sprint[]; showSprint: boolean;
+function KanbanCard({ task, members, sprints, showSprint, onOpen, onMove, onDelete }: {
+  task: Task; members: Member[]; sprints: Sprint[]; showSprint: boolean; checklistCount: number;
   onOpen: () => void; onMove: (dir: "next"|"prev") => void; onDelete: () => void;
 }) {
-  const member  = members.find((m) => m.user_id === task.assigne_a);
-  const sprint  = sprints.find((s) => s.id === task.sprint_id);
+  const member = members.find((m) => m.user_id === task.assigne_a);
+  const sprint = sprints.find((s) => s.id === task.sprint_id);
   const overdue = isOverdue(task.due_date) && task.statut !== "done";
 
   return (
-    <div
-      onClick={onOpen}
-      className="group cursor-pointer rounded-lg p-2.5 transition-all duration-150"
-      style={{
-        background: "#fff",
-        border: "1px solid rgba(0,0,0,0.08)",
-        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
-        (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.12)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 2px rgba(0,0,0,0.04)";
-        (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.08)";
-      }}
-    >
-      <p className="text-sm font-medium leading-snug mb-2" style={{ color: "var(--text)" }}>{task.titre}</p>
+    <div onClick={onOpen}
+      className="transition-all group cursor-pointer"
+      style={{ background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 12, padding: 12 }}>
+      <p style={{ fontSize: 13, fontWeight: 600, color: C.ink, lineHeight: 1.35, margin: "0 0 8px" }}>{task.titre}</p>
 
-      <div className="flex items-center gap-1.5">
-        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: PRIO[task.priorite].dot }} />
-        {task.due_date && (
-          <span className="text-xs flex items-center gap-0.5" style={{ color: overdue ? "var(--rose)" : "var(--subtle)" }}>
-            {overdue && <AlertCircle size={9} />}{fmtDate(task.due_date)}
-          </span>
-        )}
+      <div className="flex flex-wrap gap-1 mb-2">
+        <span style={prioStyle(task.priorite)}>{task.priorite}</span>
         {showSprint && sprint && (
-          <span className="text-xs font-medium px-1.5 py-0.5 rounded" style={{ background: "rgba(139,92,246,0.07)", color: "var(--violet)", fontSize: 10 }}>
-            {sprint.nom}
-          </span>
+          <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, border: `1px solid ${C.hairline}`, background: C.canvas, color: C.muted }}>{sprint.nom}</span>
         )}
-        <div className="ml-auto flex items-center gap-1">
-          {member && <Avatar member={member} size={16} />}
-          {/* Actions au hover */}
-          <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-            onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => onMove("prev")} disabled={task.statut === "todo"}
-              className="w-5 h-5 rounded flex items-center justify-center disabled:opacity-20"
-              style={{ background: "rgba(0,0,0,0.06)", color: "var(--muted)" }}>
-              <ChevronLeft size={10} strokeWidth={2} />
-            </button>
-            <button onClick={() => onMove("next")} disabled={task.statut === "done"}
-              className="w-5 h-5 rounded flex items-center justify-center disabled:opacity-20"
-              style={{ background: "rgba(0,0,0,0.06)", color: "var(--muted)" }}>
-              <ChevronRight size={10} strokeWidth={2} />
-            </button>
-            <button onClick={onDelete}
-              className="w-5 h-5 rounded flex items-center justify-center"
-              style={{ background: "var(--rose-soft)", color: "var(--rose)" }}>
-              <X size={9} strokeWidth={2.5} />
-            </button>
-          </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {member && (
+            <div style={{ width: 20, height: 20, borderRadius: 7, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{member.nom[0].toUpperCase()}</span>
+            </div>
+          )}
+          {task.due_date && (
+            <span style={{ fontSize: 11, fontWeight: 600, color: overdue ? C.rose : C.muted, display: "inline-flex", alignItems: "center", gap: 3 }}>
+              {overdue ? <AlertTriangle size={10} strokeWidth={2} /> : <Calendar size={10} strokeWidth={2} />} {fmtDate(task.due_date)}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+          <button onClick={() => onMove("prev")} disabled={task.statut === "todo"}
+            style={{ fontSize: 11, padding: "3px 7px", borderRadius: 6, background: C.canvas, color: C.muted, border: `1px solid ${C.hairline}`, cursor: "pointer", opacity: task.statut === "todo" ? 0.2 : 1 }}>←</button>
+          <button onClick={() => onMove("next")} disabled={task.statut === "done"}
+            style={{ fontSize: 11, padding: "3px 7px", borderRadius: 6, background: C.canvas, color: C.muted, border: `1px solid ${C.hairline}`, cursor: "pointer", opacity: task.statut === "done" ? 0.2 : 1 }}>→</button>
+          <button onClick={onDelete}
+            style={{ fontSize: 11, padding: "3px 7px", borderRadius: 6, background: C.canvas, color: C.rose, border: `1px solid ${C.hairline}`, cursor: "pointer" }}>✕</button>
         </div>
       </div>
     </div>
   );
 }
 
-function FileRow({ d, members, userId, role, onDelete }: {
-  d: Deliverable; members: Member[]; userId: string | null; role: string | null; onDelete: () => void;
+function FileCard({ d, members, userId, role, onDelete, sprints }: {
+  d: Deliverable; members: Member[]; userId: string | null; role: string | null;
+  onDelete: () => void; sprints: Sprint[];
 }) {
   const uploader = members.find((m) => m.user_id === d.uploaded_by);
-  const FileIcon = fileIcon(d.file_type);
+  const sprint = sprints.find((s) => s.id === d.sprint_id);
   const canDelete = d.uploaded_by === userId || role === "founder";
-
   return (
-    <div className="group flex items-center gap-3 p-3 rounded-xl transition-all"
-      style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)" }}
-      onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.11)"}
-      onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,0,0,0.07)"}
-    >
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: "var(--rose-soft)" }}>
-        <FileIcon size={16} style={{ color: "var(--rose)" }} />
+    <div className="flex items-center gap-4 transition-all group" style={{ background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 12, padding: 16 }}>
+      <div style={{ width: 44, height: 44, borderRadius: 12, border: `1px solid ${C.hairline}`, background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <FileIcon t={d.file_type} size={20} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate" style={{ color: "var(--text)" }}>{d.nom}</p>
-        <div className="flex items-center gap-2 mt-0.5">
-          {uploader && <span className="text-xs" style={{ color: "var(--subtle)" }}>{uploader.nom}</span>}
-          {d.file_size && <span className="text-xs" style={{ color: "var(--subtle)" }}>{fileSize(d.file_size)}</span>}
-          <span className="text-xs" style={{ color: "var(--subtle)" }}>{fmtDate(d.created_at)}</span>
+        <p className="truncate" style={{ fontSize: 13, fontWeight: 600, color: C.ink, margin: 0 }}>{d.nom}</p>
+        {d.description && <p className="line-clamp-1" style={{ fontSize: 11, color: C.muted, margin: "2px 0 0" }}>{d.description}</p>}
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          {uploader && <span style={{ fontSize: 11, color: C.muted }}>{uploader.nom}</span>}
+          {d.file_size && <span style={{ fontSize: 11, color: C.muted, fontVariantNumeric: "tabular-nums" }}>{fileSize(d.file_size)}</span>}
+          <span style={{ fontSize: 11, color: C.muted, fontVariantNumeric: "tabular-nums" }}>{fmtDate(d.created_at)}</span>
+          {sprint && <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6, border: `1px solid ${C.hairline}`, background: C.canvas, color: C.muted }}>{sprint.nom}</span>}
         </div>
       </div>
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
         <a href={d.file_url} target="_blank" rel="noreferrer"
-          className="btn-icon" style={{ width: 28, height: 28, color: "var(--blue)" }}
-          onClick={(e) => e.stopPropagation()}>
-          <Download size={13} strokeWidth={2} />
+          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 9, border: `1px solid ${C.hairline}`, background: C.surface, color: C.ink }}>
+          <Download size={14} strokeWidth={2} />
         </a>
         {canDelete && (
-          <button onClick={onDelete} className="btn-icon opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ width: 28, height: 28, color: "var(--rose)" }}>
-            <X size={12} strokeWidth={2} />
-          </button>
+          <button onClick={onDelete}
+            className="opacity-0 group-hover:opacity-100 transition-all"
+            style={{ fontSize: 12, color: C.muted, background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>✕</button>
         )}
       </div>
     </div>
