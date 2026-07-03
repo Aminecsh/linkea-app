@@ -91,20 +91,27 @@ export default function ContratPage() {
   }, [id, router]);
 
   async function openDispute() {
-    if (!payment || !disputeReason.trim() || openingDispute) return;
+    if (!payment || !contract || !disputeReason.trim() || openingDispute) return;
     setOpeningDispute(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) { setOpeningDispute(false); return; }
     const res = await fetch("/api/disputes", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ paymentId: payment.id, reason: disputeReason.trim() }),
+      body: JSON.stringify({
+        projectId: contract.project_id,
+        paymentId: payment.id,
+        devUserId: payment.dev_user_id,
+        reason: disputeReason.trim(),
+      }),
     });
     if (res.ok) {
       const data = await res.json();
       setDispute(data.dispute ?? { id: "", status: "open", reason: disputeReason.trim() });
+      setPayment((prev) => prev ? { ...prev, status: "disputed" } : prev);
       setShowDisputeModal(false);
       setDisputeReason("");
+      router.push("/messages");
     }
     setOpeningDispute(false);
   }
