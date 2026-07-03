@@ -310,7 +310,7 @@ export default function ProjetsPage() {
                       {p.budget && (
                         <span className="tag tag-green">
                           <Banknote size={10} strokeWidth={2} />
-                          {(p.budget * 0.9).toFixed(0)}€ net
+                          {(p.budget * 0.9).toFixed(0)}€
                         </span>
                       )}
                     </div>
@@ -380,11 +380,10 @@ export default function ProjetsPage() {
                       <Banknote size={17} style={{ color: "#10b981" }} />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold mb-0.5" style={{ color: "#059669" }}>Budget du projet</p>
+                      <p className="text-xs font-semibold mb-0.5" style={{ color: "#059669" }}>Rémunération</p>
                       <p className="text-lg font-black" style={{ color: "#065f46" }}>
-                        {(selected.budget * 0.9).toFixed(0)}€ <span className="text-sm font-semibold opacity-60">net après commission</span>
+                        {(selected.budget * 0.9).toFixed(0)}€
                       </p>
-                      <p className="text-xs" style={{ color: "#6ee7b7" }}>Budget total : {selected.budget}€ (Linkea retient 10%)</p>
                     </div>
                   </div>
                 )}

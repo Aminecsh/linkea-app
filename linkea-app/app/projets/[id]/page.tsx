@@ -301,9 +301,8 @@ export default function ProjectDetailPage() {
                   <div>
                     <p className="text-xs font-semibold mb-0.5" style={{ color: "#059669" }}>Rémunération</p>
                     <p className="text-xl font-black" style={{ color: "#065f46" }}>
-                      {(project.budget * 0.9).toFixed(0)}€ <span className="text-sm font-semibold opacity-60">net</span>
+                      {(project.budget * 0.9).toFixed(0)}€
                     </p>
-                    <p className="text-xs text-slate-400">Budget total {project.budget}€ · Linkea retient 10%</p>
                   </div>
                 </div>
               )}
