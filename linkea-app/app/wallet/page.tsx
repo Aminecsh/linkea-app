@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
-import { ArrowLeft, Wallet, ArrowDownToLine, TrendingUp, Clock, CheckCircle, X } from "lucide-react";
+import { ArrowLeft, Wallet, ArrowDownToLine, TrendingUp, Clock, CheckCircle, X, Lock } from "lucide-react";
 
 type WalletData = {
   id: string;
@@ -30,6 +30,13 @@ type Withdrawal = {
   created_at: string;
 };
 
+type PendingPayment = {
+  id: string;
+  dev_amount: number;
+  created_at: string;
+  projects: { titre: string } | null;
+};
+
 function maskIban(iban: string) {
   if (iban.length < 8) return iban;
   return iban.slice(0, 4) + " •••• •••• " + iban.slice(-4);
@@ -41,9 +48,10 @@ function formatDate(iso: string) {
 
 export default function WalletPage() {
   const router = useRouter();
-  const [wallet,       setWallet]       = useState<WalletData | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [withdrawals,  setWithdrawals]  = useState<Withdrawal[]>([]);
+  const [wallet,          setWallet]          = useState<WalletData | null>(null);
+  const [transactions,    setTransactions]    = useState<Transaction[]>([]);
+  const [withdrawals,     setWithdrawals]     = useState<Withdrawal[]>([]);
+  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [withdrawAmt,  setWithdrawAmt]  = useState("");
@@ -70,12 +78,14 @@ export default function WalletPage() {
       setWallet(w as WalletData | null);
 
       if (w) {
-        const [{ data: txs }, { data: wds }] = await Promise.all([
+        const [{ data: txs }, { data: wds }, { data: pending }] = await Promise.all([
           supabase.from("wallet_transactions").select("*").eq("wallet_id", w.id).order("created_at", { ascending: false }),
           supabase.from("withdrawals").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+          supabase.from("payments").select("id, dev_amount, created_at, projects(titre)").eq("dev_user_id", user.id).eq("status", "held").order("created_at", { ascending: false }),
         ]);
         setTransactions((txs as Transaction[]) ?? []);
         setWithdrawals((wds as Withdrawal[]) ?? []);
+        setPendingPayments((pending as unknown as PendingPayment[]) ?? []);
       }
 
       setLoading(false);
@@ -188,6 +198,35 @@ export default function WalletPage() {
           <ArrowDownToLine size={16} /> Retirer vers mon IBAN
         </button>
 
+        {/* Paiements en attente */}
+        {pendingPayments.length > 0 && (
+          <div>
+            <p className="label mb-2 mt-2">Paiements en attente</p>
+            <div className="flex flex-col gap-2">
+              {pendingPayments.map((p) => (
+                <div key={p.id} className="card px-4 py-3.5 flex items-center gap-3"
+                  style={{ border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.04)" }}>
+                  <div className="w-9 h-9 rounded-2xl flex items-center justify-center shrink-0"
+                    style={{ background: "rgba(245,158,11,0.12)" }}>
+                    <Lock size={15} style={{ color: "#f59e0b" }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: "var(--text)" }}>
+                      {p.projects?.titre ?? "Projet"}
+                    </p>
+                    <p className="text-xs" style={{ color: "var(--muted)" }}>
+                      Bloqué · sera débloqué à la livraison
+                    </p>
+                  </div>
+                  <p className="text-sm font-black shrink-0" style={{ color: "#f59e0b" }}>
+                    +{p.dev_amount.toFixed(2)}€
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Transactions */}
         {transactions.length > 0 && (
           <div>
@@ -241,7 +280,7 @@ export default function WalletPage() {
           </div>
         )}
 
-        {transactions.length === 0 && withdrawals.length === 0 && (
+        {transactions.length === 0 && withdrawals.length === 0 && pendingPayments.length === 0 && (
           <div className="flex flex-col items-center py-12 text-center">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3"
               style={{ background: "rgba(99,102,241,0.08)" }}>
