@@ -101,28 +101,51 @@ export default function AdminDashboard() {
       // Charger les litiges
       const { data: disputesData } = await supabase
         .from("disputes")
-        .select("id, payment_id, status, reason, created_at, payments(amount, dev_amount, founder_user_id, dev_user_id)")
+        .select("id, project_id, payment_id, status, reason, created_at, payments(amount, dev_amount, founder_user_id, dev_user_id)")
         .order("created_at", { ascending: false });
       if (disputesData?.length) {
+        // Récupérer toutes les conversations litige en une seule requête
+        const projectIds = disputesData.map((d: Record<string, unknown>) => d.project_id as string).filter(Boolean);
+        const { data: litigeConvs } = await supabase
+          .from("conversations")
+          .select("id, project_id, group_name")
+          .in("project_id", projectIds)
+          .eq("is_group", true)
+          .like("group_name", "⚠️ Litige%");
+
+        const convFounderMap: Record<string, string> = {};
+        const convDevMap: Record<string, string> = {};
+        (litigeConvs ?? []).forEach((c: { id: string; project_id: string; group_name: string }) => {
+          if (c.group_name.endsWith("(Founder)")) convFounderMap[c.project_id] = c.id;
+          if (c.group_name.endsWith("(Dev)"))     convDevMap[c.project_id]     = c.id;
+        });
+
         const enrichedDisputes = await Promise.all(disputesData.map(async (d: Record<string, unknown>) => {
           const pay = d.payments as Record<string, unknown> | null;
           const founderUid = pay?.founder_user_id as string | undefined;
           const devUid     = pay?.dev_user_id     as string | undefined;
+          const projectId  = d.project_id as string;
           let founderNom: string | undefined, devNom: string | undefined;
-          let founderConvId: string | undefined, devConvId: string | undefined;
           if (founderUid) {
             const { data: fp } = await supabase.from("profiles_founder").select("nom").eq("user_id", founderUid).maybeSingle();
             founderNom = fp?.nom;
-            const { data: fc } = await supabase.from("support_conversations").select("id").eq("user_id", founderUid).maybeSingle();
-            founderConvId = fc?.id;
           }
           if (devUid) {
             const { data: dp } = await supabase.from("profiles_developer").select("nom").eq("user_id", devUid).maybeSingle();
             devNom = dp?.nom;
-            const { data: dc } = await supabase.from("support_conversations").select("id").eq("user_id", devUid).maybeSingle();
-            devConvId = dc?.id;
           }
-          return { id: d.id as string, payment_id: d.payment_id as string, status: d.status as Dispute["status"], reason: d.reason as string, created_at: d.created_at as string, amount: pay?.amount as number | undefined, dev_amount: pay?.dev_amount as number | undefined, founderNom, devNom, founderConvId, devConvId };
+          return {
+            id: d.id as string,
+            payment_id: d.payment_id as string,
+            status: d.status as Dispute["status"],
+            reason: d.reason as string,
+            created_at: d.created_at as string,
+            amount: pay?.amount as number | undefined,
+            dev_amount: pay?.dev_amount as number | undefined,
+            founderNom, devNom,
+            founderConvId: convFounderMap[projectId],
+            devConvId: convDevMap[projectId],
+          };
         }));
         setDisputes(enrichedDisputes);
       }
