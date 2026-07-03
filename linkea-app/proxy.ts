@@ -27,7 +27,7 @@ function getIP(req: NextRequest): string {
   );
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const ruleKey = getRule(pathname);
   if (!ruleKey) return NextResponse.next();
