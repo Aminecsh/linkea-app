@@ -234,8 +234,9 @@ export default function CandidatsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-pink-400 border-t-transparent animate-spin" />
+      <div style={{ minHeight: "100vh", background: "#FAF8F4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid #ECE7DD", borderTopColor: "#1A2138", animation: "lk-spin 0.8s linear infinite" }} />
+        <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -245,21 +246,22 @@ export default function CandidatsPage() {
   const refused = candidatures.filter((c) => c.statut === "refused");
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-10">
+    <div className="min-h-screen pb-10" style={{ background: "#FAF8F4" }}>
 
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-4 sticky top-0 z-10">
+      <div className="px-4 py-4 sticky top-0 z-10" style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderBottom: "1px solid #ECE7DD" }}>
         <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <button onClick={() => router.push("/profil")} className="text-slate-400 hover:text-slate-600 text-sm font-medium">
+          <button onClick={() => router.push("/profil")}
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#8A8579", padding: 0 }}>
             ← Retour
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="font-black text-slate-900 text-base truncate">{project?.titre}</h1>
-            <p className="text-xs text-slate-400">{candidatures.length} candidature{candidatures.length > 1 ? "s" : ""}</p>
+            <h1 className="truncate" style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 700, color: "#1A2138", margin: 0 }}>{project?.titre}</h1>
+            <p style={{ fontSize: 11, color: "#8A8579", margin: 0, fontVariantNumeric: "tabular-nums" }}>{candidatures.length} candidature{candidatures.length > 1 ? "s" : ""}</p>
           </div>
           {project?.statut === "matched" && (
-            <span className="text-xs font-bold bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1 rounded-full shrink-0">
-              ✓ Matchée
+            <span className="shrink-0" style={{ fontSize: 11, fontWeight: 600, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", padding: "4px 11px", borderRadius: 7 }}>
+              Matchée
             </span>
           )}
         </div>
@@ -268,16 +270,16 @@ export default function CandidatsPage() {
       <div className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-6">
 
         {candidatures.length === 0 && (
-          <div className="text-center py-20 bg-white rounded-2xl border border-slate-200">
-            <p className="text-slate-400 text-sm">Aucune candidature pour l'instant.</p>
-            <p className="text-slate-400 text-sm mt-1">Les devs intéressés apparaîtront ici.</p>
+          <div className="text-center py-20" style={{ background: "#fff", borderRadius: 16, border: "1px solid #ECE7DD" }}>
+            <p style={{ fontSize: 13, color: "#8A8579", margin: 0 }}>Aucune candidature pour l&apos;instant.</p>
+            <p style={{ fontSize: 13, color: "#8A8579", margin: "4px 0 0" }}>Les devs intéressés apparaîtront ici.</p>
           </div>
         )}
 
         {/* Candidatures en attente */}
         {pending.length > 0 && (
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", margin: "0 0 12px" }}>
               En attente ({pending.length})
             </p>
             <div className="flex flex-col gap-3">
@@ -298,8 +300,8 @@ export default function CandidatsPage() {
         {/* Candidature acceptée */}
         {accepted.length > 0 && (
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-green-500 mb-3">
-              Dev sélectionné ✓
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#1A2138", margin: "0 0 12px" }}>
+              Dev sélectionné
             </p>
             <div className="flex flex-col gap-3">
               {accepted.map((c) => (
@@ -312,7 +314,7 @@ export default function CandidatsPage() {
         {/* Candidatures refusées */}
         {refused.length > 0 && (
           <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-300 mb-3">
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", margin: "0 0 12px" }}>
               Refusés ({refused.length})
             </p>
             <div className="flex flex-col gap-3 opacity-50">
@@ -343,38 +345,38 @@ function CandidatCard({
 }) {
   const dev = c.profiles_developer;
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+    <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ECE7DD", padding: 20 }}>
       <div className="flex items-start gap-4">
         {dev.avatar_url ? (
-          <img src={dev.avatar_url} alt={dev.nom} className="w-11 h-11 rounded-full object-cover shrink-0 border border-slate-200" />
+          <img src={dev.avatar_url} alt={dev.nom} className="shrink-0" style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", border: "1px solid #ECE7DD" }} />
         ) : (
-          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-black shrink-0">
-            {dev.nom?.[0]?.toUpperCase() ?? "?"}
+          <div className="shrink-0" style={{ width: 44, height: 44, borderRadius: 12, background: "#1A2138", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{dev.nom?.[0]?.toUpperCase() ?? "?"}</span>
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-slate-900 text-base">{dev.nom}</h3>
-          {dev.ecole && <p className="text-xs text-slate-400 mb-2">{dev.ecole}</p>}
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#1A2138", margin: 0 }}>{dev.nom}</h3>
+          {dev.ecole && <p style={{ fontSize: 12, color: "#8A8579", margin: "2px 0 8px" }}>{dev.ecole}</p>}
 
           {dev.competences?.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
               {dev.competences.map((comp) => (
-                <span key={comp} className="text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full">
+                <span key={comp} style={{ fontSize: 11, fontWeight: 600, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", padding: "3px 9px", borderRadius: 7 }}>
                   {comp}
                 </span>
               ))}
             </div>
           )}
 
-          <div className="flex gap-4 text-xs text-slate-400 mb-4">
-            {dev.dispo_heures_semaine && <span>⏱ {dev.dispo_heures_semaine}h/semaine</span>}
+          <div className="flex gap-4 mb-4" style={{ fontSize: 12, color: "#8A8579" }}>
+            {dev.dispo_heures_semaine && <span style={{ fontVariantNumeric: "tabular-nums" }}>{dev.dispo_heures_semaine}h/semaine</span>}
             {dev.github && (
-              <a href={dev.github} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline" onClick={(e) => e.stopPropagation()}>
+              <a href={dev.github} target="_blank" rel="noreferrer" style={{ color: "#1A2138", textDecoration: "underline" }} onClick={(e) => e.stopPropagation()}>
                 GitHub ↗
               </a>
             )}
             {dev.linkedin && (
-              <a href={dev.linkedin} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline" onClick={(e) => e.stopPropagation()}>
+              <a href={dev.linkedin} target="_blank" rel="noreferrer" style={{ color: "#1A2138", textDecoration: "underline" }} onClick={(e) => e.stopPropagation()}>
                 LinkedIn ↗
               </a>
             )}
@@ -383,7 +385,7 @@ function CandidatCard({
           <div className="flex gap-2 flex-wrap">
             <a
               href={`/profil/${dev.user_id}`}
-              className="btn-ghost px-4 py-2 text-sm"
+              style={{ display: "inline-flex", alignItems: "center", padding: "8px 16px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#fff", color: "#8A8579", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
             >
               Voir le profil
             </a>
@@ -392,14 +394,14 @@ function CandidatCard({
                 <button
                   onClick={onAccept}
                   disabled={acting === c.id}
-                  className="btn-pink px-5 py-2 text-sm"
+                  style={{ padding: "8px 20px", borderRadius: 10, background: "#1A2138", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: acting === c.id ? 0.6 : 1 }}
                 >
-                  {acting === c.id ? "..." : "✓ Accepter"}
+                  {acting === c.id ? "..." : "Accepter"}
                 </button>
                 <button
                   onClick={onRefuse}
                   disabled={acting === c.id}
-                  className="btn-ghost px-5 py-2 text-sm"
+                  style={{ padding: "8px 20px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#fff", color: "#8A8579", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: acting === c.id ? 0.6 : 1 }}
                 >
                   Refuser
                 </button>

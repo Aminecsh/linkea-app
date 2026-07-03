@@ -684,41 +684,36 @@ export default function PublicProfilePage() {
   }
   if (!profile) return null;
 
-  const accentColor  = isFounder ? "var(--rose)"  : "var(--blue)";
-  const accentSoft   = isFounder ? "var(--rose-soft)"  : "var(--blue-soft)";
-  const accentBorder = isFounder ? "var(--rose-border)" : "var(--blue-border)";
-  const heroBg       = isFounder
-    ? "linear-gradient(135deg, #f43f5e 0%, #8b5cf6 100%)"
-    : "linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)";
+  const accentColor  = "#1A2138";
+  const accentSoft   = "#FAF8F4";
+  const accentBorder = "#ECE7DD";
+  const heroBg       = "#1A2138";
   const doneProjects   = projects.filter((p) => ["livre","termine"].includes(p.statut));
   const activeProjects = projects.filter((p) => ["pending","matched","en_cours"].includes(p.statut));
   const dispo          = devProfile?.dispo_heures_semaine;
-  const isAvailable    = (dispo ?? 0) >= 10;
 
-  // "En un coup d'œil" highlights
+  // "En un coup d'œil" highlights — hairline monochrome
   type Highlight = { icon: React.ReactNode; text: string; color: string; bg: string; border: string };
   const highlights: Highlight[] = [
     dispo ? {
       icon: <Zap size={11} strokeWidth={2} />,
       text: `${dispo}h/sem`,
-      color: isAvailable ? "var(--green)" : "var(--amber)",
-      bg:    isAvailable ? "var(--green-soft)" : "var(--amber-soft)",
-      border: isAvailable ? "var(--green-border)" : "var(--amber-border)",
+      color: "#1A2138", bg: "#FFFFFF", border: "#ECE7DD",
     } : null,
     doneProjects.length > 0 ? {
       icon: <Check size={11} strokeWidth={2.5} />,
       text: `${doneProjects.length} livré${doneProjects.length > 1 ? "s" : ""}`,
-      color: "var(--blue)", bg: "var(--blue-soft)", border: "var(--blue-border)",
+      color: "#1A2138", bg: "#FFFFFF", border: "#ECE7DD",
     } : null,
     score !== null ? {
-      icon: <Star size={11} strokeWidth={1.5} fill="var(--amber)" style={{ color: "var(--amber)" }} />,
+      icon: <Star size={11} strokeWidth={1.5} fill="#1A2138" style={{ color: "#1A2138" }} />,
       text: `${score}/5`,
-      color: "var(--amber)", bg: "var(--amber-soft)", border: "var(--amber-border)",
+      color: "#1A2138", bg: "#FFFFFF", border: "#ECE7DD",
     } : null,
     devProfile?.competences?.[0] ? {
       icon: null,
       text: devProfile.competences[0],
-      color: "var(--violet)", bg: "var(--violet-soft)", border: "var(--violet-border)",
+      color: "#1A2138", bg: "#FFFFFF", border: "#ECE7DD",
     } : null,
   ].filter((h): h is NonNullable<typeof h> => h !== null) as Highlight[];
 
@@ -1142,8 +1137,8 @@ export default function PublicProfilePage() {
                   <div style={i < arr.length - 1 ? { paddingBottom: 20, flex: 1 } : { flex: 1 }}>
                     <div className="flex items-start gap-2">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                        style={{ background: isFounder ? "var(--rose-soft)" : "var(--blue-soft)" }}>
-                        <Briefcase size={13} strokeWidth={1.8} style={{ color: accentColor }} />
+                        style={{ background: "#FAF8F4", border: "1px solid #ECE7DD" }}>
+                        <Briefcase size={13} strokeWidth={1.8} style={{ color: "#1A2138" }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm leading-tight" style={{ color: "var(--text)" }}>{exp.titre}</p>
@@ -1170,7 +1165,7 @@ export default function PublicProfilePage() {
                 <div key={f.id} className="flex gap-4">
                   <div className="flex flex-col items-center">
                     <div className="w-3 h-3 rounded-full border-2 mt-0.5 shrink-0"
-                      style={{ borderColor: "var(--amber)", background: "#fff" }} />
+                      style={{ borderColor: "#1A2138", background: "#fff" }} />
                     {i < arr.length - 1 && (
                       <div className="w-px flex-1 mt-1" style={{ background: "rgba(0,0,0,0.08)", minHeight: 20 }} />
                     )}
@@ -1178,8 +1173,8 @@ export default function PublicProfilePage() {
                   <div style={i < arr.length - 1 ? { paddingBottom: 20, flex: 1 } : { flex: 1 }}>
                     <div className="flex items-start gap-2">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                        style={{ background: "var(--amber-soft)" }}>
-                        <GraduationCap size={13} strokeWidth={1.8} style={{ color: "var(--amber)" }} />
+                        style={{ background: "#FAF8F4", border: "1px solid #ECE7DD" }}>
+                        <GraduationCap size={13} strokeWidth={1.8} style={{ color: "#1A2138" }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm leading-tight" style={{ color: "var(--text)" }}>{f.diplome}</p>

@@ -54,14 +54,14 @@ export default function BanniPage() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="w-6 h-6 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
+      <div className="w-6 h-6 rounded-full border-2 border-[#ECE7DD] border-t-[#1A2138] animate-spin" />
     </div>
   );
 
   if (!ban) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4">
       <div className="max-w-md w-full">
 
         {/* Card principale */}
@@ -85,9 +85,9 @@ export default function BanniPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-                <p className="text-xs text-slate-400 mb-1">Décision le</p>
-                <p className="text-xs font-semibold text-slate-700">{fmtDate(ban.created_at)}</p>
+              <div className="bg-[#FAF8F4] rounded-xl p-3 border border-[#ECE7DD]">
+                <p className="text-xs text-[#8A8579] mb-1">Décision le</p>
+                <p className="text-xs font-semibold text-[#1A2138]">{fmtDate(ban.created_at)}</p>
               </div>
               <div className={`rounded-xl p-3 border ${ban.type === "permanent" ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"}`}>
                 <p className={`text-xs mb-1 ${ban.type === "permanent" ? "text-red-400" : "text-amber-500"}`}>Levée le</p>
@@ -97,9 +97,9 @@ export default function BanniPage() {
               </div>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-sm text-slate-500 leading-relaxed">
+            <div className="bg-[#FAF8F4] rounded-2xl p-4 border border-[#ECE7DD] text-sm text-[#8A8579] leading-relaxed">
               Si tu penses que cette décision est une erreur, contacte-nous à{" "}
-              <a href="mailto:support@linkea.fr" className="text-pink-500 font-semibold hover:underline">
+              <a href="mailto:support@linkea.fr" className="text-[#D4537E] font-semibold hover:underline">
                 support@linkea.fr
               </a>
             </div>
@@ -110,7 +110,7 @@ export default function BanniPage() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-400 mt-4">Linkea · {new Date().getFullYear()}</p>
+        <p className="text-center text-xs text-[#8A8579] mt-4">Linkea · {new Date().getFullYear()}</p>
       </div>
     </div>
   );
