@@ -37,6 +37,7 @@ export default function NouveauProjet() {
   const [customStack, setCustomStack]   = useState("");
   const [showCustom, setShowCustom]     = useState(false);
   const [deadline, setDeadline]         = useState("");
+  const [budget, setBudget]             = useState("");
 
   useEffect(() => {
     async function checkAccess() {
@@ -92,6 +93,7 @@ export default function NouveauProjet() {
       description: description.trim(),
       stack_souhaitee: selectedStacks.join(", "),
       deadline,
+      budget: budget ? parseFloat(budget) : null,
       statut: "pending",
     });
 
@@ -336,6 +338,27 @@ export default function NouveauProjet() {
                       </button>
                     </div>
                   )}
+                </div>
+
+                {/* Budget */}
+                <div>
+                  <label className="label mb-1.5 block">Budget du projet (€)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold" style={{ color: "var(--muted)" }}>€</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                      placeholder="500"
+                      className="input-field"
+                      style={{ paddingLeft: 28 }}
+                    />
+                  </div>
+                  <p className="text-xs mt-1" style={{ color: "var(--subtle)" }}>
+                    Le dev recevra {budget ? `${(parseFloat(budget) * 0.9).toFixed(0)}€` : "90%"} après commission Linkea (10%)
+                  </p>
                 </div>
 
                 {/* Deadline radio cards */}

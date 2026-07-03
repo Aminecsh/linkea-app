@@ -212,6 +212,17 @@ export default function ProfilPage() {
     setMenuOpenId(null);
     await supabase.from("projects").update({ statut: "livre" }).eq("id", projectId);
     setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, statut: "livre" } : p));
+
+    // Débloquer le paiement si un paiement "held" existe
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      await fetch("/api/payments/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ projectId }),
+      });
+    }
+
     router.push(`/projets/${projectId}/review`);
   }
 

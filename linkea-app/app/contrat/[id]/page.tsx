@@ -46,6 +46,7 @@ export default function ContratPage() {
   const [loading, setLoading] = useState(true);
   const [signing, setSigning] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [payment, setPayment] = useState<{ id: string; status: string; amount: number; dev_amount: number } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -65,6 +66,15 @@ export default function ContratPage() {
 
       if (!c) { router.push("/profil"); return; }
       setContract(c as Contract);
+
+      // Vérifier si un paiement existe pour ce projet
+      const { data: pay } = await supabase
+        .from("payments")
+        .select("id, status, amount, dev_amount")
+        .eq("project_id", (c as Contract).project_id)
+        .maybeSingle();
+      if (pay) setPayment(pay as { id: string; status: string; amount: number; dev_amount: number });
+
       setLoading(false);
     }
     load();
@@ -176,6 +186,48 @@ export default function ContratPage() {
             <div>
               <p className="font-bold text-green-700">Contrat signé par les deux parties</p>
               <p className="text-sm text-green-600">La collaboration est officiellement lancée.</p>
+            </div>
+          </div>
+        )}
+
+        {/* CTA Paiement */}
+        {bothSigned && isFounder && !payment && (
+          <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(99,102,241,0.25)", background: "rgba(99,102,241,0.04)" }}>
+            <div className="px-5 py-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">💰</span>
+                <p className="font-bold text-slate-900">Sécuriser le paiement</p>
+              </div>
+              <p className="text-sm text-slate-500">
+                Le contrat est signé. Dépose le budget du projet — il sera bloqué chez Linkea et débloqué au dev à la livraison.
+              </p>
+            </div>
+            <div className="px-5 pb-4">
+              <button
+                onClick={() => router.push(`/projets/${contract.project_id}/paiement`)}
+                className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
+              >
+                💳 Procéder au paiement
+              </button>
+            </div>
+          </div>
+        )}
+
+        {bothSigned && payment && (
+          <div className="rounded-2xl px-5 py-4 flex items-center gap-3"
+            style={{
+              background: payment.status === "released" ? "rgba(16,185,129,0.06)" : "rgba(245,158,11,0.06)",
+              border: `1px solid ${payment.status === "released" ? "rgba(16,185,129,0.20)" : "rgba(245,158,11,0.20)"}`,
+            }}>
+            <span className="text-xl">{payment.status === "released" ? "✅" : "🔒"}</span>
+            <div>
+              <p className="font-bold text-sm" style={{ color: payment.status === "released" ? "#065f46" : "#92400e" }}>
+                {payment.status === "released" ? `${payment.dev_amount.toFixed(2)}€ débloqués au dev` : `${payment.amount.toFixed(2)}€ sécurisés chez Linkea`}
+              </p>
+              <p className="text-xs" style={{ color: payment.status === "released" ? "#6ee7b7" : "#fcd34d", opacity: 0.9 }}>
+                {payment.status === "released" ? "Paiement libéré à la livraison" : "En attente de livraison"}
+              </p>
             </div>
           </div>
         )}
