@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
-import { Search, ArrowRight, Check, X, SlidersHorizontal, Calendar, Users, Clock } from "lucide-react";
+import { Search, ArrowRight, Check, X, SlidersHorizontal, Calendar, Users, Clock, Banknote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Project = {
@@ -16,6 +16,7 @@ type Project = {
   deadline: string;
   statut: string;
   created_at: string;
+  budget: number | null;
   profiles_founder: {
     nom: string;
     ecole: string;
@@ -106,7 +107,7 @@ export default function ProjetsPage() {
 
       const { data: projs } = await supabase
         .from("projects")
-        .select("*, profiles_founder(nom, ecole, email, user_id, avatar_url)")
+        .select("*, budget, profiles_founder(nom, ecole, email, user_id, avatar_url)")
         .eq("statut", "pending")
         .order("created_at", { ascending: false });
       const p = (projs as Project[]) ?? [];
@@ -322,6 +323,16 @@ export default function ProjetsPage() {
                           {p.deadline && stacks.length > 0 && <span style={{ color: "var(--border-2)", fontSize: 10 }}>·</span>}
                           {p.deadline && <span className="text-[11px]" style={{ color: "var(--subtle)" }}>{p.deadline}</span>}
                         </div>
+                        {role === "developer" && p.budget != null && (
+                          <div className="flex items-center gap-1 mt-2">
+                            <span
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 7, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", color: "#059669" }}
+                            >
+                              <Banknote size={11} strokeWidth={2} />
+                              {Math.round(p.budget * 0.9)} €
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

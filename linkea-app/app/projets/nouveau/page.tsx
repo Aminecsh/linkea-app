@@ -41,6 +41,7 @@ export default function NouveauProjet() {
   const [showCustom, setShowCustom]     = useState(false);
   const [dateDebut, setDateDebut]       = useState("");
   const [dateFin, setDateFin]           = useState("");
+  const [budget, setBudget]             = useState("");
 
   useEffect(() => {
     async function checkAccess() {
@@ -101,6 +102,7 @@ export default function NouveauProjet() {
       stack_souhaitee: selectedStacks.join(", "),
       deadline: deadlineStr,
       statut: "pending",
+      budget: budget ? Number(budget) : null,
     });
 
     if (dbError) {
@@ -316,6 +318,24 @@ export default function NouveauProjet() {
                       </span>
                     </div>
                   )}
+                </div>
+
+                {/* Budget */}
+                <div>
+                  <label style={sLabel}>Budget (€)</label>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      type="number"
+                      min={0}
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                      placeholder="Ex : 500"
+                      className="lk-n-input"
+                      style={{ ...sInput, paddingRight: 32 }}
+                    />
+                    <span style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", fontSize: 13, fontWeight: 600, color: "#8A8579" }}>€</span>
+                  </div>
+                  <p style={{ fontSize: 11, color: "#8A8579", margin: "5px 0 0" }}>Optionnel — le dev reçoit 90 % du montant</p>
                 </div>
 
                 {error && (

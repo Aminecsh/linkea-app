@@ -10,6 +10,7 @@ import {
   Search,
   User,
   LogOut,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import NotifToast from "@/components/NotifToast";
@@ -135,6 +136,7 @@ export default function BottomNav() {
     : [
         { label: "Projets",  icon: Search,          href: "/projets"  },
         { label: "Messages", icon: MessageCircle,   href: "/messages" },
+        { label: "Wallet",   icon: Wallet,          href: "/wallet"   },
         { label: "Profil",   icon: User,            href: "/profil"   },
       ];
 

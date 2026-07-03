@@ -14,7 +14,8 @@ type Match    = { id: string; statut: string; created_at: string; projects: { ti
 type Report   = { id: string; reporter_id: string; target_type: string; target_id: string; target_nom?: string; raison: string; description?: string; statut: "pending" | "resolu" | "ignore"; created_at: string; };
 type SupportConv = { id: string; user_id: string; created_at: string; nom?: string; role?: string; lastMessage?: string; unreadCount: number; };
 type ActiveBan   = { id: string; user_id: string; type: "temp" | "permanent"; raison: string; expires_at: string | null; created_at: string; nom?: string; role?: string; };
-type Tab = "analytics" | "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support";
+type Dispute     = { id: string; payment_id: string; status: "open" | "resolved_founder" | "resolved_dev"; reason: string; created_at: string; amount?: number; dev_amount?: number; founderNom?: string; devNom?: string; founderConvId?: string; devConvId?: string; };
+type Tab = "analytics" | "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support" | "litiges";
 
 const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" };
 
@@ -33,6 +34,9 @@ export default function AdminDashboard() {
   const [reports,     setReports]     = useState<Report[]>([]);
   const [activeBans,  setActiveBans]  = useState<ActiveBan[]>([]);
   const [supportConvs,setSupportConvs]= useState<SupportConv[]>([]);
+  const [disputes,    setDisputes]    = useState<Dispute[]>([]);
+  const [resolvingDispute, setResolvingDispute] = useState<string | null>(null);
+  const [disputeNote, setDisputeNote] = useState<Record<string, string>>({});
   const [loading,      setLoading]     = useState(true);
   const [updatingId,   setUpdatingId]  = useState<string | null>(null);
   const [filterReport, setFilterReport]= useState<"all" | "pending" | "resolu" | "ignore">("pending");
@@ -93,6 +97,36 @@ export default function AdminDashboard() {
         }));
         setSupportConvs(enriched as SupportConv[]);
       }
+
+      // Charger les litiges
+      const { data: disputesData } = await supabase
+        .from("disputes")
+        .select("id, payment_id, status, reason, created_at, payments(amount, dev_amount, founder_user_id, dev_user_id)")
+        .order("created_at", { ascending: false });
+      if (disputesData?.length) {
+        const enrichedDisputes = await Promise.all(disputesData.map(async (d: Record<string, unknown>) => {
+          const pay = d.payments as Record<string, unknown> | null;
+          const founderUid = pay?.founder_user_id as string | undefined;
+          const devUid     = pay?.dev_user_id     as string | undefined;
+          let founderNom: string | undefined, devNom: string | undefined;
+          let founderConvId: string | undefined, devConvId: string | undefined;
+          if (founderUid) {
+            const { data: fp } = await supabase.from("profiles_founder").select("nom").eq("user_id", founderUid).maybeSingle();
+            founderNom = fp?.nom;
+            const { data: fc } = await supabase.from("support_conversations").select("id").eq("user_id", founderUid).maybeSingle();
+            founderConvId = fc?.id;
+          }
+          if (devUid) {
+            const { data: dp } = await supabase.from("profiles_developer").select("nom").eq("user_id", devUid).maybeSingle();
+            devNom = dp?.nom;
+            const { data: dc } = await supabase.from("support_conversations").select("id").eq("user_id", devUid).maybeSingle();
+            devConvId = dc?.id;
+          }
+          return { id: d.id as string, payment_id: d.payment_id as string, status: d.status as Dispute["status"], reason: d.reason as string, created_at: d.created_at as string, amount: pay?.amount as number | undefined, dev_amount: pay?.dev_amount as number | undefined, founderNom, devNom, founderConvId, devConvId };
+        }));
+        setDisputes(enrichedDisputes);
+      }
+
       setLoading(false);
     }
     load();
@@ -104,6 +138,20 @@ export default function AdminDashboard() {
     await supabase.from("notifications").insert({ user_id: userId, type: "admin_unban", title: "Sanction levée", body: "Ton compte Linkea a été réactivé." });
     setActiveBans((prev) => prev.filter((b) => b.id !== banId));
     setLiftingBan(null);
+  }
+
+  async function resolveDispute(disputeId: string, decision: "resolved_founder" | "resolved_dev") {
+    setResolvingDispute(disputeId);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      await fetch(`/api/disputes/${disputeId}/resolve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ decision }),
+      });
+    }
+    setDisputes((prev) => prev.map((d) => d.id === disputeId ? { ...d, status: decision } : d));
+    setResolvingDispute(null);
   }
 
   async function updateReportStatut(reportId: string, statut: "resolu" | "ignore") {
@@ -134,6 +182,7 @@ export default function AdminDashboard() {
 
   // ── Métriques ─────────────────────────────────────────────────────────────
   const pendingReports   = reports.filter((r) => r.statut === "pending");
+  const openDisputes     = disputes.filter((d) => d.status === "open");
   const totalUsers       = founders.length + developers.length;
   const projectsMatched  = projects.filter((p) => ["matched", "en_cours", "livre"].includes(p.statut)).length;
   const projectsLivre    = projects.filter((p) => p.statut === "livre").length;
@@ -155,6 +204,7 @@ export default function AdminDashboard() {
     { key: "matchings",    label: "Matchings",     count: matches.length },
     { key: "signalements", label: "Signalements",  count: pendingReports.length, urgent: pendingReports.length > 0 },
     { key: "bans",         label: "Bans",          count: activeBans.length },
+    { key: "litiges",      label: "⚠️ Litiges",   count: openDisputes.length, urgent: openDisputes.length > 0 },
     { key: "support",      label: "Support",       count: supportConvs.length, urgent: urgentSupport },
   ];
 
@@ -486,6 +536,79 @@ export default function AdminDashboard() {
                     {liftingBan === b.id ? "…" : "Lever"}
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── LITIGES ───────────────────────────────────────────────────────── */}
+        {tab === "litiges" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {disputes.length === 0 ? (
+              <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "48px 32px", textAlign: "center" }}>
+                <p style={{ fontSize: 13, color: C.muted }}>Aucun litige pour l&apos;instant.</p>
+              </div>
+            ) : disputes.map((d) => (
+              <div key={d.id} style={{ background: C.surface, border: `1.5px solid ${d.status === "open" ? C.rose : C.hairline}`, borderRadius: 14, padding: "18px 22px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: `1px solid ${d.status === "open" ? C.rose : C.hairline}`, color: d.status === "open" ? C.rose : C.muted }}>
+                        {d.status === "open" ? "Ouvert" : d.status === "resolved_founder" ? "Résolu → Founder" : "Résolu → Dev"}
+                      </span>
+                      {d.amount != null && (
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.hairline}`, color: C.muted }}>
+                          {d.amount} € ({d.dev_amount} € net dev)
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>
+                      {d.founderNom ?? "Founder"} ↔ {d.devNom ?? "Dev"}
+                    </p>
+                    <p style={{ fontSize: 13, color: C.muted, margin: "0 0 4px", fontStyle: "italic" }}>&ldquo;{d.reason}&rdquo;</p>
+                    <p style={{ fontSize: 11, color: C.muted, margin: 0 }}>{new Date(d.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                  </div>
+                </div>
+
+                {/* Boutons conversations */}
+                <div style={{ display: "flex", gap: 8, paddingTop: 12, borderTop: `1px solid ${C.hairline}`, flexWrap: "wrap" }}>
+                  {d.founderConvId && (
+                    <button onClick={() => router.push(`/support/${d.founderConvId}`)}
+                      style={{ fontSize: 12, fontWeight: 600, padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.hairline}`, background: C.surface, color: C.ink, cursor: "pointer" }}>
+                      Conv. Founder →
+                    </button>
+                  )}
+                  {d.devConvId && (
+                    <button onClick={() => router.push(`/support/${d.devConvId}`)}
+                      style={{ fontSize: 12, fontWeight: 600, padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.hairline}`, background: C.surface, color: C.ink, cursor: "pointer" }}>
+                      Conv. Dev →
+                    </button>
+                  )}
+                </div>
+
+                {/* Résolution */}
+                {d.status === "open" && (
+                  <div style={{ display: "flex", gap: 8, paddingTop: 10, flexWrap: "wrap" }}>
+                    <input
+                      value={disputeNote[d.id] ?? ""}
+                      onChange={(e) => setDisputeNote((prev) => ({ ...prev, [d.id]: e.target.value }))}
+                      placeholder="Note interne (optionnel)"
+                      style={{ flex: 1, minWidth: 120, padding: "8px 12px", fontSize: 12, borderRadius: 8, border: `1.5px solid ${C.hairline}`, outline: "none", fontFamily: "inherit", color: C.ink }}
+                    />
+                    <button
+                      onClick={() => resolveDispute(d.id, "resolved_founder")}
+                      disabled={resolvingDispute === d.id}
+                      style={{ fontSize: 12, fontWeight: 600, padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${C.hairline}`, background: C.surface, color: C.ink, cursor: "pointer", opacity: resolvingDispute === d.id ? 0.5 : 1 }}>
+                      {resolvingDispute === d.id ? "…" : "→ Founder"}
+                    </button>
+                    <button
+                      onClick={() => resolveDispute(d.id, "resolved_dev")}
+                      disabled={resolvingDispute === d.id}
+                      style={{ fontSize: 12, fontWeight: 600, padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${C.rose}`, background: C.surface, color: C.rose, cursor: "pointer", opacity: resolvingDispute === d.id ? 0.5 : 1 }}>
+                      {resolvingDispute === d.id ? "…" : "→ Dev"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -155,6 +155,7 @@ export default function PublicProfilePage() {
   const [myCandidatures, setMyCandidatures]   = useState<MyCandidature[]>([]);
   const [myDevFilter, setMyDevFilter]         = useState<MyDevFilterKey>("all");
   const [myContractMap, setMyContractMap]     = useState<Record<string, string>>({});
+  const [deliveringId, setDeliveringId]       = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Pin flow (founder → dev)
@@ -295,6 +296,26 @@ export default function PublicProfilePage() {
     }
     load();
   }, [userId, router]);
+
+  async function handleLivrer(projectId: string) {
+    if (deliveringId) return;
+    setDeliveringId(projectId);
+    await supabase.from("projects").update({ statut: "livre" }).eq("id", projectId);
+    setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, statut: "livre" } : p));
+
+    // Débloquer le paiement si un paiement "held" existe
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      await fetch("/api/payments/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ projectId }),
+      });
+    }
+
+    setDeliveringId(null);
+    router.push(`/projets/${projectId}/review`);
+  }
 
   // Charge les projets pour pinner (on-demand à l'ouverture du modal)
   async function openPinModal() {
@@ -1216,6 +1237,14 @@ export default function PublicProfilePage() {
                     <button onClick={() => router.push(`/projets/${p.id}/gestion`)}
                       style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#1A2138", padding: "3px 6px", flexShrink: 0, textDecoration: "underline" }}>
                       Gérer
+                    </button>
+                  )}
+                  {isMe && isFounder && p.statut === "en_cours" && (
+                    <button
+                      onClick={() => handleLivrer(p.id)}
+                      disabled={deliveringId === p.id}
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#D4537E", padding: "3px 6px", flexShrink: 0, textDecoration: "underline", opacity: deliveringId === p.id ? 0.5 : 1 }}>
+                      {deliveringId === p.id ? "…" : "Marquer livré"}
                     </button>
                   )}
                 </div>
