@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
-import { Search, Calendar, Check, ArrowRight, Sparkles } from "lucide-react";
+import { Search, Calendar, Check, ArrowRight, Sparkles, Banknote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Project = {
@@ -15,6 +15,7 @@ type Project = {
   stack_souhaitee: string;
   deadline: string;
   statut: string;
+  budget: number | null;
   created_at: string;
   profiles_founder: {
     nom: string;
@@ -68,7 +69,7 @@ export default function ProjetsPage() {
 
       const { data: projs } = await supabase
         .from("projects")
-        .select("*, profiles_founder(nom, ecole, email, user_id, avatar_url)")
+        .select("*, budget, profiles_founder(nom, ecole, email, user_id, avatar_url)")
         .eq("statut", "pending")
         .order("created_at", { ascending: false });
 
@@ -306,6 +307,12 @@ export default function ProjetsPage() {
                           {p.deadline}
                         </span>
                       )}
+                      {p.budget && (
+                        <span className="tag tag-green">
+                          <Banknote size={10} strokeWidth={2} />
+                          {(p.budget * 0.9).toFixed(0)}€ net
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -363,6 +370,24 @@ export default function ProjetsPage() {
                   )}
                   <span className="tag tag-gray">En attente d&apos;un dev</span>
                 </div>
+
+                {/* Budget */}
+                {selected.budget && (
+                  <div className="mb-6 rounded-2xl p-4 flex items-center gap-3"
+                    style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ background: "rgba(16,185,129,0.12)" }}>
+                      <Banknote size={17} style={{ color: "#10b981" }} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold mb-0.5" style={{ color: "#059669" }}>Budget du projet</p>
+                      <p className="text-lg font-black" style={{ color: "#065f46" }}>
+                        {(selected.budget * 0.9).toFixed(0)}€ <span className="text-sm font-semibold opacity-60">net après commission</span>
+                      </p>
+                      <p className="text-xs" style={{ color: "#6ee7b7" }}>Budget total : {selected.budget}€ (Linkea retient 10%)</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Stack */}
                 {selected.stack_souhaitee && (

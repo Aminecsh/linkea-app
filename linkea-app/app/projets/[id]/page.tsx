@@ -11,6 +11,7 @@ type Project = {
   stack_souhaitee: string;
   deadline: string;
   statut: string;
+  budget: number | null;
   profiles_founder: {
     nom: string;
     ecole?: string;
@@ -51,7 +52,7 @@ export default function ProjectDetailPage() {
 
       const { data: proj } = await supabase
         .from("projects")
-        .select("id, titre, description, stack_souhaitee, deadline, statut, profiles_founder(nom, ecole, user_id, avatar_url)")
+        .select("id, titre, description, stack_souhaitee, deadline, statut, budget, profiles_founder(nom, ecole, user_id, avatar_url)")
         .eq("id", id)
         .maybeSingle();
 
@@ -289,6 +290,23 @@ export default function ProjectDetailPage() {
                   En attente d'un dev
                 </span>
               </div>
+
+              {project.budget && (
+                <div className="mb-5 rounded-2xl p-4 flex items-center gap-3"
+                  style={{ background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.15)" }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-xl"
+                    style={{ background: "rgba(16,185,129,0.12)" }}>
+                    💸
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold mb-0.5" style={{ color: "#059669" }}>Rémunération</p>
+                    <p className="text-xl font-black" style={{ color: "#065f46" }}>
+                      {(project.budget * 0.9).toFixed(0)}€ <span className="text-sm font-semibold opacity-60">net</span>
+                    </p>
+                    <p className="text-xs text-slate-400">Budget total {project.budget}€ · Linkea retient 10%</p>
+                  </div>
+                </div>
+              )}
 
               {stacks.length > 0 && (
                 <div className="mb-5">
