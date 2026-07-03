@@ -116,7 +116,8 @@ type Dispute = {
   payments: { amount: number; dev_amount: number } | null;
   founder_profile?: { nom: string };
   dev_profile?: { nom: string };
-  conversation_id?: string;
+  conv_founder_id?: string;
+  conv_dev_id?: string;
 };
 
 type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support" | "analytics" | "litiges";
@@ -221,22 +222,28 @@ export default function AdminDashboard() {
         const dMap: Record<string, string> = {};
         (fProfiles ?? []).forEach((p: { user_id: string; nom: string }) => { fMap[p.user_id] = p.nom; });
         (dProfiles ?? []).forEach((p: { user_id: string; nom: string }) => { dMap[p.user_id] = p.nom; });
-        // Récupérer les conversations de groupe litige associées
+        // Récupérer les conversations de litige par projet
         const projectIds = raw.map((d) => d.project_id);
         const { data: litigeConvs } = await supabase
           .from("conversations")
-          .select("id, project_id")
+          .select("id, project_id, group_name")
           .in("project_id", projectIds)
           .eq("is_group", true)
           .ilike("group_name", "⚠️ Litige%");
-        const convMap: Record<string, string> = {};
-        (litigeConvs ?? []).forEach((c: { id: string; project_id: string }) => { convMap[c.project_id] = c.id; });
+
+        const convFounderMap: Record<string, string> = {};
+        const convDevMap: Record<string, string> = {};
+        (litigeConvs ?? []).forEach((c: { id: string; project_id: string; group_name: string }) => {
+          if (c.group_name.endsWith("(Founder)")) convFounderMap[c.project_id] = c.id;
+          if (c.group_name.endsWith("(Dev)")) convDevMap[c.project_id] = c.id;
+        });
 
         setDisputes(raw.map((d) => ({
           ...d,
           founder_profile: { nom: fMap[d.founder_user_id] ?? "?" },
           dev_profile: { nom: dMap[d.dev_user_id] ?? "?" },
-          conversation_id: convMap[d.project_id],
+          conv_founder_id: convFounderMap[d.project_id],
+          conv_dev_id: convDevMap[d.project_id],
         })));
       }
 
@@ -664,14 +671,26 @@ export default function AdminDashboard() {
                     <p className="text-sm text-slate-700">{d.reason}</p>
                   </div>
 
-                  {/* Lien conversation */}
-                  {d.conversation_id && (
-                    <button
-                      onClick={() => router.push(`/messages/${d.conversation_id}`)}
-                      className="w-full py-2.5 rounded-xl text-sm font-semibold border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
-                    >
-                      💬 Ouvrir la discussion avec les parties
-                    </button>
+                  {/* Liens conversations */}
+                  {(d.conv_founder_id || d.conv_dev_id) && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {d.conv_founder_id && (
+                        <button
+                          onClick={() => router.push(`/messages/${d.conv_founder_id}`)}
+                          className="py-2.5 rounded-xl text-sm font-semibold border border-purple-200 text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          💬 Founder
+                        </button>
+                      )}
+                      {d.conv_dev_id && (
+                        <button
+                          onClick={() => router.push(`/messages/${d.conv_dev_id}`)}
+                          className="py-2.5 rounded-xl text-sm font-semibold border border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          💬 Dev
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   {/* Décision admin (seulement si ouvert) */}

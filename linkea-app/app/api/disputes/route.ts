@@ -47,28 +47,52 @@ export async function POST(req: NextRequest) {
   const { data: admins } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
   const adminIds = (admins ?? []).map((a: { user_id: string }) => a.user_id);
 
-  // Créer une conversation de groupe litige
-  const { data: conv } = await supabase.from("conversations").insert({
-    project_id: projectId,
-    is_group: true,
-    group_name: `⚠️ Litige — ${titre}`,
-  }).select().maybeSingle();
+  // Créer deux conversations privées : admin ↔ founder et admin ↔ dev
+  const convMessage = `⚠️ Litige ouvert sur le projet "${titre}".\n\nMotif : ${reason}\n\nNous traitons la situation. N'hésitez pas à nous donner plus de détails ici.`;
 
-  if (conv) {
-    // Ajouter les participants : founder + dev + admins
-    const participants = [
-      { conversation_id: conv.id, user_id: user.id },
-      { conversation_id: conv.id, user_id: devUserId },
-      ...adminIds.map((aid: string) => ({ conversation_id: conv.id, user_id: aid })),
-    ];
-    await supabase.from("conversation_participants").insert(participants);
+  let convFounderId: string | undefined;
+  let convDevId: string | undefined;
 
-    // Message initial automatique
-    await supabase.from("messages").insert({
-      conversation_id: conv.id,
-      sender_id: user.id,
-      content: `⚠️ Un litige a été ouvert sur le projet "${titre}".\n\nMotif : ${reason}\n\nL'équipe Linkea va examiner la situation et vous recontacter ici.`,
-    });
+  for (const adminId of adminIds) {
+    // Conv admin ↔ founder
+    const { data: convFounder } = await supabase.from("conversations").insert({
+      project_id: projectId,
+      is_group: true,
+      group_name: `⚠️ Litige — ${titre} (Founder)`,
+    }).select().maybeSingle();
+
+    if (convFounder) {
+      convFounderId = convFounder.id;
+      await supabase.from("conversation_participants").insert([
+        { conversation_id: convFounder.id, user_id: adminId },
+        { conversation_id: convFounder.id, user_id: user.id },
+      ]);
+      await supabase.from("messages").insert({
+        conversation_id: convFounder.id,
+        sender_id: adminId,
+        content: convMessage,
+      });
+    }
+
+    // Conv admin ↔ dev
+    const { data: convDev } = await supabase.from("conversations").insert({
+      project_id: projectId,
+      is_group: true,
+      group_name: `⚠️ Litige — ${titre} (Dev)`,
+    }).select().maybeSingle();
+
+    if (convDev) {
+      convDevId = convDev.id;
+      await supabase.from("conversation_participants").insert([
+        { conversation_id: convDev.id, user_id: adminId },
+        { conversation_id: convDev.id, user_id: devUserId },
+      ]);
+      await supabase.from("messages").insert({
+        conversation_id: convDev.id,
+        sender_id: adminId,
+        content: convMessage,
+      });
+    }
   }
 
   // Notifier le dev
@@ -76,8 +100,8 @@ export async function POST(req: NextRequest) {
     user_id: devUserId,
     type: "litige",
     title: "⚠️ Litige ouvert",
-    body: `Un litige a été ouvert sur "${titre}". L'équipe Linkea va traiter le dossier.`,
-    link: conv ? `/messages/${conv.id}` : "/wallet",
+    body: `Un litige a été ouvert sur "${titre}". L'équipe Linkea te contacte via la messagerie.`,
+    link: convDevId ? `/messages/${convDevId}` : "/wallet",
   });
 
   // Notifier les admins
@@ -87,11 +111,11 @@ export async function POST(req: NextRequest) {
         user_id: aid,
         type: "litige",
         title: "⚠️ Nouveau litige",
-        body: `Litige sur "${titre}" — à traiter`,
-        link: conv ? `/messages/${conv.id}` : "/admin",
+        body: `Litige sur "${titre}" — conversations créées avec les deux parties`,
+        link: "/admin",
       }))
     );
   }
 
-  return NextResponse.json({ ok: true, dispute, conversationId: conv?.id });
+  return NextResponse.json({ ok: true, dispute });
 }
