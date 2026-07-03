@@ -215,7 +215,7 @@ export default function WalletPage() {
                       {p.projects?.titre ?? "Projet"}
                     </p>
                     <p className="text-xs" style={{ color: "var(--muted)" }}>
-                      Bloqué · sera débloqué à la livraison
+                      En attente · sera débloqué à la livraison
                     </p>
                   </div>
                   <p className="text-sm font-black shrink-0" style={{ color: "#f59e0b" }}>
