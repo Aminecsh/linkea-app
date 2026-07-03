@@ -116,6 +116,7 @@ type Dispute = {
   payments: { amount: number; dev_amount: number } | null;
   founder_profile?: { nom: string };
   dev_profile?: { nom: string };
+  conversation_id?: string;
 };
 
 type Tab = "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support" | "analytics" | "litiges";
@@ -220,7 +221,23 @@ export default function AdminDashboard() {
         const dMap: Record<string, string> = {};
         (fProfiles ?? []).forEach((p: { user_id: string; nom: string }) => { fMap[p.user_id] = p.nom; });
         (dProfiles ?? []).forEach((p: { user_id: string; nom: string }) => { dMap[p.user_id] = p.nom; });
-        setDisputes(raw.map((d) => ({ ...d, founder_profile: { nom: fMap[d.founder_user_id] ?? "?" }, dev_profile: { nom: dMap[d.dev_user_id] ?? "?" } })));
+        // Récupérer les conversations de groupe litige associées
+        const projectIds = raw.map((d) => d.project_id);
+        const { data: litigeConvs } = await supabase
+          .from("conversations")
+          .select("id, project_id")
+          .in("project_id", projectIds)
+          .eq("is_group", true)
+          .ilike("group_name", "⚠️ Litige%");
+        const convMap: Record<string, string> = {};
+        (litigeConvs ?? []).forEach((c: { id: string; project_id: string }) => { convMap[c.project_id] = c.id; });
+
+        setDisputes(raw.map((d) => ({
+          ...d,
+          founder_profile: { nom: fMap[d.founder_user_id] ?? "?" },
+          dev_profile: { nom: dMap[d.dev_user_id] ?? "?" },
+          conversation_id: convMap[d.project_id],
+        })));
       }
 
       setLoading(false);
@@ -646,6 +663,16 @@ export default function AdminDashboard() {
                     <p className="text-xs font-bold text-slate-400 mb-1">MOTIF DU LITIGE</p>
                     <p className="text-sm text-slate-700">{d.reason}</p>
                   </div>
+
+                  {/* Lien conversation */}
+                  {d.conversation_id && (
+                    <button
+                      onClick={() => router.push(`/messages/${d.conversation_id}`)}
+                      className="w-full py-2.5 rounded-xl text-sm font-semibold border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2"
+                    >
+                      💬 Ouvrir la discussion avec les parties
+                    </button>
+                  )}
 
                   {/* Décision admin (seulement si ouvert) */}
                   {isOpen && (

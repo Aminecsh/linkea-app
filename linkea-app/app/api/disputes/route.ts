@@ -29,6 +29,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
+  const titre = (project as { titre: string }).titre;
+
   // Passer le paiement en "disputed"
   await supabase.from("payments").update({ status: "disputed" }).eq("id", paymentId);
 
@@ -41,28 +43,55 @@ export async function POST(req: NextRequest) {
     reason,
   }).select().maybeSingle();
 
+  // Récupérer les admins
+  const { data: admins } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+  const adminIds = (admins ?? []).map((a: { user_id: string }) => a.user_id);
+
+  // Créer une conversation de groupe litige
+  const { data: conv } = await supabase.from("conversations").insert({
+    project_id: projectId,
+    is_group: true,
+    group_name: `⚠️ Litige — ${titre}`,
+  }).select().maybeSingle();
+
+  if (conv) {
+    // Ajouter les participants : founder + dev + admins
+    const participants = [
+      { conversation_id: conv.id, user_id: user.id },
+      { conversation_id: conv.id, user_id: devUserId },
+      ...adminIds.map((aid: string) => ({ conversation_id: conv.id, user_id: aid })),
+    ];
+    await supabase.from("conversation_participants").insert(participants);
+
+    // Message initial automatique
+    await supabase.from("messages").insert({
+      conversation_id: conv.id,
+      sender_id: user.id,
+      content: `⚠️ Un litige a été ouvert sur le projet "${titre}".\n\nMotif : ${reason}\n\nL'équipe Linkea va examiner la situation et vous recontacter ici.`,
+    });
+  }
+
   // Notifier le dev
   await supabase.from("notifications").insert({
     user_id: devUserId,
     type: "litige",
     title: "⚠️ Litige ouvert",
-    body: `Un litige a été ouvert sur "${(project as { titre: string }).titre}". L'équipe Linkea va traiter le dossier.`,
-    link: "/wallet",
+    body: `Un litige a été ouvert sur "${titre}". L'équipe Linkea va traiter le dossier.`,
+    link: conv ? `/messages/${conv.id}` : "/wallet",
   });
 
   // Notifier les admins
-  const { data: admins } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
-  if (admins && admins.length > 0) {
+  if (adminIds.length > 0) {
     await supabase.from("notifications").insert(
-      admins.map((a: { user_id: string }) => ({
-        user_id: a.user_id,
+      adminIds.map((aid: string) => ({
+        user_id: aid,
         type: "litige",
         title: "⚠️ Nouveau litige",
-        body: `Litige sur "${(project as { titre: string }).titre}" — à traiter`,
-        link: "/admin",
+        body: `Litige sur "${titre}" — à traiter`,
+        link: conv ? `/messages/${conv.id}` : "/admin",
       }))
     );
   }
 
-  return NextResponse.json({ ok: true, dispute });
+  return NextResponse.json({ ok: true, dispute, conversationId: conv?.id });
 }
