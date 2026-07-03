@@ -596,15 +596,15 @@ export default function AdminDashboard() {
                 {/* Boutons conversations */}
                 <div style={{ display: "flex", gap: 8, paddingTop: 12, borderTop: `1px solid ${C.hairline}`, flexWrap: "wrap" }}>
                   {d.founderConvId && (
-                    <button onClick={() => router.push(`/support/${d.founderConvId}`)}
+                    <button onClick={() => router.push(`/messages/${d.founderConvId}`)}
                       style={{ fontSize: 12, fontWeight: 600, padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.hairline}`, background: C.surface, color: C.ink, cursor: "pointer" }}>
-                      Conv. Founder →
+                      💬 Founder →
                     </button>
                   )}
                   {d.devConvId && (
-                    <button onClick={() => router.push(`/support/${d.devConvId}`)}
+                    <button onClick={() => router.push(`/messages/${d.devConvId}`)}
                       style={{ fontSize: 12, fontWeight: 600, padding: "7px 14px", borderRadius: 8, border: `1.5px solid ${C.hairline}`, background: C.surface, color: C.ink, cursor: "pointer" }}>
-                      Conv. Dev →
+                      💬 Dev →
                     </button>
                   )}
                 </div>
