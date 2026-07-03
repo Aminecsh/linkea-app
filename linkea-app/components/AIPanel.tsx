@@ -69,7 +69,7 @@ function CodeBlock({ children, className }: { children?: React.ReactNode; classN
     <div className="relative group my-2">
       <button
         onClick={copy}
-        className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300 hover:bg-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded bg-[#1A2138] text-white/70 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
       >
         {copied ? "Copié !" : "📋 Copier"}
       </button>
@@ -83,7 +83,7 @@ function CodeBlock({ children, className }: { children?: React.ReactNode; classN
 function MdMessage({ content, streaming }: { content: string; streaming?: boolean }) {
   const { clean, suggestions: _ } = extractSuggestions(content);
   return (
-    <div className="prose prose-sm max-w-none prose-headings:text-slate-900 prose-headings:font-bold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-code:bg-slate-200 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono prose-table:text-xs prose-hr:my-3">
+    <div className="prose prose-sm max-w-none prose-headings:text-[#1A2138] prose-headings:font-bold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-code:bg-[#ECE7DD] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono prose-table:text-xs prose-hr:my-3">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
@@ -97,7 +97,7 @@ function MdMessage({ content, streaming }: { content: string; streaming?: boolea
       >
         {clean}
       </ReactMarkdown>
-      {streaming && <span className="inline-block w-0.5 h-4 bg-violet-500 ml-0.5 animate-blink align-text-bottom" />}
+      {streaming && <span className="inline-block w-0.5 h-4 bg-[#D4537E] ml-0.5 animate-blink align-text-bottom" />}
     </div>
   );
 }
@@ -121,8 +121,8 @@ function QuestionForm({ questions, onSubmit, disabled }: {
   return (
     <div className="mt-2 ml-8 flex flex-col gap-2">
       {questions.map((q, i) => (
-        <div key={i} className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col gap-1.5">
-          <p className="text-xs font-semibold text-slate-700">{q}</p>
+        <div key={i} className="bg-white border border-[#ECE7DD] rounded-xl p-3 flex flex-col gap-1.5">
+          <p className="text-xs font-semibold text-[#1A2138]">{q}</p>
           <input
             type="text"
             value={answers[i] ?? ""}
@@ -130,14 +130,14 @@ function QuestionForm({ questions, onSubmit, disabled }: {
             onKeyDown={e => { if (e.key === "Enter" && allAnswered) handleSubmit(); }}
             placeholder="Ta réponse..."
             disabled={disabled}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-violet-400 transition-colors disabled:opacity-50"
+            className="text-sm border border-[#ECE7DD] rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4537E] transition-colors disabled:opacity-50"
           />
         </div>
       ))}
       <button
         onClick={handleSubmit}
         disabled={!allAnswered || disabled}
-        className="self-start mt-1 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
+        className="self-start mt-1 px-4 py-2 rounded-xl bg-[#1A2138] hover:bg-[#2A3252] disabled:opacity-40 text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z" /></svg>
         Envoyer mes réponses
@@ -164,21 +164,21 @@ function MessageActions({ content, onRegenerate, isLast }: {
   return (
     <div className="flex items-center gap-1 mt-1.5 ml-8 opacity-0 group-hover:opacity-100 transition-opacity">
       <button onClick={copy} title="Copier"
-        className="text-[10px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors">
+        className="text-[10px] px-2 py-1 rounded-lg bg-[#FAF8F4] hover:bg-[#ECE7DD] text-[#8A8579] transition-colors">
         {copied ? "✓ Copié" : "📋 Copier"}
       </button>
       {isLast && onRegenerate && (
         <button onClick={onRegenerate} title="Régénérer"
-          className="text-[10px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors">
+          className="text-[10px] px-2 py-1 rounded-lg bg-[#FAF8F4] hover:bg-[#ECE7DD] text-[#8A8579] transition-colors">
           🔄 Régénérer
         </button>
       )}
       <button onClick={() => setFeedback("up")}
-        className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${feedback === "up" ? "bg-green-100 text-green-600" : "bg-slate-100 hover:bg-slate-200 text-slate-500"}`}>
+        className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${feedback === "up" ? "bg-[#ECE7DD] text-[#1A2138]" : "bg-[#FAF8F4] hover:bg-[#ECE7DD] text-[#8A8579]"}`}>
         👍
       </button>
       <button onClick={() => setFeedback("down")}
-        className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${feedback === "down" ? "bg-red-100 text-red-500" : "bg-slate-100 hover:bg-slate-200 text-slate-500"}`}>
+        className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${feedback === "down" ? "bg-[#ECE7DD] text-[#1A2138]" : "bg-[#FAF8F4] hover:bg-[#ECE7DD] text-[#8A8579]"}`}>
         👎
       </button>
     </div>
@@ -390,21 +390,21 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
         <div className="w-full sm:max-w-lg bg-white sm:rounded-2xl flex flex-col shadow-2xl" style={{ height: "85vh" }}>
 
           {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold shrink-0">✦</div>
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-[#ECE7DD] shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-[#1A2138] flex items-center justify-center text-white text-sm font-bold shrink-0">✦</div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-900">Linkeo · Chef de projet IA</p>
-              <p className="text-xs text-slate-400 truncate">{projectTitre}</p>
+              <p className="text-sm font-bold text-[#1A2138]">Linkeo · Chef de projet IA</p>
+              <p className="text-xs text-[#8A8579] truncate">{projectTitre}</p>
             </div>
-            <button onClick={clearHistory} title="Nouvelle conversation" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors text-sm">🗑</button>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors text-lg">✕</button>
+            <button onClick={clearHistory} title="Nouvelle conversation" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#FAF8F4] text-[#8A8579] hover:text-[#1A2138] transition-colors text-sm">↺</button>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#FAF8F4] text-[#8A8579] hover:text-[#1A2138] transition-colors text-lg">✕</button>
           </div>
 
           {/* Quick actions */}
-          <div className="px-4 py-2.5 border-b border-slate-100 flex gap-2 overflow-x-auto scrollbar-hide shrink-0">
+          <div className="px-4 py-2.5 border-b border-[#ECE7DD] flex gap-2 overflow-x-auto scrollbar-hide shrink-0">
             {QUICK_ACTIONS.map((a) => (
               <button key={a.label} onClick={() => sendMessage(a.prompt)} disabled={isLoading}
-                className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:text-violet-600 hover:bg-violet-50 transition-all disabled:opacity-40">
+                className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border border-[#ECE7DD] bg-white text-[#8A8579] hover:border-[#1A2138] hover:text-[#1A2138] transition-all disabled:opacity-40">
                 {a.label}
               </button>
             ))}
@@ -425,12 +425,12 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
                 <div key={i} className="flex flex-col msg-fade group">
                   <div className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                     {isAssistant && (
-                      <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0 mr-2 mt-1">✦</div>
+                      <div className="w-6 h-6 rounded-lg bg-[#1A2138] flex items-center justify-center text-white text-xs font-bold shrink-0 mr-2 mt-1">✦</div>
                     )}
                     <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
                       msg.role === "user"
-                        ? "bg-violet-600 text-white rounded-br-md"
-                        : "bg-slate-100 text-slate-800 rounded-bl-md"
+                        ? "bg-[#D4537E] text-white rounded-br-md"
+                        : "bg-[#FAF8F4] text-[#1A2138] rounded-bl-md border border-[#ECE7DD]"
                     }`}>
                       {isAssistant ? (
                         <MdMessage content={msg.content} streaming={isStreamingThis} />
@@ -463,7 +463,7 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
                     <div className="ml-8 mt-2 flex flex-wrap gap-2">
                       {suggestions.map((s, si) => (
                         <button key={si} onClick={() => sendMessage(s)} disabled={isLoading}
-                          className="text-xs px-3 py-1.5 rounded-full border border-violet-200 text-violet-600 bg-violet-50 hover:bg-violet-100 hover:border-violet-300 transition-all disabled:opacity-40">
+                          className="text-xs px-3 py-1.5 rounded-full border border-[#ECE7DD] text-[#1A2138] bg-white hover:bg-[#FAF8F4] hover:border-[#1A2138] transition-all disabled:opacity-40">
                           {s}
                         </button>
                       ))}
@@ -475,17 +475,17 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
 
             {(roadmapLoading || ficheLoading) && (
               <div className="flex justify-start msg-fade">
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0 mr-2 mt-1">✦</div>
-                <div className="bg-slate-100 px-4 py-3 rounded-2xl rounded-bl-md flex gap-1 items-center">
-                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                <div className="w-6 h-6 rounded-lg bg-[#1A2138] flex items-center justify-center text-white text-xs font-bold shrink-0 mr-2 mt-1">✦</div>
+                <div className="bg-[#FAF8F4] border border-[#ECE7DD] px-4 py-3 rounded-2xl rounded-bl-md flex gap-1 items-center">
+                  <span className="w-1.5 h-1.5 bg-[#8A8579] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 bg-[#8A8579] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 bg-[#8A8579] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             )}
 
             {error && (
-              <div className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-center">
+              <div className="text-xs text-[#D4537E] bg-white border border-[#D4537E] rounded-xl px-3 py-2 text-center">
                 ❌ {error}
               </div>
             )}
@@ -494,7 +494,7 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
           </div>
 
           {/* Input */}
-          <div className="px-4 py-3 border-t border-slate-100 shrink-0">
+          <div className="px-4 py-3 border-t border-[#ECE7DD] shrink-0">
             <div className="flex gap-2 items-end">
               <textarea
                 ref={textareaRef}
@@ -504,18 +504,18 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
                 placeholder="Ou écris directement à Linkeo..."
                 rows={1}
                 disabled={isLoading}
-                className="flex-1 resize-none border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-violet-400 transition-colors disabled:opacity-50 overflow-hidden"
+                className="flex-1 resize-none border border-[#ECE7DD] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#D4537E] transition-colors disabled:opacity-50 overflow-hidden"
                 style={{ minHeight: 40, maxHeight: 96 }}
               />
               <button
                 onClick={() => sendMessage(input)}
                 disabled={!input.trim() || isLoading}
-                className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-40 flex items-center justify-center text-white transition-colors shrink-0"
+                className="w-10 h-10 rounded-xl bg-[#1A2138] hover:bg-[#2A3252] disabled:opacity-40 flex items-center justify-center text-white transition-colors shrink-0"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z" /></svg>
               </button>
             </div>
-            <p className="text-[10px] text-slate-300 text-center mt-2">Linkeo · Chef de projet IA · Propulsé par Claude</p>
+            <p className="text-[10px] text-[#8A8579]/60 text-center mt-2">Linkeo · Chef de projet IA · Propulsé par Claude</p>
           </div>
         </div>
       </div>

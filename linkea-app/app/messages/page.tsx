@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
-import { MessageCircle, Briefcase, ChevronDown, ChevronUp, Send, Users, Plus, X } from "lucide-react";
+import { MessageCircle, Briefcase, ChevronDown, ChevronUp, Send, Users, Plus, X, Ban } from "lucide-react";
+
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
 
 type Conversation = {
   id: string;
@@ -288,27 +290,29 @@ export default function MessagesPage() {
         </div>
         <div className="max-w-2xl mx-auto px-4 py-4 flex flex-col gap-3">
           {/* Infos ban */}
-          <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid var(--rose-border)" }}>
-            <div className="px-4 py-3 flex items-center gap-3" style={{ background: "var(--rose-soft)" }}>
-              <span className="text-lg shrink-0">🚫</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold" style={{ color: "var(--rose)" }}>
+          <div style={{ borderRadius: 16, overflow: "hidden", border: `1px solid ${C.hairline}`, background: C.surface }}>
+            <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${C.hairline}`, background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Ban size={16} strokeWidth={2} style={{ color: C.rose }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: 0 }}>
                   Compte {banInfo?.type === "permanent" ? "banni définitivement" : "suspendu"}
                 </p>
                 {banInfo?.raison && (
-                  <p className="text-xs mt-0.5" style={{ color: "var(--rose)" }}>Motif : {banInfo.raison}</p>
+                  <p style={{ fontSize: 12, color: C.muted, margin: "2px 0 0" }}>Motif : {banInfo.raison}</p>
                 )}
               </div>
             </div>
             {banInfo?.type === "temp" && banInfo.expires_at && countdown && (
-              <div className="px-4 py-3 flex items-center justify-between" style={{ background: "#fff7f7", borderTop: "1px solid var(--rose-border)" }}>
-                <span className="text-xs font-semibold text-slate-500">Levée du ban dans</span>
-                <span className="text-sm font-black tabular-nums" style={{ color: "var(--rose)" }}>{countdown}</span>
+              <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: C.canvas, borderTop: `1px solid ${C.hairline}` }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.muted }}>Levée du ban dans</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{countdown}</span>
               </div>
             )}
             {banInfo?.type === "permanent" && (
-              <div className="px-4 py-3" style={{ background: "#fff7f7", borderTop: "1px solid var(--rose-border)" }}>
-                <p className="text-xs text-slate-500">Cette suspension est définitive. Contacte le support pour contester.</p>
+              <div style={{ padding: "12px 16px", background: C.canvas, borderTop: `1px solid ${C.hairline}` }}>
+                <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Cette suspension est définitive. Contacte le support pour contester.</p>
               </div>
             )}
           </div>
@@ -316,48 +320,39 @@ export default function MessagesPage() {
             <div onClick={() => router.push(`/support/${supportConv.id}`)}
               className="cursor-pointer active:scale-[0.99] transition-transform"
               style={{ WebkitTapHighlightColor: "transparent" }}>
-              <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-                style={{
-                  background: "linear-gradient(180deg, #ffffff 0%, #fdfcfc 100%)",
-                  border: "1px solid var(--rose-border)",
-                  boxShadow: "0 2px 12px rgba(244,63,94,0.08), 0 1px 3px rgba(0,0,0,0.04)",
-                }}>
-                <div className="relative shrink-0">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base"
-                    style={{ background: "linear-gradient(135deg, #f43f5e, #e8304f)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}>
-                    L
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 16, background: C.surface, border: `1px solid ${C.hairline}` }}>
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: "#fff", lineHeight: 1 }}>L</span>
                   </div>
                   {supportConv.unreadCount > 0 && (
-                    <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-white rounded-full px-1"
-                      style={{ background: "var(--rose)", fontSize: 10, fontWeight: 800 }}>
+                    <div style={{ position: "absolute", top: -3, right: -3, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", borderRadius: 999, padding: "0 4px", background: C.rose, fontSize: 10, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
                       {supportConv.unreadCount > 9 ? "9+" : supportConv.unreadCount}
                     </div>
                   )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-bold" style={{ color: "var(--text)" }}>Support Linkea</span>
-                  <p className="text-xs" style={{ color: "var(--subtle)" }}>Équipe Linkea</p>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>Support Linkea</span>
+                  <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Équipe Linkea</p>
                   {supportConv.lastMessage && (
-                    <p className="text-xs truncate mt-0.5" style={{ color: "var(--muted)" }}>{supportConv.lastMessage}</p>
+                    <p style={{ fontSize: 12, color: C.muted, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{supportConv.lastMessage}</p>
                   )}
                 </div>
-                <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: "var(--border-2)", flexShrink: 0 }}>
+                <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: C.hairline, flexShrink: 0 }}>
                   <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center py-10 rounded-2xl"
-              style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)" }}>
-              <p className="text-sm" style={{ color: "var(--muted)" }}>Conversation en cours de création...</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 0", borderRadius: 16, background: C.surface, border: `1px solid ${C.hairline}` }}>
+              <p style={{ fontSize: 14, color: C.muted, margin: 0 }}>Conversation en cours de création...</p>
             </div>
           )}
 
           {/* Déconnexion */}
           <button
             onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }}
-            className="w-full py-3 rounded-2xl text-sm font-semibold transition-colors"
-            style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", color: "var(--muted)" }}
+            style={{ width: "100%", padding: "12px 0", borderRadius: 12, fontSize: 14, fontWeight: 600, background: C.surface, border: `1px solid ${C.hairline}`, color: C.muted, cursor: "pointer" }}
           >
             Se déconnecter
           </button>
@@ -375,7 +370,7 @@ export default function MessagesPage() {
         <div className="page-header px-4 py-4">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={() => router.push("/admin")} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/5 transition-colors text-slate-400 hover:text-slate-700">
+              <button onClick={() => router.push("/admin")} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: "none", border: "none", cursor: "pointer", color: C.muted }}>
                 <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M7 1L1 7l6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </button>
               <div>
@@ -408,39 +403,29 @@ export default function MessagesPage() {
             <div key={c.id} onClick={() => router.push(`/support/${c.id}`)}
               className="cursor-pointer active:scale-[0.99] transition-transform"
               style={{ WebkitTapHighlightColor: "transparent" }}>
-              <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-                style={{
-                  background: c.unreadCount > 0
-                    ? "linear-gradient(135deg, rgba(244,63,94,0.04) 0%, #ffffff 60%)"
-                    : "linear-gradient(180deg, #ffffff 0%, #fdfcfc 100%)",
-                  border: c.unreadCount > 0 ? "1px solid rgba(244,63,94,0.16)" : "1px solid rgba(0,0,0,0.075)",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)",
-                }}>
-                <div className="relative shrink-0">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base"
-                    style={{ background: "linear-gradient(135deg, #f43f5e, #8b5cf6)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}>
-                    {c.nom[0]?.toUpperCase() ?? "?"}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 16, background: C.surface, border: c.unreadCount > 0 ? `1px solid ${C.rose}` : `1px solid ${C.hairline}` }}>
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{c.nom[0]?.toUpperCase() ?? "?"}</span>
                   </div>
                   {c.unreadCount > 0 && (
-                    <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-white rounded-full px-1"
-                      style={{ background: "var(--rose)", fontSize: 10, fontWeight: 800 }}>
+                    <div style={{ position: "absolute", top: -3, right: -3, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", borderRadius: 999, padding: "0 4px", background: C.rose, fontSize: 10, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
                       {c.unreadCount > 9 ? "9+" : c.unreadCount}
                     </div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-sm font-bold" style={{ color: "var(--text)" }}>{c.nom}</span>
-                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full"
-                      style={{ background: "var(--rose-soft)", color: "var(--rose)", fontSize: 10 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{c.nom}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", padding: "2px 7px", borderRadius: 6, border: `1px solid ${C.hairline}`, background: C.canvas, color: C.rose }}>
                       Banni
                     </span>
                   </div>
                   {c.lastMessage && (
-                    <p className="text-xs truncate" style={{ color: "var(--muted)" }}>{c.lastMessage}</p>
+                    <p className="text-xs truncate" style={{ color: C.muted }}>{c.lastMessage}</p>
                   )}
                 </div>
-                <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: "var(--border-2)", flexShrink: 0 }}>
+                <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: C.hairline, flexShrink: 0 }}>
                   <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
@@ -470,17 +455,11 @@ export default function MessagesPage() {
         style={{ WebkitTapHighlightColor: "transparent" }}
       >
         <div
-          className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
           style={{
-            background: hasUnread
-              ? "linear-gradient(135deg, rgba(244,63,94,0.04) 0%, #ffffff 60%)"
-              : "linear-gradient(180deg, #ffffff 0%, #fdfcfc 100%)",
-            border: hasUnread
-              ? "1px solid rgba(244,63,94,0.16)"
-              : "1px solid rgba(0,0,0,0.075)",
-            boxShadow: hasUnread
-              ? "0 2px 12px rgba(244,63,94,0.08), 0 1px 3px rgba(0,0,0,0.04)"
-              : "0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03)",
+            display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 16,
+            background: C.surface,
+            border: hasUnread ? `1px solid ${C.rose}` : `1px solid ${C.hairline}`,
+            opacity: isArchived ? 0.7 : 1,
           }}
         >
           {/* Avatar */}
@@ -489,29 +468,16 @@ export default function MessagesPage() {
               <img
                 src={c.otherAvatarUrl}
                 alt={otherNom}
-                className="w-12 h-12 rounded-full object-cover"
-                style={{ border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}
+                style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", border: `1px solid ${C.hairline}`, display: "block" }}
               />
             ) : (
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base"
-                style={{
-                  background: isArchived
-                    ? "linear-gradient(135deg, #b0b0b8, #8a8a92)"
-                    : "linear-gradient(135deg, #f43f5e, #8b5cf6)",
-                  border: "2px solid rgba(255,255,255,0.9)",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-                }}
-              >
-                {initial}
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: isArchived ? C.hairline : C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: isArchived ? C.muted : "#fff", lineHeight: 1 }}>{initial}</span>
               </div>
             )}
             {/* Badge non-lu */}
             {hasUnread && (
-              <div
-                className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-white rounded-full px-1"
-                style={{ background: "var(--rose)", fontSize: 10, fontWeight: 800, boxShadow: "0 1px 4px rgba(244,63,94,0.40)" }}
-              >
+              <div style={{ position: "absolute", top: -3, right: -3, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", borderRadius: 999, padding: "0 4px", background: C.rose, fontSize: 10, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
                 {c.unreadCount > 9 ? "9+" : c.unreadCount}
               </div>
             )}
@@ -521,18 +487,14 @@ export default function MessagesPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-0.5">
               <span
-                className="truncate text-sm"
-                style={{
-                  color: hasUnread ? "var(--text)" : isArchived ? "var(--muted)" : "var(--text)",
-                  fontWeight: hasUnread ? 700 : 600,
-                  letterSpacing: "-0.01em",
-                }}
+                className="truncate"
+                style={{ fontSize: 14, color: isArchived ? C.muted : C.ink, fontWeight: hasUnread ? 700 : 600, letterSpacing: "-0.01em" }}
               >
                 {otherNom ?? "—"}
               </span>
               <span
-                className="shrink-0 text-xs tabular-nums"
-                style={{ color: hasUnread ? "var(--rose)" : "var(--subtle)", fontWeight: hasUnread ? 700 : 400 }}
+                className="shrink-0 text-xs"
+                style={{ color: hasUnread ? C.rose : C.muted, fontWeight: hasUnread ? 700 : 400, fontVariantNumeric: "tabular-nums" }}
               >
                 {formatTime(c.lastMessageTime)}
               </span>
@@ -540,8 +502,8 @@ export default function MessagesPage() {
 
             {/* Sous-titre projet */}
             <div className="flex items-center gap-1 mb-1">
-              <Briefcase size={10} style={{ color: "var(--subtle)", flexShrink: 0 }} />
-              <span className="text-xs truncate" style={{ color: "var(--subtle)", fontWeight: 500 }}>
+              <Briefcase size={10} style={{ color: C.muted, flexShrink: 0 }} />
+              <span className="text-xs truncate" style={{ color: C.muted, fontWeight: 500 }}>
                 {c.projects?.titre ?? "Projet"}
               </span>
             </div>
@@ -549,12 +511,12 @@ export default function MessagesPage() {
             {/* Dernier message */}
             <div className="flex items-center gap-1">
               {isMine && !isArchived && (
-                <Send size={10} style={{ color: "var(--subtle)", flexShrink: 0, transform: "rotate(0deg)" }} />
+                <Send size={10} style={{ color: C.muted, flexShrink: 0 }} />
               )}
               <p
                 className="text-xs truncate"
                 style={{
-                  color: hasUnread ? "var(--text-2)" : "var(--muted)",
+                  color: hasUnread ? C.ink : C.muted,
                   fontWeight: hasUnread ? 600 : 400,
                   fontStyle: !c.lastMessage ? "italic" : "normal",
                 }}
@@ -565,7 +527,7 @@ export default function MessagesPage() {
           </div>
 
           {/* Chevron */}
-          <div style={{ color: "var(--border-2)", flexShrink: 0 }}>
+          <div style={{ color: C.hairline, flexShrink: 0 }}>
             <svg width="8" height="14" viewBox="0 0 8 14" fill="none">
               <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -601,11 +563,10 @@ export default function MessagesPage() {
             {groupProjects.length > 0 && (
               <button
                 onClick={() => setShowNewGroup(true)}
-                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
-                style={{ background: "rgba(99,102,241,0.10)", border: "1px solid rgba(99,102,241,0.20)" }}
+                style={{ width: 36, height: 36, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: C.surface, border: `1px solid ${C.hairline}`, cursor: "pointer" }}
                 title="Créer un groupe"
               >
-                <Plus size={16} style={{ color: "#6366f1" }} />
+                <Plus size={16} strokeWidth={2} style={{ color: C.ink }} />
               </button>
             )}
             <NotificationBell />
@@ -658,34 +619,27 @@ export default function MessagesPage() {
                     <div key={g.id} onClick={() => router.push(`/messages/${g.id}`)}
                       className="cursor-pointer active:scale-[0.99] transition-transform"
                       style={{ WebkitTapHighlightColor: "transparent" }}>
-                      <div className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-                        style={{
-                          background: g.unreadCount > 0 ? "linear-gradient(135deg,rgba(99,102,241,0.06) 0%,#fff 60%)" : "linear-gradient(180deg,#fff 0%,#fdfcfc 100%)",
-                          border: g.unreadCount > 0 ? "1px solid rgba(99,102,241,0.20)" : "1px solid rgba(0,0,0,0.075)",
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                        }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 16, background: C.surface, border: g.unreadCount > 0 ? `1px solid ${C.rose}` : `1px solid ${C.hairline}` }}>
                         <div className="relative shrink-0">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold"
-                            style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" }}>
-                            <Users size={18} />
+                          <div style={{ width: 44, height: 44, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Users size={18} strokeWidth={1.8} style={{ color: "#fff" }} />
                           </div>
                           {g.unreadCount > 0 && (
-                            <div className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-white rounded-full px-1"
-                              style={{ background: "#6366f1", fontSize: 10, fontWeight: 800 }}>
+                            <div style={{ position: "absolute", top: -3, right: -3, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", borderRadius: 999, padding: "0 4px", background: C.rose, fontSize: 10, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
                               {g.unreadCount > 9 ? "9+" : g.unreadCount}
                             </div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-0.5">
-                            <span className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>{g.group_name || "Groupe"}</span>
-                            <span className="shrink-0 text-xs tabular-nums" style={{ color: "var(--subtle)" }}>{formatTime(g.lastMessageTime)}</span>
+                            <span className="truncate text-sm font-semibold" style={{ color: C.ink }}>{g.group_name || "Groupe"}</span>
+                            <span className="shrink-0 text-xs" style={{ color: C.muted, fontVariantNumeric: "tabular-nums" }}>{formatTime(g.lastMessageTime)}</span>
                           </div>
-                          <p className="text-xs truncate" style={{ color: "var(--muted)", fontStyle: !g.lastMessage ? "italic" : "normal" }}>
+                          <p className="text-xs truncate" style={{ color: C.muted, fontStyle: !g.lastMessage ? "italic" : "normal" }}>
                             {g.lastMessage ?? "Démarrer la discussion..."}
                           </p>
                         </div>
-                        <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: "var(--border-2)", flexShrink: 0 }}>
+                        <svg width="8" height="14" viewBox="0 0 8 14" fill="none" style={{ color: C.hairline, flexShrink: 0 }}>
                           <path d="M1 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </div>
@@ -728,35 +682,35 @@ export default function MessagesPage() {
       {showNewGroup && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 px-4 pb-6"
           onClick={() => setShowNewGroup(false)}>
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+          <div style={{ width: "100%", maxWidth: 384, background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 24, display: "flex", flexDirection: "column", gap: 16 }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: "rgba(99,102,241,0.10)" }}>
-                  <Users size={18} style={{ color: "#6366f1" }} />
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Users size={18} strokeWidth={1.8} style={{ color: "#fff" }} />
                 </div>
-                <p className="font-bold text-slate-900">Nouveau groupe</p>
+                <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: C.ink, margin: 0 }}>Nouveau groupe</p>
               </div>
-              <button onClick={() => setShowNewGroup(false)} className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-lg">
+              <button onClick={() => setShowNewGroup(false)} style={{ width: 32, height: 32, borderRadius: 10, background: C.canvas, border: `1px solid ${C.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.muted }}>
                 <X size={16} />
               </button>
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-500 mb-1 block">Nom du groupe</label>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, marginBottom: 8 }}>Nom du groupe</label>
               <input
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-indigo-400 transition-colors"
+                style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: `1px solid ${C.hairline}`, background: C.surface, fontSize: 14, color: C.ink, outline: "none" }}
                 placeholder="Ex: Cybercamp — Équipe dev"
               />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-500 mb-1 block">Projet associé</label>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, marginBottom: 8 }}>Projet associé</label>
               <select
                 value={newGroupProjectId}
                 onChange={(e) => setNewGroupProjectId(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-indigo-400 transition-colors"
+                style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: `1px solid ${C.hairline}`, background: C.surface, fontSize: 14, color: C.ink, outline: "none", appearance: "none" }}
               >
                 <option value="">Choisir un projet...</option>
                 {groupProjects.map((p) => (
@@ -765,7 +719,7 @@ export default function MessagesPage() {
               </select>
             </div>
 
-            <p className="text-xs text-slate-400">Tous les membres du projet sélectionné seront ajoutés automatiquement.</p>
+            <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Tous les membres du projet sélectionné seront ajoutés automatiquement.</p>
 
             <button
               onClick={async () => {
@@ -814,13 +768,13 @@ export default function MessagesPage() {
                 setCreatingGroup(false);
               }}
               disabled={creatingGroup || !newGroupProjectId}
-              className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
-              style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
+              style={{ width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 14, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.ink, border: "none", cursor: "pointer", opacity: (creatingGroup || !newGroupProjectId) ? 0.4 : 1 }}
             >
               {creatingGroup
-                ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                : <><Users size={15} /> Créer le groupe</>}
+                ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
+                : <><Users size={15} strokeWidth={2} /> Créer le groupe</>}
             </button>
+            <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         </div>
       )}

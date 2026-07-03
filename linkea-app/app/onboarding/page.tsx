@@ -3,6 +3,30 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { Camera, ArrowRight } from "lucide-react";
+
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: 12,
+  border: `1px solid ${C.hairline}`,
+  background: C.surface,
+  fontSize: 14,
+  color: C.ink,
+  outline: "none",
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 11,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "1.2px",
+  color: C.muted,
+  marginBottom: 8,
+};
 
 export default function Onboarding() {
   const router = useRouter();
@@ -115,95 +139,106 @@ export default function Onboarding() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 rounded-full border-2 border-pink-400 border-t-transparent animate-spin" />
+      <div style={{ minHeight: "100vh", background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${C.hairline}`, borderTopColor: C.ink, animation: "lk-spin 0.8s linear infinite" }} />
+        <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  const initiale = form.nom?.[0]?.toUpperCase() ?? "?";
+  const initiale = form.nom?.[0]?.toUpperCase();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white px-4 py-16">
-      <div className="w-full max-w-md">
-        <div className="mb-8">
-          <span className="label-tag bg-pink-50 text-pink-600 mb-4 inline-flex">
+    <div style={{ minHeight: "100vh", background: C.canvas, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "64px 20px" }}>
+      <style>{`
+        @keyframes lk-spin { to { transform: rotate(360deg); } }
+        .lk-input:focus { outline: 2px solid ${C.rose}; outline-offset: 1px; }
+      `}</style>
+      <div style={{ width: "100%", maxWidth: 440 }}>
+
+        {/* En-tête */}
+        <div style={{ marginBottom: 32 }}>
+          <span style={{ display: "inline-block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, border: `1px solid ${C.hairline}`, background: C.surface, borderRadius: 7, padding: "4px 10px", marginBottom: 16 }}>
             {role === "founder" ? "Founder" : "Développeur"}
           </span>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+          <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 700, color: C.ink, margin: 0, lineHeight: 1.15 }}>
             Complète ton profil
           </h1>
-          <p className="text-slate-500 mt-2">
+          <p style={{ fontSize: 14, color: C.muted, margin: "10px 0 0", lineHeight: 1.5 }}>
             Ces infos nous aident à trouver le meilleur match pour toi.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
 
           {/* Avatar upload */}
-          <div className="flex flex-col items-center gap-3 mb-2">
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginBottom: 4 }}>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="relative group"
+              style={{ position: "relative", background: "none", border: "none", cursor: "pointer", padding: 0 }}
             >
               {avatarPreview ? (
                 <img
                   src={avatarPreview}
                   alt="Aperçu"
-                  className="w-20 h-20 rounded-full object-cover border-2 border-pink-300"
+                  style={{ width: 80, height: 80, borderRadius: 20, objectFit: "cover", border: `1px solid ${C.hairline}`, display: "block" }}
                 />
               ) : (
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-2xl font-black border-2 border-transparent group-hover:border-pink-300 transition-all">
-                  {initiale !== "?" ? initiale : "📷"}
+                <div style={{ width: 80, height: 80, borderRadius: 20, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {initiale
+                    ? <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{initiale}</span>
+                    : <Camera size={24} strokeWidth={1.5} style={{ color: "rgba(255,255,255,0.75)" }} />
+                  }
                 </div>
               )}
-              <span className="absolute bottom-0 right-0 w-6 h-6 bg-pink-500 rounded-full flex items-center justify-center text-white text-xs border-2 border-white">
+              <span style={{ position: "absolute", bottom: -4, right: -4, width: 24, height: 24, background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: C.ink, lineHeight: 1 }}>
                 +
               </span>
             </button>
-            <p className="text-xs text-slate-400">
-              {avatarPreview ? "Photo sélectionnée ✓" : "Ajouter une photo de profil"}
+            <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
+              {avatarPreview ? "Photo sélectionnée" : "Ajouter une photo de profil"}
             </p>
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
               onChange={handleAvatarChange}
-              className="hidden"
+              style={{ display: "none" }}
             />
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Nom complet</label>
-            <input name="nom" value={form.nom} onChange={handleChange} placeholder="Jean Dupont" required className="input-field" />
+            <label style={labelStyle}>Nom complet</label>
+            <input name="nom" value={form.nom} onChange={handleChange} placeholder="Jean Dupont" required className="lk-input" style={inputStyle} />
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-slate-700 mb-1.5 block">École</label>
-            <input name="ecole" value={form.ecole} onChange={handleChange} placeholder="HEC, Epitech, 42..." className="input-field" />
+            <label style={labelStyle}>École</label>
+            <input name="ecole" value={form.ecole} onChange={handleChange} placeholder="HEC, Epitech, 42..." className="lk-input" style={inputStyle} />
           </div>
 
           {role === "founder" && (
             <>
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Décris ton idée</label>
+                <label style={labelStyle}>Décris ton idée</label>
                 <textarea
                   name="description_idee"
                   value={form.description_idee}
                   onChange={handleChange}
                   placeholder="Une plateforme qui permet de..."
                   rows={3}
-                  className="input-field resize-none"
+                  className="lk-input"
+                  style={{ ...inputStyle, resize: "none", lineHeight: 1.5 }}
                 />
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Besoin technique</label>
-                <input name="besoin_tech" value={form.besoin_tech} onChange={handleChange} placeholder="App mobile, web app, API..." className="input-field" />
+                <label style={labelStyle}>Besoin technique</label>
+                <input name="besoin_tech" value={form.besoin_tech} onChange={handleChange} placeholder="App mobile, web app, API..." className="lk-input" style={inputStyle} />
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Budget</label>
-                <select name="budget" value={form.budget} onChange={handleChange} className="input-field">
+                <label style={labelStyle}>Budget</label>
+                <select name="budget" value={form.budget} onChange={handleChange} className="lk-input" style={{ ...inputStyle, appearance: "none" }}>
                   <option value="">Sélectionne un budget</option>
                   <option value="0-500€">0 – 500€</option>
                   <option value="500-1500€">500 – 1500€</option>
@@ -217,31 +252,39 @@ export default function Onboarding() {
           {role === "developer" && (
             <>
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Compétences <span className="text-slate-400 font-normal">(séparées par des virgules)</span></label>
-                <input name="competences" value={form.competences} onChange={handleChange} placeholder="React, Node.js, Flutter..." className="input-field" />
+                <label style={labelStyle}>Compétences <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(séparées par des virgules)</span></label>
+                <input name="competences" value={form.competences} onChange={handleChange} placeholder="React, Node.js, Flutter..." className="lk-input" style={inputStyle} />
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Disponibilité (heures/semaine)</label>
-                <input name="dispo_heures_semaine" type="number" value={form.dispo_heures_semaine} onChange={handleChange} placeholder="10" min={1} max={40} className="input-field" />
+                <label style={labelStyle}>Disponibilité (heures/semaine)</label>
+                <input name="dispo_heures_semaine" type="number" value={form.dispo_heures_semaine} onChange={handleChange} placeholder="10" min={1} max={40} className="lk-input" style={{ ...inputStyle, fontVariantNumeric: "tabular-nums" }} />
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">GitHub</label>
-                <input name="github" value={form.github} onChange={handleChange} placeholder="https://github.com/..." className="input-field" />
+                <label style={labelStyle}>GitHub</label>
+                <input name="github" value={form.github} onChange={handleChange} placeholder="https://github.com/..." className="lk-input" style={inputStyle} />
               </div>
             </>
           )}
 
           <div>
-            <label className="text-sm font-semibold text-slate-700 mb-1.5 block">LinkedIn</label>
-            <input name="linkedin" value={form.linkedin} onChange={handleChange} placeholder="https://linkedin.com/in/..." className="input-field" />
+            <label style={labelStyle}>LinkedIn</label>
+            <input name="linkedin" value={form.linkedin} onChange={handleChange} placeholder="https://linkedin.com/in/..." className="lk-input" style={inputStyle} />
           </div>
 
           {error && (
-            <p className="text-sm text-red-500 bg-red-50 px-4 py-3 rounded-xl">{error}</p>
+            <p style={{ fontSize: 13, color: C.rose, background: C.surface, border: `1px solid ${C.rose}`, padding: "12px 16px", borderRadius: 12, margin: 0 }}>{error}</p>
           )}
 
-          <button type="submit" disabled={saving} className="btn-pink w-full mt-2">
-            {saving ? "Enregistrement..." : "Accéder à mon espace →"}
+          <button
+            type="submit"
+            disabled={saving}
+            className="lk-input"
+            style={{ width: "100%", padding: "14px 0", borderRadius: 12, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 600, cursor: saving ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 6, opacity: saving ? 0.6 : 1 }}
+          >
+            {saving
+              ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
+              : <>Accéder à mon espace <ArrowRight size={15} strokeWidth={2} /></>
+            }
           </button>
         </form>
       </div>

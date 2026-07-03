@@ -26,6 +26,19 @@ type Project = {
   };
 };
 
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
+
+function ProjectThumbnail({ titre, size = 48 }: { titre: string; size?: number }) {
+  const r = size >= 56 ? 16 : 14;
+  return (
+    <div style={{ width: size, height: size, borderRadius: r, background: C.hairline, border: `1px solid ${C.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: Math.round(size * 0.38), fontWeight: 600, color: C.ink, lineHeight: 1 }}>
+        {titre?.[0]?.toUpperCase() ?? "?"}
+      </span>
+    </div>
+  );
+}
+
 const DEADLINES = ["2 semaines", "1 mois", "2 mois", "3 mois", "Flexible"];
 const STACKS    = ["React", "Node.js", "Flutter", "Python", "Vue.js", "Laravel", "Swift", "Kotlin"];
 
@@ -276,34 +289,19 @@ export default function ProjetsPage() {
                 return (
                   <div key={p.id} onClick={() => setSelected(p)} className="card cursor-pointer"
                     style={{
-                      padding: "16px", transition: "box-shadow 0.18s, border-color 0.18s",
-                      ...(isSelected ? {
-                        borderColor: "rgba(244,63,94,0.3)",
-                        boxShadow: "0 0 0 3px rgba(244,63,94,0.08), 0 6px 20px rgba(0,0,0,0.07)",
-                      } : {}),
+                      padding: "16px", transition: "border-color 0.15s",
+                      ...(isSelected ? { borderColor: C.rose } : {}),
                     }}>
                     <div className="flex items-start gap-3.5">
-                      <button onClick={(e) => { e.stopPropagation(); router.push(`/profil/${p.profiles_founder?.user_id}`); }}
-                        className="shrink-0 hover:opacity-80 transition-opacity">
-                        {p.profiles_founder?.avatar_url
-                          ? <img src={p.profiles_founder.avatar_url} alt={p.profiles_founder.nom} className="object-cover"
-                              style={{ width: 48, height: 48, borderRadius: 14, border: "1px solid rgba(0,0,0,0.08)" }} />
-                          : <div style={{ width: 48, height: 48, borderRadius: 14,
-                              background: "linear-gradient(135deg, var(--rose-soft) 0%, #f3f0ff 100%)",
-                              border: "1px solid rgba(0,0,0,0.07)", display: "flex", alignItems: "center",
-                              justifyContent: "center", fontSize: 18, fontWeight: 900, color: "var(--rose)" }}>
-                              {p.profiles_founder?.nom?.[0]?.toUpperCase() ?? "?"}
-                            </div>
-                        }
-                      </button>
+                      <ProjectThumbnail titre={p.titre} size={48} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-0.5">
                           <h3 className="font-bold text-[14px] leading-snug" style={{ color: "var(--text)", letterSpacing: "-0.015em" }}>
                             {p.titre}
                           </h3>
                           {hasApplied
-                            ? <Check size={13} strokeWidth={2.5} style={{ color: "var(--green)", flexShrink: 0, marginTop: 2 }} />
-                            : sc >= 50 && <span className="text-[11px] font-bold shrink-0" style={{ color: "var(--green)", marginTop: 2 }}>{sc}%</span>
+                            ? <Check size={13} strokeWidth={2.5} style={{ color: C.ink, flexShrink: 0, marginTop: 2 }} />
+                            : sc > 0 && <span className="text-[11px] font-bold shrink-0" style={{ color: C.muted, marginTop: 2 }}>{sc}%</span>
                           }
                         </div>
                         <p className="text-xs mb-2" style={{ color: "var(--muted)" }}>
@@ -339,19 +337,7 @@ export default function ProjetsPage() {
                   {/* Header */}
                   <div className="p-6 pb-5" style={{ borderBottom: "1px solid rgba(0,0,0,0.05)" }}>
                     <div className="flex items-start gap-4">
-                      <button onClick={() => router.push(`/profil/${selected.profiles_founder?.user_id}`)}
-                        className="shrink-0 hover:opacity-80 transition-opacity">
-                        {selected.profiles_founder?.avatar_url
-                          ? <img src={selected.profiles_founder.avatar_url} alt={selected.profiles_founder.nom} className="object-cover"
-                              style={{ width: 56, height: 56, borderRadius: 16, border: "1px solid rgba(0,0,0,0.08)" }} />
-                          : <div style={{ width: 56, height: 56, borderRadius: 16,
-                              background: "linear-gradient(135deg, var(--rose-soft) 0%, #f3f0ff 100%)",
-                              border: "1px solid rgba(0,0,0,0.07)", display: "flex", alignItems: "center",
-                              justifyContent: "center", fontSize: 22, fontWeight: 900, color: "var(--rose)" }}>
-                              {selected.profiles_founder?.nom?.[0]?.toUpperCase() ?? "?"}
-                            </div>
-                        }
-                      </button>
+                      <ProjectThumbnail titre={selected.titre} size={56} />
                       <div className="flex-1 min-w-0">
                         <button onClick={() => router.push(`/profil/${selected.profiles_founder?.user_id}`)}
                           className="text-left hover:opacity-70 transition-opacity">
@@ -395,25 +381,15 @@ export default function ProjetsPage() {
                         <p className="text-xs font-semibold" style={{ color: "var(--subtle)", letterSpacing: "0.04em" }}>
                           COMPATIBILITÉ
                         </p>
-                        <p className="text-sm font-black" style={{
-                          color: score >= 75 ? "var(--green)" : score >= 40 ? "var(--amber)" : "var(--muted)"
-                        }}>
+                        <p className="text-sm font-black" style={{ color: C.ink, fontVariantNumeric: "tabular-nums" }}>
                           {score}%
                         </p>
                       </div>
                       {/* Barre */}
-                      <div style={{ height: 5, borderRadius: 99, background: "var(--border)", overflow: "hidden" }}>
-                        <div style={{
-                          height: "100%", borderRadius: 99, transition: "width 0.4s ease",
-                          width: `${score}%`,
-                          background: score >= 75
-                            ? "linear-gradient(90deg, var(--green), #10b981)"
-                            : score >= 40
-                            ? "linear-gradient(90deg, var(--amber), #f59e0b)"
-                            : "linear-gradient(90deg, var(--subtle), var(--muted))",
-                        }} />
+                      <div style={{ height: 4, borderRadius: 99, background: C.hairline, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 99, transition: "width 0.4s ease", width: `${score}%`, background: C.ink }} />
                       </div>
-                      <p className="text-xs mt-2" style={{ color: "var(--muted)" }}>
+                      <p className="text-xs mt-2" style={{ color: C.muted }}>
                         {score >= 75
                           ? "Excellente correspondance avec tes compétences"
                           : score >= 40
@@ -460,21 +436,24 @@ export default function ProjetsPage() {
                       <button
                         onClick={() => { if (!candidatures.has(selected.id)) handleCandidater(selected.id); }}
                         disabled={candidatures.has(selected.id) || applying === selected.id}
-                        className={cn(
-                          "w-full py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all",
-                          !candidatures.has(selected.id) && applying !== selected.id && "btn-primary"
-                        )}
                         style={candidatures.has(selected.id) ? {
-                          background: "var(--green-soft)", color: "var(--green)", border: "1px solid var(--green-border)",
-                        } : undefined}
+                          width: "100%", padding: "13px 0", borderRadius: 12, fontSize: 14, fontWeight: 600,
+                          background: C.surface, color: C.muted, border: `1px solid ${C.hairline}`,
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "default",
+                        } : {
+                          width: "100%", padding: "13px 0", borderRadius: 12, fontSize: 14, fontWeight: 600,
+                          background: C.ink, color: "#fff", border: "none",
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer",
+                        }}
                       >
                         {applying === selected.id
-                          ? <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                          ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
                           : candidatures.has(selected.id)
                             ? <><Check size={15} strokeWidth={2.5} /> Candidature envoyée</>
-                            : <>Candidater à ce projet <ArrowRight size={15} strokeWidth={2.2} /></>
+                            : <>Candidater à ce projet <ArrowRight size={15} strokeWidth={2} /></>
                         }
                       </button>
+                      <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
                     </div>
                   )}
                 </div>

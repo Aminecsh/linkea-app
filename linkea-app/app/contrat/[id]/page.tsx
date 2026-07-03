@@ -148,7 +148,7 @@ export default function ContratPage() {
               <div className="flex gap-4">
                 <div className="w-8 shrink-0 pt-0.5">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white"
-                    style={{ background: "linear-gradient(135deg,#f43f5e,#8b5cf6)" }}>
+                    style={{ background: "#1A2138" }}>
                     {d.founder.nom[0]}
                   </div>
                 </div>
@@ -162,7 +162,7 @@ export default function ContratPage() {
               <div className="flex gap-4">
                 <div className="w-8 shrink-0 pt-0.5">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white"
-                    style={{ background: "linear-gradient(135deg,#3b82f6,#6366f1)" }}>
+                    style={{ background: "#1A2138" }}>
                     {d.dev.nom[0]}
                   </div>
                 </div>
@@ -249,12 +249,12 @@ export default function ContratPage() {
                   {contract.founder_signed_at ? (
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
-                        <CheckCircle2 size={14} style={{ color: "var(--green)" }} strokeWidth={2.5} />
+                        <CheckCircle2 size={14} style={{ color: "#1A2138" }} strokeWidth={2.5} />
                         <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{contract.founder_signed_name}</p>
                       </div>
                       <p className="text-xs" style={{ color: "var(--muted)" }}>{fmtFull(contract.founder_signed_at)}</p>
                       {/* Ligne de signature stylisée */}
-                      <div className="mt-3 pt-3" style={{ borderTop: "2px solid var(--green)" }}>
+                      <div className="mt-3 pt-3" style={{ borderTop: "2px solid #1A2138" }}>
                         <p className="text-base font-black italic" style={{ color: "var(--text)", fontFamily: "Georgia, serif" }}>
                           {contract.founder_signed_name}
                         </p>
@@ -279,11 +279,11 @@ export default function ContratPage() {
                   {contract.dev_signed_at ? (
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
-                        <CheckCircle2 size={14} style={{ color: "var(--green)" }} strokeWidth={2.5} />
+                        <CheckCircle2 size={14} style={{ color: "#1A2138" }} strokeWidth={2.5} />
                         <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{contract.dev_signed_name}</p>
                       </div>
                       <p className="text-xs" style={{ color: "var(--muted)" }}>{fmtFull(contract.dev_signed_at)}</p>
-                      <div className="mt-3 pt-3" style={{ borderTop: "2px solid var(--green)" }}>
+                      <div className="mt-3 pt-3" style={{ borderTop: "2px solid #1A2138" }}>
                         <p className="text-base font-black italic" style={{ color: "var(--text)", fontFamily: "Georgia, serif" }}>
                           {contract.dev_signed_name}
                         </p>
@@ -331,9 +331,9 @@ export default function ContratPage() {
           {alreadySigned && !bothSigned && (
             <div className="rounded-2xl px-5 py-4 flex items-center gap-3"
               style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.14)" }}>
-              <Clock size={16} style={{ color: "var(--blue)" }} strokeWidth={1.8} />
+              <Clock size={16} style={{ color: "#1A2138" }} strokeWidth={1.8} />
               <div>
-                <p className="text-sm font-bold" style={{ color: "var(--blue)" }}>Tu as signé</p>
+                <p className="text-sm font-bold" style={{ color: "#1A2138" }}>Tu as signé</p>
                 <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>En attente de la signature de l&apos;autre partie.</p>
               </div>
             </div>
@@ -342,9 +342,9 @@ export default function ContratPage() {
           {bothSigned && (
             <div className="rounded-2xl px-5 py-4 flex items-center gap-3"
               style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)" }}>
-              <CheckCircle2 size={16} style={{ color: "var(--green)" }} strokeWidth={2} />
+              <CheckCircle2 size={16} style={{ color: "#1A2138" }} strokeWidth={2} />
               <div>
-                <p className="text-sm font-bold" style={{ color: "var(--green)" }}>Contrat signé par les deux parties</p>
+                <p className="text-sm font-bold" style={{ color: "#1A2138" }}>Contrat signé par les deux parties</p>
                 <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>La collaboration est officiellement lancée.</p>
               </div>
             </div>
@@ -367,9 +367,9 @@ export default function ContratPage() {
               </p>
             </div>
             <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3"
-              style={{ background: "var(--amber-soft)", border: "1px solid var(--amber-border)" }}>
-              <AlertCircle size={14} style={{ color: "var(--amber)", marginTop: 1 }} strokeWidth={2} />
-              <p className="text-xs leading-relaxed" style={{ color: "var(--amber)" }}>
+              style={{ background: "#FAF8F4", border: "1px solid #ECE7DD" }}>
+              <AlertCircle size={14} style={{ color: "#8A8579", marginTop: 1 }} strokeWidth={2} />
+              <p className="text-xs leading-relaxed" style={{ color: "#8A8579" }}>
                 Cette action est définitive et ne peut pas être annulée.
               </p>
             </div>

@@ -87,6 +87,8 @@ function parseCallContent(content: string): CallData | null {
   try { return JSON.parse(content.slice(9)); } catch { return null; }
 }
 
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
+
 function MeetingCard({ data }: { data: MeetingData }) {
   const d = new Date(data.scheduled_at);
   const now = new Date();
@@ -96,25 +98,24 @@ function MeetingCard({ data }: { data: MeetingData }) {
   const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(99,102,241,0.25)", background: "rgba(99,102,241,0.04)", minWidth: 220, maxWidth: 280 }}>
+    <div style={{ borderRadius: 16, overflow: "hidden", border: `1px solid ${C.hairline}`, background: C.surface, minWidth: 220, maxWidth: 280 }}>
       <div className="px-4 pt-3 pb-2">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: "rgba(99,102,241,0.12)" }}>
-            <Calendar size={13} style={{ color: "#6366f1" }} />
+          <div style={{ width: 28, height: 28, borderRadius: 9, background: C.canvas, border: `1px solid ${C.hairline}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Calendar size={13} strokeWidth={2} style={{ color: C.ink }} />
           </div>
-          <span className="text-xs font-bold" style={{ color: "#6366f1" }}>Réunion planifiée</span>
+          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: C.muted }}>Réunion planifiée</span>
         </div>
-        <p className="text-sm font-bold text-slate-900 leading-tight">{data.title}</p>
-        <p className="text-xs text-slate-500 mt-1 capitalize">{label} · {time}</p>
-        <p className="text-xs text-slate-400">{data.duration_minutes} min</p>
+        <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: 0, lineHeight: 1.3 }}>{data.title}</p>
+        <p className="capitalize" style={{ fontSize: 12, color: C.muted, margin: "4px 0 0" }}>{label} · {time}</p>
+        <p style={{ fontSize: 12, color: C.muted, margin: 0, fontVariantNumeric: "tabular-nums" }}>{data.duration_minutes} min</p>
       </div>
-      <div style={{ borderTop: "1px solid rgba(99,102,241,0.15)" }} className="px-3 py-2.5">
+      <div style={{ borderTop: `1px solid ${C.hairline}` }} className="px-3 py-2.5">
         <a
           href={url} target="_blank" rel="noreferrer"
-          className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-bold text-white transition-opacity hover:opacity-90"
-          style={{ background: isPast ? "#6366f1" : "linear-gradient(135deg,#6366f1,#8b5cf6)", opacity: isPast ? 0.7 : 1 }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "9px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#fff", background: C.ink, opacity: isPast ? 0.6 : 1, textDecoration: "none" }}
         >
-          <Video size={12} /> {isPast ? "Voir le replay" : "Rejoindre le call"}
+          <Video size={12} strokeWidth={2} /> {isPast ? "Voir le replay" : "Rejoindre le call"}
           <ExternalLink size={10} style={{ opacity: 0.7 }} />
         </a>
       </div>
@@ -124,23 +125,22 @@ function MeetingCard({ data }: { data: MeetingData }) {
 
 function CallCard({ data, onJoin }: { data: CallData; onJoin: (room: string) => void }) {
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(16,185,129,0.25)", background: "rgba(16,185,129,0.04)", minWidth: 200, maxWidth: 260 }}>
+    <div style={{ borderRadius: 16, overflow: "hidden", border: `1px solid ${C.hairline}`, background: C.surface, minWidth: 200, maxWidth: 260 }}>
       <div className="px-4 py-3">
         <div className="flex items-center gap-2 mb-1.5">
-          <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: "rgba(16,185,129,0.12)" }}>
-            <Video size={13} style={{ color: "#10b981" }} />
+          <div style={{ width: 28, height: 28, borderRadius: 9, background: C.canvas, border: `1px solid ${C.hairline}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Video size={13} strokeWidth={2} style={{ color: C.ink }} />
           </div>
-          <span className="text-xs font-bold" style={{ color: "#10b981" }}>Appel démarré</span>
+          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: C.muted }}>Appel en cours</span>
         </div>
-        <p className="text-xs text-slate-500">par {data.starter}</p>
+        <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>par {data.starter}</p>
       </div>
-      <div style={{ borderTop: "1px solid rgba(16,185,129,0.15)" }} className="px-3 py-2.5">
+      <div style={{ borderTop: `1px solid ${C.hairline}` }} className="px-3 py-2.5">
         <button
           onClick={() => onJoin(data.room)}
-          className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-bold text-white hover:opacity-90 transition-opacity"
-          style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "9px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#fff", background: C.rose, border: "none", cursor: "pointer" }}
         >
-          <Video size={12} /> Rejoindre l'appel
+          <Video size={12} strokeWidth={2} /> Rejoindre l&apos;appel
         </button>
       </div>
     </div>
@@ -541,26 +541,24 @@ export default function ChatPage() {
           {/* Avatar */}
           <button onClick={() => !isGroup && otherUserId && router.push(`/profil/${otherUserId}`)} className="shrink-0">
             {isGroup ? (
-              <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 6px rgba(0,0,0,0.10)" }}>
-                <Users size={16} />
+              <div style={{ width: 36, height: 36, borderRadius: 11, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Users size={16} strokeWidth={1.8} style={{ color: "#fff" }} />
               </div>
             ) : otherAvatarUrl ? (
-              <img src={otherAvatarUrl} alt={otherNom ?? ""} className="w-9 h-9 rounded-full object-cover"
-                style={{ border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 6px rgba(0,0,0,0.10)" }} />
+              <img src={otherAvatarUrl} alt={otherNom ?? ""}
+                style={{ width: 36, height: 36, borderRadius: 11, objectFit: "cover", border: `1px solid ${C.hairline}`, display: "block" }} />
             ) : (
-              <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                style={{ background: "linear-gradient(135deg, #f43f5e, #8b5cf6)", border: "2px solid rgba(255,255,255,0.9)", boxShadow: "0 2px 6px rgba(0,0,0,0.10)" }}>
-                {otherNom?.[0]?.toUpperCase() ?? "?"}
+              <div style={{ width: 36, height: 36, borderRadius: 11, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 14, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{otherNom?.[0]?.toUpperCase() ?? "?"}</span>
               </div>
             )}
           </button>
 
           {/* Nom + statut */}
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm leading-tight truncate" style={{ color: "var(--text)", letterSpacing: "-0.015em" }}>{otherNom}</p>
+            <p className="font-bold text-sm leading-tight truncate" style={{ color: C.ink, letterSpacing: "-0.015em" }}>{otherNom}</p>
             <p className="text-xs truncate transition-all duration-200"
-              style={{ color: otherTyping ? "var(--rose)" : "var(--muted)", fontWeight: otherTyping ? 600 : 400 }}>
+              style={{ color: otherTyping ? C.rose : C.muted, fontWeight: otherTyping ? 600 : 400 }}>
               {otherTyping ? "En train d'écrire…" : conversation?.projects?.titre}
             </p>
           </div>
@@ -571,22 +569,20 @@ export default function ChatPage() {
             {!isArchived && (
               <button
                 onClick={() => setShowCallModal(true)}
-                className="flex items-center justify-center rounded-xl transition-all"
-                style={{ width: 34, height: 34, background: "rgba(16,185,129,0.10)", border: "1px solid rgba(16,185,129,0.20)" }}
+                style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: C.surface, border: `1px solid ${C.hairline}`, cursor: "pointer" }}
                 title="Appel vidéo"
               >
-                <Video size={15} style={{ color: "#10b981" }} />
+                <Video size={15} strokeWidth={2} style={{ color: C.ink }} />
               </button>
             )}
             {/* Planifier meeting */}
             {!isArchived && (
               <button
                 onClick={() => setShowMeetingModal(true)}
-                className="flex items-center justify-center rounded-xl transition-all"
-                style={{ width: 34, height: 34, background: "rgba(99,102,241,0.10)", border: "1px solid rgba(99,102,241,0.20)" }}
+                style={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: C.surface, border: `1px solid ${C.hairline}`, cursor: "pointer" }}
                 title="Planifier une réunion"
               >
-                <Calendar size={15} style={{ color: "#6366f1" }} />
+                <Calendar size={15} strokeWidth={2} style={{ color: C.ink }} />
               </button>
             )}
             <button
@@ -611,13 +607,13 @@ export default function ChatPage() {
         </div>
 
         {contractId && !isArchived && (
-          <div className="mx-3 mb-2 rounded-xl px-3 py-2 flex items-center justify-between"
-            style={{ background: "var(--blue-soft)", border: "1px solid var(--blue-border)" }}>
+          <div className="mx-3 mb-2 flex items-center justify-between"
+            style={{ borderRadius: 10, padding: "8px 12px", background: C.canvas, border: `1px solid ${C.hairline}` }}>
             <div className="flex items-center gap-2">
-              <ScrollText size={13} style={{ color: "var(--blue)", flexShrink: 0 }} />
-              <span className="text-xs font-semibold" style={{ color: "var(--blue)" }}>Projet en cours — contrat signé</span>
+              <ScrollText size={13} strokeWidth={2} style={{ color: C.ink, flexShrink: 0 }} />
+              <span className="text-xs font-semibold" style={{ color: C.ink }}>Projet en cours — contrat signé</span>
             </div>
-            <button onClick={() => router.push(`/contrat/${contractId}`)} className="text-xs font-bold" style={{ color: "var(--blue)" }}>Voir →</button>
+            <button onClick={() => router.push(`/contrat/${contractId}`)} className="text-xs font-bold" style={{ color: C.ink, background: "none", border: "none", cursor: "pointer" }}>Voir →</button>
           </div>
         )}
       </div>
@@ -627,7 +623,7 @@ export default function ChatPage() {
         <div className="max-w-2xl mx-auto px-3 py-4">
           {messages.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-sm" style={{ color: "var(--muted)" }}>Début de la conversation — dites bonjour 👋</p>
+              <p className="text-sm" style={{ color: C.muted }}>Début de la conversation — dites bonjour</p>
             </div>
           )}
 
@@ -672,11 +668,10 @@ export default function ChatPage() {
                         {isLastInGroup ? (
                           <button onClick={() => otherUserId && router.push(`/profil/${otherUserId}`)}>
                             {otherAvatarUrl ? (
-                              <img src={otherAvatarUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+                              <img src={otherAvatarUrl} alt="" style={{ width: 24, height: 24, borderRadius: 8, objectFit: "cover", display: "block" }} />
                             ) : (
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                                style={{ background: "linear-gradient(135deg, #f43f5e, #8b5cf6)" }}>
-                                {otherNom?.[0]?.toUpperCase() ?? "?"}
+                              <div style={{ width: 24, height: 24, borderRadius: 8, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{otherNom?.[0]?.toUpperCase() ?? "?"}</span>
                               </div>
                             )}
                           </button>
@@ -708,10 +703,9 @@ export default function ChatPage() {
                             className="flex items-center gap-2.5 px-4 py-3 text-sm font-semibold"
                             style={{
                               borderRadius: br,
-                              background: isMe ? "linear-gradient(145deg, #f43f5e, #d4264b)" : "#ffffff",
-                              color: isMe ? "#fff" : "var(--text)",
-                              border: isMe ? "none" : "1px solid var(--border-2)",
-                              boxShadow: isMe ? "var(--shadow-rose)" : "var(--shadow-xs)",
+                              background: isMe ? C.rose : C.surface,
+                              color: isMe ? "#fff" : C.ink,
+                              border: isMe ? "none" : `1px solid ${C.hairline}`,
                             }}>
                             {isPdf ? <FileText size={16} style={{ flexShrink: 0 }} /> : <FileArchive size={16} style={{ flexShrink: 0 }} />}
                             <span className="truncate max-w-[160px]">{m.file_url?.split("/").pop()}</span>
@@ -722,12 +716,9 @@ export default function ChatPage() {
                           className="px-4 py-2.5 text-sm leading-relaxed"
                           style={{
                             borderRadius: br,
-                            background: isMe ? "linear-gradient(145deg, #f43f5e 0%, #e8304f 60%, #d4264b 100%)" : "#ffffff",
-                            color: isMe ? "#ffffff" : "var(--text)",
-                            border: isMe ? "none" : "1px solid rgba(0,0,0,0.07)",
-                            boxShadow: isMe
-                              ? "0 2px 10px rgba(244,63,94,0.30), inset 0 1px 0 rgba(255,255,255,0.12)"
-                              : "0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04)",
+                            background: isMe ? C.rose : C.surface,
+                            color: isMe ? "#ffffff" : C.ink,
+                            border: isMe ? "none" : `1px solid ${C.hairline}`,
                             wordBreak: "break-word",
                             whiteSpace: "pre-wrap",
                           }}
@@ -748,11 +739,10 @@ export default function ChatPage() {
                       <div className="w-6 shrink-0 self-end mb-0.5">
                         {isLastInGroup ? (
                           myAvatarUrl ? (
-                            <img src={myAvatarUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+                            <img src={myAvatarUrl} alt="" style={{ width: 24, height: 24, borderRadius: 8, objectFit: "cover", display: "block" }} />
                           ) : (
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                              style={{ background: "linear-gradient(135deg, #3b82f6, #6366f1)" }}>
-                              {myNom?.[0]?.toUpperCase() ?? "?"}
+                            <div style={{ width: 24, height: 24, borderRadius: 8, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{myNom?.[0]?.toUpperCase() ?? "?"}</span>
                             </div>
                           )
                         ) : null}
@@ -768,16 +758,15 @@ export default function ChatPage() {
               <div className="flex items-end gap-2 mt-3">
                 <div className="w-6 shrink-0">
                   {otherAvatarUrl ? (
-                    <img src={otherAvatarUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
+                    <img src={otherAvatarUrl} alt="" style={{ width: 24, height: 24, borderRadius: 8, objectFit: "cover", display: "block" }} />
                   ) : (
-                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                      style={{ background: "linear-gradient(135deg, #f43f5e, #8b5cf6)" }}>
-                      {otherNom?.[0]?.toUpperCase() ?? "?"}
+                    <div style={{ width: 24, height: 24, borderRadius: 8, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{otherNom?.[0]?.toUpperCase() ?? "?"}</span>
                     </div>
                   )}
                 </div>
                 <div className="px-4 py-3 flex gap-1 items-center"
-                  style={{ borderRadius: "18px 18px 18px 5px", background: "#ffffff", border: "1px solid rgba(0,0,0,0.07)", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" }}>
+                  style={{ borderRadius: "18px 18px 18px 5px", background: C.surface, border: `1px solid ${C.hairline}` }}>
                   {[0, 150, 300].map((delay) => (
                     <span key={delay} className="w-2 h-2 rounded-full animate-bounce"
                       style={{ background: "var(--muted)", animationDelay: `${delay}ms` }} />
@@ -842,13 +831,13 @@ export default function ChatPage() {
                       <div className="absolute bottom-12 left-0 z-20 overflow-hidden"
                         style={{ background: "#fff", borderRadius: 16, border: "1px solid var(--border-2)", boxShadow: "var(--shadow-md)", width: 180 }}>
                         <button type="button" onClick={() => { setShowAttach(false); mediaInputRef.current?.click(); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-slate-50 transition-colors" style={{ color: "var(--text)" }}>
-                          <ImageIcon size={16} style={{ color: "var(--blue)" }} /> Photo / Vidéo
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold transition-colors" style={{ color: C.ink }}>
+                          <ImageIcon size={16} strokeWidth={2} style={{ color: C.muted }} /> Photo / Vidéo
                         </button>
-                        <div className="mx-3 h-px" style={{ background: "var(--border)" }} />
+                        <div className="mx-3 h-px" style={{ background: C.hairline }} />
                         <button type="button" onClick={() => { setShowAttach(false); fileInputRef.current?.click(); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold hover:bg-slate-50 transition-colors" style={{ color: "var(--text)" }}>
-                          <FileText size={16} style={{ color: "var(--violet)" }} /> Fichier
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold transition-colors" style={{ color: C.ink }}>
+                          <FileText size={16} strokeWidth={2} style={{ color: C.muted }} /> Fichier
                         </button>
                       </div>
                     </>
@@ -888,9 +877,9 @@ export default function ChatPage() {
                 onBlur={(e)  => { e.target.style.borderColor = "rgba(0,0,0,0.10)"; e.target.style.boxShadow = "0 1px 2px rgba(0,0,0,0.03)"; }}
               />
 
-              <button type="submit" disabled={!hasText || sending} className="shrink-0 flex items-center justify-center rounded-full transition-all"
-                style={{ width: 38, height: 38, background: hasText ? "linear-gradient(145deg, #f43f5e, #d4264b)" : "rgba(0,0,0,0.08)", boxShadow: hasText ? "var(--shadow-rose)" : "none", border: "none", cursor: hasText ? "pointer" : "default", transform: hasText ? "scale(1)" : "scale(0.90)", opacity: sending ? 0.6 : 1, transition: "all 0.18s cubic-bezier(0.34, 1.26, 0.64, 1)" }}>
-                <ArrowUp size={17} color={hasText ? "#fff" : "var(--muted)"} strokeWidth={2.5} />
+              <button type="submit" disabled={!hasText || sending} className="shrink-0 flex items-center justify-center rounded-full"
+                style={{ width: 38, height: 38, background: hasText ? C.rose : C.hairline, border: "none", cursor: hasText ? "pointer" : "default", transform: hasText ? "scale(1)" : "scale(0.90)", opacity: sending ? 0.6 : 1, transition: "all 0.18s cubic-bezier(0.34, 1.26, 0.64, 1)" }}>
+                <ArrowUp size={17} color={hasText ? "#fff" : C.muted} strokeWidth={2.5} />
               </button>
             </form>
           </div>
@@ -949,8 +938,8 @@ export default function ChatPage() {
                               {daysLeft > 0 ? ` · J-${daysLeft}` : daysLeft === 0 ? " · aujourd'hui" : " · terminé"}
                             </p>
                           </div>
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                            style={{ background: s.statut === "en_cours" ? "var(--green-soft)" : s.statut === "termine" ? "var(--blue-soft)" : "var(--amber-soft)", color: s.statut === "en_cours" ? "var(--green)" : s.statut === "termine" ? "var(--blue)" : "var(--amber)" }}>
+                          <span className="text-xs font-semibold px-2 py-0.5"
+                            style={{ borderRadius: 6, border: `1px solid ${C.hairline}`, background: C.surface, color: s.statut === "en_cours" ? C.ink : C.muted }}>
                             {s.statut === "en_cours" ? "En cours" : s.statut === "termine" ? "Terminé" : "À venir"}
                           </span>
                         </button>
@@ -974,9 +963,9 @@ export default function ChatPage() {
                     ) : (
                       <div className="rounded-xl p-3.5" style={{ background: "rgba(0,0,0,0.03)", border: "1px solid var(--border)" }}>
                         <p className="label mb-3">Aperçu du message</p>
-                        <Section label="Terminé" items={done}   icon={<CheckCircle2 size={12} style={{ color: "var(--green)" }} />} color="var(--green)" />
-                        <Section label="En cours" items={inProg} icon={<RotateCcw    size={12} style={{ color: "var(--blue)" }} />}  color="var(--blue)" />
-                        <Section label="À faire"  items={todo}   icon={<Circle       size={12} style={{ color: "var(--muted)" }} />} color="var(--muted)" />
+                        <Section label="Terminé" items={done}   icon={<CheckCircle2 size={12} style={{ color: C.ink }} />} color={C.ink} />
+                        <Section label="En cours" items={inProg} icon={<RotateCcw    size={12} style={{ color: C.ink }} />}  color={C.ink} />
+                        <Section label="À faire"  items={todo}   icon={<Circle       size={12} style={{ color: C.muted }} />} color={C.muted} />
                       </div>
                     );
                   })()}
@@ -998,26 +987,25 @@ export default function ChatPage() {
       {showCallModal && (
         <div className="fixed inset-0 z-60 flex items-end justify-center bg-black/50 px-4 pb-8"
           onClick={() => setShowCallModal(false)}>
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div style={{ width: "100%", maxWidth: 384, background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 24 }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: "rgba(16,185,129,0.10)" }}>
-                  <Video size={20} style={{ color: "#10b981" }} />
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Video size={18} strokeWidth={1.8} style={{ color: "#fff" }} />
                 </div>
                 <div>
-                  <p className="font-bold text-slate-900">Appel vidéo</p>
-                  <p className="text-xs text-slate-400">via Jitsi Meet</p>
+                  <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: C.ink, margin: 0 }}>Appel vidéo</p>
+                  <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>via Jitsi Meet</p>
                 </div>
               </div>
-              <button onClick={() => setShowCallModal(false)} className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-lg">×</button>
+              <button onClick={() => setShowCallModal(false)} style={{ width: 32, height: 32, borderRadius: 10, background: C.canvas, border: `1px solid ${C.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.muted, fontSize: 18, lineHeight: 1 }}>×</button>
             </div>
-            <p className="text-sm text-slate-500 mb-5">
-              Un appel va être démarré avec <strong>{otherNom}</strong>. Les deux participants doivent cliquer sur "Rejoindre" pour se connecter.
+            <p style={{ fontSize: 14, color: C.muted, margin: "0 0 20px", lineHeight: 1.55 }}>
+              Un appel va être démarré avec <strong style={{ color: C.ink }}>{otherNom}</strong>. Les deux participants doivent cliquer sur &quot;Rejoindre&quot; pour se connecter.
             </p>
             <button onClick={startCall}
-              className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2"
-              style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}>
-              <Video size={16} /> Démarrer l'appel
+              style={{ width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 14, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.rose, border: "none", cursor: "pointer" }}>
+              <Video size={16} strokeWidth={2} /> Démarrer l&apos;appel
             </button>
           </div>
         </div>
@@ -1027,47 +1015,47 @@ export default function ChatPage() {
       {showMeetingModal && (
         <div className="fixed inset-0 z-60 flex items-end justify-center bg-black/50 px-4 pb-6"
           onClick={() => setShowMeetingModal(false)}>
-          <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+          <div style={{ width: "100%", maxWidth: 384, background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 24, display: "flex", flexDirection: "column", gap: 16 }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: "rgba(99,102,241,0.10)" }}>
-                  <Calendar size={18} style={{ color: "#6366f1" }} />
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Calendar size={18} strokeWidth={1.8} style={{ color: "#fff" }} />
                 </div>
                 <div>
-                  <p className="font-bold text-slate-900">Planifier une réunion</p>
-                  <p className="text-xs text-slate-400">Lien Jitsi généré automatiquement</p>
+                  <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: C.ink, margin: 0 }}>Planifier une réunion</p>
+                  <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Lien Jitsi généré automatiquement</p>
                 </div>
               </div>
-              <button onClick={() => setShowMeetingModal(false)} className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-lg">×</button>
+              <button onClick={() => setShowMeetingModal(false)} style={{ width: 32, height: 32, borderRadius: 10, background: C.canvas, border: `1px solid ${C.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.muted, fontSize: 18, lineHeight: 1 }}>×</button>
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-500 mb-1 block">Titre</label>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, marginBottom: 8 }}>Titre</label>
               <input value={meetingTitle} onChange={(e) => setMeetingTitle(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-indigo-400 transition-colors"
+                style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: `1px solid ${C.hairline}`, background: C.surface, fontSize: 14, color: C.ink, outline: "none" }}
                 placeholder="Réunion hebdo, Demo, Stand-up..." />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-slate-500 mb-1 block">Date *</label>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, marginBottom: 8 }}>Date *</label>
                 <input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-indigo-400 transition-colors" />
+                  style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: `1px solid ${C.hairline}`, background: C.surface, fontSize: 14, color: C.ink, outline: "none", fontVariantNumeric: "tabular-nums" }} />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-500 mb-1 block">Heure *</label>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, marginBottom: 8 }}>Heure *</label>
                 <input type="time" value={meetingTime} onChange={(e) => setMeetingTime(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:border-indigo-400 transition-colors" />
+                  style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: `1px solid ${C.hairline}`, background: C.surface, fontSize: 14, color: C.ink, outline: "none", fontVariantNumeric: "tabular-nums" }} />
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-500 mb-2 block">Durée</label>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, marginBottom: 8 }}>Durée</label>
               <div className="flex gap-2">
                 {[30, 60, 90].map((d) => (
                   <button key={d} onClick={() => setMeetingDuration(d)}
-                    className="flex-1 py-2 rounded-xl text-xs font-bold border transition-colors"
-                    style={{ background: meetingDuration === d ? "#6366f1" : "white", color: meetingDuration === d ? "white" : "#64748b", borderColor: meetingDuration === d ? "#6366f1" : "#e2e8f0" }}>
+                    className="flex-1 py-2 text-xs font-bold transition-colors"
+                    style={{ borderRadius: 10, background: meetingDuration === d ? C.ink : C.surface, color: meetingDuration === d ? "#fff" : C.muted, border: meetingDuration === d ? `1px solid ${C.ink}` : `1px solid ${C.hairline}`, cursor: "pointer", fontVariantNumeric: "tabular-nums" }}>
                     {d} min
                   </button>
                 ))}
@@ -1075,12 +1063,12 @@ export default function ChatPage() {
             </div>
 
             <button onClick={scheduleMeeting} disabled={meetingCreating || !meetingDate || !meetingTime}
-              className="w-full py-3.5 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
-              style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+              style={{ width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 14, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.ink, border: "none", cursor: "pointer", opacity: (meetingCreating || !meetingDate || !meetingTime) ? 0.4 : 1 }}>
               {meetingCreating
-                ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                : <><Calendar size={15} /> Planifier la réunion</>}
+                ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
+                : <><Calendar size={15} strokeWidth={2} /> Planifier la réunion</>}
             </button>
+            <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         </div>
       )}

@@ -56,32 +56,32 @@ export default function ReportModal({ isOpen, onClose, targetType, targetId, tar
       <div className="bg-white rounded-2xl w-full max-w-sm flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="px-5 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-5 pt-5 pb-4 border-b border-[#ECE7DD] flex items-center justify-between">
           <div>
-            <h2 className="text-base font-black text-slate-900">Signaler</h2>
-            {targetNom && <p className="text-xs text-slate-400 mt-0.5">{targetType === "profile" ? "Profil" : "Projet"} · {targetNom}</p>}
+            <h2 className="text-base font-black text-[#1A2138]">Signaler</h2>
+            {targetNom && <p className="text-xs text-[#8A8579] mt-0.5">{targetType === "profile" ? "Profil" : "Projet"} · {targetNom}</p>}
           </div>
-          <button onClick={close} className="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100">✕</button>
+          <button onClick={close} className="text-[#8A8579] hover:text-[#1A2138] w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#FAF8F4]">✕</button>
         </div>
 
         {done ? (
           <div className="px-5 py-10 text-center flex flex-col items-center gap-3">
             <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center text-2xl">✓</div>
-            <p className="font-bold text-slate-900">Signalement envoyé</p>
-            <p className="text-sm text-slate-400">Notre équipe va examiner ce contenu.</p>
+            <p className="font-bold text-[#1A2138]">Signalement envoyé</p>
+            <p className="text-sm text-[#8A8579]">Notre équipe va examiner ce contenu.</p>
             <button onClick={close} className="btn-pink mt-2 px-8 py-2.5">Fermer</button>
           </div>
         ) : (
           <div className="px-5 py-4 flex flex-col gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Raison du signalement</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-[#8A8579] mb-2">Raison du signalement</p>
               <div className="flex flex-col gap-2">
                 {RAISONS.map((r) => (
-                  <label key={r.value} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${raison === r.value ? "border-red-400 bg-red-50" : "border-slate-100 hover:border-slate-200"}`}>
-                    <input type="radio" name="raison" value={r.value} checked={raison === r.value} onChange={() => setRaison(r.value)} className="mt-0.5 accent-red-500 shrink-0" />
+                  <label key={r.value} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${raison === r.value ? "border-[#1A2138] bg-[#FAF8F4]" : "border-[#ECE7DD] hover:border-[#8A8579]"}`}>
+                    <input type="radio" name="raison" value={r.value} checked={raison === r.value} onChange={() => setRaison(r.value)} className="mt-0.5 accent-[#D4537E] shrink-0" />
                     <div>
-                      <p className="text-sm font-bold text-slate-900">{r.label}</p>
-                      <p className="text-xs text-slate-400">{r.desc}</p>
+                      <p className="text-sm font-bold text-[#1A2138]">{r.label}</p>
+                      <p className="text-xs text-[#8A8579]">{r.desc}</p>
                     </div>
                   </label>
                 ))}
@@ -89,7 +89,7 @@ export default function ReportModal({ isOpen, onClose, targetType, targetId, tar
             </div>
 
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Précisions (optionnel)</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-[#8A8579] mb-2">Précisions (optionnel)</p>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}

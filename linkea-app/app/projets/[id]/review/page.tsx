@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { ArrowLeft, Lock, Check } from "lucide-react";
+
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
 
 type OtherParty = { nom: string; ecole?: string; user_id: string; };
 
@@ -123,7 +126,7 @@ export default function ReviewPage() {
     await supabase.from("notifications").insert({
       user_id: other.user_id,
       type: "nouvelle_review",
-      title: "Tu as reçu un avis ⭐",
+      title: "Tu as reçu un avis",
       body: `${ratingLabel} (${rating}/5) sur le projet "${projetTitre}"`,
       link: "/profil",
     });
@@ -132,29 +135,34 @@ export default function ReviewPage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-6 h-6 rounded-full border-2 border-pink-400 border-t-transparent animate-spin" />
+    <div style={{ minHeight: "100vh", background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${C.hairline}`, borderTopColor: C.ink, animation: "lk-spin 0.8s linear infinite" }} />
+      <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 
   if (notAllowed) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-sm w-full text-center">
-        <p className="text-2xl mb-3">🔒</p>
-        <p className="font-bold text-slate-900 mb-1">Accès non autorisé</p>
-        <p className="text-slate-400 text-sm mb-6">Ce projet n'est pas encore terminé ou tu n'y es pas associé.</p>
-        <button onClick={() => router.push("/profil")} className="btn-pink w-full">Retour au profil</button>
+    <div style={{ minHeight: "100vh", background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}>
+      <div className="max-w-sm w-full text-center" style={{ background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 32 }}>
+        <div style={{ width: 48, height: 48, borderRadius: 14, border: `1px solid ${C.hairline}`, background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+          <Lock size={20} strokeWidth={1.5} style={{ color: C.muted }} />
+        </div>
+        <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>Accès non autorisé</p>
+        <p style={{ fontSize: 13, color: C.muted, margin: "0 0 24px" }}>Ce projet n&apos;est pas encore terminé ou tu n&apos;y es pas associé.</p>
+        <button onClick={() => router.push("/profil")} style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Retour au profil</button>
       </div>
     </div>
   );
 
   if (alreadyReviewed) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-sm w-full text-center">
-        <p className="text-3xl mb-3">✅</p>
-        <p className="font-bold text-slate-900 mb-1">Avis déjà soumis</p>
-        <p className="text-slate-400 text-sm mb-6">Tu as déjà laissé un avis pour ce projet.</p>
-        <button onClick={() => router.push("/profil")} className="btn-pink w-full">Retour au profil</button>
+    <div style={{ minHeight: "100vh", background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}>
+      <div className="max-w-sm w-full text-center" style={{ background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 32 }}>
+        <div style={{ width: 48, height: 48, borderRadius: 14, border: `1px solid ${C.hairline}`, background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+          <Check size={20} strokeWidth={2} style={{ color: C.ink }} />
+        </div>
+        <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>Avis déjà soumis</p>
+        <p style={{ fontSize: 13, color: C.muted, margin: "0 0 24px" }}>Tu as déjà laissé un avis pour ce projet.</p>
+        <button onClick={() => router.push("/profil")} style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Retour au profil</button>
       </div>
     </div>
   );
@@ -163,64 +171,66 @@ export default function ReviewPage() {
   const targetLabel = isFounder ? "le développeur" : "le founder";
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      <div className="bg-white rounded-2xl border border-slate-200 p-8 max-w-sm w-full">
+    <div style={{ minHeight: "100vh", background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}>
+      <div className="max-w-sm w-full" style={{ background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 32 }}>
 
-        <button onClick={() => router.push("/profil")} className="text-slate-400 hover:text-slate-600 text-sm font-medium mb-6 block">
-          ← Retour
+        <button onClick={() => router.push("/profil")}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.muted, padding: 0, marginBottom: 24 }}>
+          <ArrowLeft size={14} strokeWidth={2} /> Retour
         </button>
 
         {/* En-tête */}
         <div className="mb-6">
-          <span className="text-xs font-bold uppercase tracking-widest text-pink-500">Avis post-projet</span>
-          <h1 className="text-xl font-black text-slate-900 mt-1">Note {targetLabel}</h1>
-          <p className="text-sm text-slate-400 mt-1">Projet : <span className="font-semibold text-slate-600">{projetTitre}</span></p>
+          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted }}>Avis post-projet</span>
+          <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 22, fontWeight: 700, color: C.ink, margin: "6px 0 0" }}>Note {targetLabel}</h1>
+          <p style={{ fontSize: 13, color: C.muted, margin: "6px 0 0" }}>Projet : <span style={{ fontWeight: 600, color: C.ink }}>{projetTitre}</span></p>
         </div>
 
         {/* Carte de l'autre partie */}
         {other && (
-          <div className="flex items-center gap-3 bg-slate-50 rounded-xl p-4 mb-6">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-black shrink-0 ${
-              isFounder ? "bg-gradient-to-br from-blue-400 to-indigo-500" : "bg-gradient-to-br from-pink-400 to-purple-500"
-            }`}>
-              {other.nom?.[0]?.toUpperCase() ?? "?"}
+          <div className="flex items-center gap-3 mb-6" style={{ background: C.canvas, borderRadius: 12, border: `1px solid ${C.hairline}`, padding: 16 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 11, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{other.nom?.[0]?.toUpperCase() ?? "?"}</span>
             </div>
             <div>
-              <p className="font-bold text-slate-900 text-sm">{other.nom}</p>
-              {other.ecole && <p className="text-xs text-slate-400">{other.ecole}</p>}
-              <p className="text-xs font-semibold text-slate-400 mt-0.5">{isFounder ? "Développeur" : "Founder"}</p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: 0 }}>{other.nom}</p>
+              {other.ecole && <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>{other.ecole}</p>}
+              <p style={{ fontSize: 11, fontWeight: 600, color: C.muted, margin: "2px 0 0" }}>{isFounder ? "Développeur" : "Founder"}</p>
             </div>
           </div>
         )}
 
         {/* Étoiles */}
         <div className="mb-6">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Note</p>
+          <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, margin: "0 0 12px" }}>Note</p>
           <div className="flex gap-2 mb-2">
             {[1, 2, 3, 4, 5].map((star) => (
               <button key={star}
                 onClick={() => setRating(star)}
                 onMouseEnter={() => setHovered(star)}
                 onMouseLeave={() => setHovered(0)}
-                className="text-3xl transition-transform hover:scale-110">
-                <span className={star <= (hovered || rating) ? "text-amber-400" : "text-slate-200"}>★</span>
+                className="transition-transform hover:scale-110"
+                style={{ fontSize: 30, background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1 }}>
+                <span style={{ color: star <= (hovered || rating) ? C.ink : C.hairline }}>★</span>
               </button>
             ))}
           </div>
           {(hovered || rating) > 0 && (
-            <p className="text-sm font-semibold text-slate-600">{LABELS[hovered || rating]}</p>
+            <p style={{ fontSize: 13, fontWeight: 600, color: C.muted, margin: 0 }}>{LABELS[hovered || rating]}</p>
           )}
         </div>
 
         {/* Commentaire */}
         <div className="mb-6">
-          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Commentaire <span className="font-normal normal-case">(optionnel)</span></p>
+          <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, margin: "0 0 8px" }}>Commentaire <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optionnel)</span></p>
           <textarea value={comment} onChange={(e) => setComment(e.target.value)}
             placeholder={isFounder ? "Décris ton expérience avec ce dev..." : "Décris ton expérience avec ce founder..."}
-            rows={3} className="input-field text-sm resize-none w-full" />
+            rows={3}
+            style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: `1px solid ${C.hairline}`, background: C.surface, fontSize: 13, color: C.ink, outline: "none", resize: "none", lineHeight: 1.5 }} />
         </div>
 
-        <button onClick={handleSubmit} disabled={rating === 0 || submitting} className="btn-pink w-full py-3">
+        <button onClick={handleSubmit} disabled={rating === 0 || submitting}
+          style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (rating === 0 || submitting) ? 0.4 : 1 }}>
           {submitting ? "Envoi..." : "Envoyer l'avis"}
         </button>
       </div>
