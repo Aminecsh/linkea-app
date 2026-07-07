@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { trackUsage } from "@/lib/ai-usage";
+import { aiFicheSchema, validationError } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -20,8 +21,9 @@ export async function POST(req: NextRequest) {
   );
   const { data: { user } } = await supabase.auth.getUser(token);
 
-  const { idee, stack, deadline } = await req.json();
-  if (!idee) return NextResponse.json({ error: "Idée manquante" }, { status: 400 });
+  const parsed = aiFicheSchema.safeParse(await req.json());
+  if (!parsed.success) return validationError(parsed.error);
+  const { idee, stack, deadline } = parsed.data;
 
   const prompt = `Tu es expert en rédaction de fiches projet pour une plateforme de freelancing tech.
 

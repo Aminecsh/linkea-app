@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { checkUsage, trackUsage, MONTHLY_TOKEN_LIMIT } from "@/lib/ai-usage";
+import { aiChatSchema } from "@/lib/validation";
 
 const STATUT_LABELS: Record<string, string> = {
   a_venir: "À venir", en_cours: "En cours", termine: "Terminé",
@@ -19,8 +20,11 @@ export async function POST(req: NextRequest) {
   }
   const token = authHeader.slice(7);
 
-  const { messages, projectId } = await req.json();
-  if (!messages?.length) return new Response(JSON.stringify({ error: "Messages manquants" }), { status: 400 });
+  const parsed = aiChatSchema.safeParse(await req.json());
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: "Données invalides", details: parsed.error.issues.map((i) => i.message) }), { status: 400 });
+  }
+  const { messages, projectId } = parsed.data;
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

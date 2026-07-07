@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { disputeResolveSchema, validationError } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("Authorization");
@@ -18,9 +19,10 @@ export async function POST(req: NextRequest) {
   const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
   if (roleData?.role !== "admin") return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
-  const { disputeId, decision, adminNote } = await req.json();
   // decision: "dev" = libérer au dev | "founder" = rembourser le founder
-  if (!disputeId || !decision) return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
+  const parsed = disputeResolveSchema.safeParse(await req.json());
+  if (!parsed.success) return validationError(parsed.error);
+  const { disputeId, decision, adminNote } = parsed.data;
 
   const { data: dispute } = await supabase
     .from("disputes")

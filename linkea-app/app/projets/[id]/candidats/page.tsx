@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { sendEmail } from "@/lib/sendEmail";
 
 type Candidature = {
   id: string;
@@ -172,11 +173,7 @@ export default function CandidatsPage() {
     // Email au dev accepté
     const { data: devProfile } = await supabase.from("profiles_developer").select("email").eq("id", developerId).maybeSingle();
     if (devProfile?.email && project) {
-      await fetch("/api/emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "candidature_acceptee", to: devProfile.email, data: { projetTitre: project.titre } }),
-      });
+      await sendEmail("candidature_acceptee", devProfile.email, { projetTitre: project.titre });
     }
 
     // Emails aux devs refusés
@@ -184,11 +181,7 @@ export default function CandidatsPage() {
     for (const c of refusedCands) {
       const { data: refDevProfile } = await supabase.from("profiles_developer").select("email").eq("id", c.profiles_developer.id).maybeSingle();
       if (refDevProfile?.email && project) {
-        await fetch("/api/emails", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "candidature_refusee", to: refDevProfile.email, data: { projetTitre: project.titre } }),
-        });
+        await sendEmail("candidature_refusee", refDevProfile.email, { projetTitre: project.titre });
       }
     }
 
@@ -221,11 +214,7 @@ export default function CandidatsPage() {
         });
       }
       if (devUserRef?.email) {
-        await fetch("/api/emails", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "candidature_refusee", to: devUserRef.email, data: { projetTitre: project.titre } }),
-        });
+        await sendEmail("candidature_refusee", devUserRef.email, { projetTitre: project.titre });
       }
     }
     setCandidatures((prev) => prev.map((c) => c.id === candidatureId ? { ...c, statut: "refused" } : c));

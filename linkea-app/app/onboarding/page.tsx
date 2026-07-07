@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { validateAvatar } from "@/lib/fileUpload";
 import { Camera, ArrowRight } from "lucide-react";
 
 const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
@@ -81,14 +82,17 @@ export default function Onboarding() {
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const check = validateAvatar(file);
+    if (!check.ok) { e.target.value = ""; alert(check.error); return; }
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
   }
 
   async function uploadAvatar(userId: string): Promise<string | null> {
     if (!avatarFile) return null;
-    const ext = avatarFile.name.split(".").pop();
-    const path = `${userId}/avatar.${ext}`;
+    const check = validateAvatar(avatarFile);
+    if (!check.ok) return null;
+    const path = `${userId}/avatar.${check.ext}`;
     const { error } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true });
     if (error) return null;
     const { data } = supabase.storage.from("avatars").getPublicUrl(path);

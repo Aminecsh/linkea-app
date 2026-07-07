@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { validateAvatar } from "@/lib/fileUpload";
 import {
   ArrowLeft, ArrowRight, Star, Clock, GitBranch, Link2, ExternalLink,
   MessageCircle, Pencil, Briefcase, GraduationCap, Check,
@@ -413,9 +414,10 @@ export default function PublicProfilePage() {
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !currentUserId || !profileId || !targetRole) return;
+    const check = validateAvatar(file);
+    if (!check.ok) { e.target.value = ""; alert(check.error); return; }
     setUploadingAvatar(true);
-    const ext = file.name.split(".").pop();
-    const path = `${currentUserId}/avatar.${ext}`;
+    const path = `${currentUserId}/avatar.${check.ext}`;
     const { error } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
     if (!error) {
       const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
@@ -661,7 +663,7 @@ export default function PublicProfilePage() {
                 <input value={expF.date_debut} onChange={(e) => setExpF({ ...expF, date_debut: e.target.value })} placeholder="Début" className="lk-edit-input" style={{ ...sInput, fontSize: 12 }} />
                 <input value={expF.date_fin} onChange={(e) => setExpF({ ...expF, date_fin: e.target.value })} placeholder="Fin (vide = présent)" className="lk-edit-input" style={{ ...sInput, fontSize: 12 }} />
               </div>
-              <textarea value={expF.description} onChange={(e) => setExpF({ ...expF, description: e.target.value })} rows={2} placeholder="Description" className="lk-edit-input" style={{ ...sInput, resize: "none" }} />
+              <textarea value={expF.description} onChange={(e) => setExpF({ ...expF, description: e.target.value })} rows={2} maxLength={500} placeholder="Description" className="lk-edit-input" style={{ ...sInput, resize: "none" }} />
               <button onClick={saveExp} className="lk-edit-navy" style={{ ...sNavy, width: "100%", justifyContent: "center", padding: "13px 0", fontSize: 14 }}>Valider</button>
               <button onClick={() => setShowExpModal(false)} className="lk-edit-ghost" style={{ ...sGhost, width: "100%", padding: "11px 0", fontSize: 14, textAlign: "center" }}>Annuler</button>
             </div>
@@ -676,7 +678,7 @@ export default function PublicProfilePage() {
               <input value={formF.diplome} onChange={(e) => setFormF({ ...formF, diplome: e.target.value })} placeholder="Diplôme" className="lk-edit-input" style={sInput} />
               <input value={formF.etablissement} onChange={(e) => setFormF({ ...formF, etablissement: e.target.value })} placeholder="École" className="lk-edit-input" style={sInput} />
               <input value={formF.annee} onChange={(e) => setFormF({ ...formF, annee: e.target.value })} placeholder="Année" className="lk-edit-input" style={sInput} />
-              <textarea value={formF.description} onChange={(e) => setFormF({ ...formF, description: e.target.value })} rows={2} placeholder="Description" className="lk-edit-input" style={{ ...sInput, resize: "none" }} />
+              <textarea value={formF.description} onChange={(e) => setFormF({ ...formF, description: e.target.value })} rows={2} maxLength={500} placeholder="Description" className="lk-edit-input" style={{ ...sInput, resize: "none" }} />
               <button onClick={saveForm} className="lk-edit-navy" style={{ ...sNavy, width: "100%", justifyContent: "center", padding: "13px 0", fontSize: 14 }}>Valider</button>
               <button onClick={() => setShowFormModal(false)} className="lk-edit-ghost" style={{ ...sGhost, width: "100%", padding: "11px 0", fontSize: 14, textAlign: "center" }}>Annuler</button>
             </div>

@@ -56,6 +56,7 @@ export default function ContratPage() {
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [disputeReason, setDisputeReason]       = useState("");
   const [openingDispute, setOpeningDispute]      = useState(false);
+  const [disputeError, setDisputeError]          = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -93,6 +94,7 @@ export default function ContratPage() {
   async function openDispute() {
     if (!payment || !contract || !disputeReason.trim() || openingDispute) return;
     setOpeningDispute(true);
+    setDisputeError(null);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) { setOpeningDispute(false); return; }
     const res = await fetch("/api/disputes", {
@@ -112,6 +114,9 @@ export default function ContratPage() {
       setShowDisputeModal(false);
       setDisputeReason("");
       router.push("/messages");
+    } else {
+      const data = await res.json().catch(() => null);
+      setDisputeError(data?.details?.[0] ?? data?.error ?? "Impossible d'ouvrir le litige.");
     }
     setOpeningDispute(false);
   }
@@ -503,8 +508,12 @@ export default function ContratPage() {
               onChange={(e) => setDisputeReason(e.target.value)}
               placeholder="Ex : Le dev n'a pas livré ce qui était convenu..."
               rows={4}
+              maxLength={1000}
               style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#FAF8F4", fontSize: 13, fontWeight: 500, outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box" }}
             />
+            {disputeError && (
+              <p style={{ fontSize: 12, color: "#D4537E", margin: 0 }}>{disputeError}</p>
+            )}
             <button
               onClick={openDispute}
               disabled={openingDispute || !disputeReason.trim()}

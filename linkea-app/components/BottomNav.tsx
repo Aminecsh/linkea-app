@@ -35,57 +35,79 @@ export default function BottomNav() {
 
   useEffect(() => {
     async function checkUnread() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // getSession() is local (no network) — use it for user identity
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const userId = session.user.id;
 
-      const now = new Date().toISOString();
-      const { data: ban } = await supabase
-        .from("bans").select("id").eq("user_id", user.id).eq("is_active", true)
-        .or(`expires_at.is.null,expires_at.gt.${now}`).limit(1).maybeSingle();
-      if (ban) {
-        setIsBanned(true);
-        if (!pathname.startsWith("/messages") && !pathname.startsWith("/support")) {
-          router.push("/messages");
-        }
-        return;
+      // Role: read from cache first, validate in background
+      const cached = localStorage.getItem("lk_role");
+      if (cached) {
+        setRole(cached);
+      } else {
+        const { data: roleData } = await supabase
+          .from("user_roles").select("role").eq("user_id", userId).maybeSingle();
+        const r = roleData?.role ?? null;
+        setRole(r);
+        if (r) localStorage.setItem("lk_role", r);
       }
-
-      const { data: roleData } = await supabase
-        .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-      const r = roleData?.role;
-      setRole(r ?? null);
-      if (r) localStorage.setItem("lk_role", r);
+      const r = cached ?? role;
       if (!r || r === "admin") return;
 
-      let convQuery;
-      if (r === "founder") {
-        const { data: p } = await supabase.from("profiles_founder").select("id").eq("user_id", user.id).maybeSingle();
-        if (!p) return;
-        convQuery = await supabase.from("conversations").select("id").eq("founder_id", p.id);
-      } else {
-        const { data: p } = await supabase.from("profiles_developer").select("id").eq("user_id", user.id).maybeSingle();
-        if (!p) return;
-        convQuery = await supabase.from("conversations").select("id").eq("developer_id", p.id);
+      // Ban check: only once per session (cache in sessionStorage)
+      const banChecked = sessionStorage.getItem("lk_ban_ok");
+      if (!banChecked) {
+        const now = new Date().toISOString();
+        const { data: ban } = await supabase
+          .from("bans").select("id").eq("user_id", userId).eq("is_active", true)
+          .or(`expires_at.is.null,expires_at.gt.${now}`).limit(1).maybeSingle();
+        if (ban) {
+          setIsBanned(true);
+          if (!pathname.startsWith("/messages") && !pathname.startsWith("/support")) {
+            router.push("/messages");
+          }
+          return;
+        }
+        sessionStorage.setItem("lk_ban_ok", "1");
       }
 
-      const convIds = convQuery?.data?.map((c: { id: string }) => c.id) ?? [];
+      // Conversations
+      let convIds: string[] = [];
+      if (r === "founder") {
+        const { data: p } = await supabase.from("profiles_founder").select("id").eq("user_id", userId).maybeSingle();
+        if (!p) return;
+        const { data: convs } = await supabase.from("conversations").select("id").eq("founder_id", p.id);
+        convIds = convs?.map((c: { id: string }) => c.id) ?? [];
+      } else {
+        const { data: p } = await supabase.from("profiles_developer").select("id").eq("user_id", userId).maybeSingle();
+        if (!p) return;
+        const { data: convs } = await supabase.from("conversations").select("id").eq("developer_id", p.id);
+        convIds = convs?.map((c: { id: string }) => c.id) ?? [];
+      }
       if (convIds.length === 0) return;
+
+      // Single batched query instead of N sequential queries
+      const earliestRead = convIds
+        .map(id => localStorage.getItem(`lastRead_${id}`) ?? "1970-01-01")
+        .sort()[0];
+
+      const { data: unreadMsgs } = await supabase
+        .from("messages")
+        .select("conversation_id, created_at")
+        .in("conversation_id", convIds)
+        .neq("sender_id", userId)
+        .gt("created_at", earliestRead);
 
       let total = 0;
       for (const convId of convIds) {
         const lastRead = localStorage.getItem(`lastRead_${convId}`) ?? "1970-01-01";
-        const { count } = await supabase
-          .from("messages")
-          .select("*", { count: "exact", head: true })
-          .eq("conversation_id", convId)
-          .neq("sender_id", user.id)
-          .gt("created_at", lastRead);
-        total += count ?? 0;
+        total += unreadMsgs?.filter(m => m.conversation_id === convId && m.created_at > lastRead).length ?? 0;
       }
       setUnreadCount(total);
     }
 
     checkUnread();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   if (role === "admin") return null;

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getAuthUser } from "@/lib/auth";
 import BottomNav from "@/components/BottomNav";
 import { ArrowLeft, Wallet, ArrowDownToLine, TrendingUp, Clock, CheckCircle, X, Lock } from "lucide-react";
 
@@ -64,7 +65,7 @@ export default function WalletPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) { router.push("/connexion"); return; }
 
       const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
@@ -107,7 +108,7 @@ export default function WalletPage() {
 
     // TODO: Replace with real bank transfer via Stripe Connect / Mangopay
     const { data: wd, error: wdErr } = await supabase.from("withdrawals").insert({
-      user_id: (await supabase.auth.getUser()).data.user?.id,
+      user_id: (await getAuthUser())?.id,
       wallet_id: wallet.id,
       amount: amt,
       iban: iban.replace(/\s/g, "").toUpperCase(),

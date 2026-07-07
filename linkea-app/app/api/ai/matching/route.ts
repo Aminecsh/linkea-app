@@ -2,16 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { checkUsage, trackUsage } from "@/lib/ai-usage";
-
-type DevInput = {
-  id: string;
-  nom: string;
-  competences?: string[];
-  ecole?: string;
-  dispo_heures_semaine?: number;
-  score?: number; // note moyenne reviews
-  reviewCount?: number;
-};
+import { aiMatchingSchema, validationError } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -37,8 +28,9 @@ export async function POST(req: NextRequest) {
     }, { status: 429 });
   }
 
-  const { projectId, devs } = await req.json() as { projectId: string; devs: DevInput[] };
-  if (!projectId || !devs?.length) return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
+  const parsed = aiMatchingSchema.safeParse(await req.json());
+  if (!parsed.success) return validationError(parsed.error);
+  const { projectId, devs } = parsed.data;
 
   const { data: project } = await supabase
     .from("projects")

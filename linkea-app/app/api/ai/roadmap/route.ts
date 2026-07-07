@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { trackUsage } from "@/lib/ai-usage";
+import { aiRoadmapSchema, validationError } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -13,8 +14,9 @@ export async function POST(req: NextRequest) {
   }
   const token = authHeader.slice(7);
 
-  const { projectId } = await req.json();
-  if (!projectId) return NextResponse.json({ error: "projectId manquant" }, { status: 400 });
+  const parsed = aiRoadmapSchema.safeParse(await req.json());
+  if (!parsed.success) return validationError(parsed.error);
+  const { projectId } = parsed.data;
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

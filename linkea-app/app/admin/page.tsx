@@ -52,6 +52,18 @@ export default function AdminDashboard() {
       const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       if (roleData?.role !== "admin") { router.push("/projets"); return; }
 
+      // 2FA obligatoire pour l'accès admin : refuse l'accès si le compte n'a pas
+      // de facteur TOTP vérifié, ou si la session actuelle n'a pas passé le challenge (AAL2).
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+        router.push("/parametres?mfa_required=1");
+        return;
+      }
+      if (aal?.nextLevel !== "aal2") {
+        router.push("/parametres?mfa_setup_required=1");
+        return;
+      }
+
       const [{ data: projs }, { data: founds }, { data: devs }, { data: matchData }, { data: reportsData }, { data: bansData }] = await Promise.all([
         supabase.from("projects").select("*, profiles_founder(nom, ecole)").order("created_at", { ascending: false }),
         supabase.from("profiles_founder").select("*").order("created_at", { ascending: false }),

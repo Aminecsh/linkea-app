@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getAuthUser } from "@/lib/auth";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
 import { MessageCircle, Briefcase, ChevronDown, ChevronUp, Send, Users, Plus, X, Ban } from "lucide-react";
@@ -91,7 +92,7 @@ export default function MessagesPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) { router.push("/connexion"); return; }
       setUserId(user.id);
 
@@ -725,7 +726,7 @@ export default function MessagesPage() {
               onClick={async () => {
                 if (!newGroupProjectId || creatingGroup) return;
                 setCreatingGroup(true);
-                const { data: { user } } = await supabase.auth.getUser();
+                const user = await getAuthUser();
                 if (!user) { setCreatingGroup(false); return; }
 
                 // Créer la conversation groupe

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getAuthUser } from "@/lib/auth";
 
 type Notif = {
   id: string;
@@ -49,7 +50,7 @@ export default function NotifToast() {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    getAuthUser().then((user) => {
       if (user) setUserId(user.id);
     });
   }, []);
@@ -95,12 +96,8 @@ export default function NotifToast() {
       .channel(`toast_${userId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications" },
-        (payload) => {
-          const notif = payload.new as Notif;
-          if (notif.user_id !== userId) return;
-          showToast(notif);
-        }
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+        (payload) => { showToast(payload.new as Notif); }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };

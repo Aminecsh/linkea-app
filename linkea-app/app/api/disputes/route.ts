@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { disputeCreateSchema, validationError } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get("Authorization");
@@ -15,8 +16,9 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser(token);
   if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-  const { projectId, paymentId, devUserId, reason } = await req.json();
-  if (!projectId || !paymentId || !reason) return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
+  const parsed = disputeCreateSchema.safeParse(await req.json());
+  if (!parsed.success) return validationError(parsed.error);
+  const { projectId, paymentId, devUserId, reason } = parsed.data;
 
   // Vérifier que c'est bien le founder
   const { data: project } = await supabase

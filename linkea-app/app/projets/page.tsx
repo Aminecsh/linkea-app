@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getAuthUser } from "@/lib/auth";
+import { sendEmail } from "@/lib/sendEmail";
 import BottomNav from "@/components/BottomNav";
 import NotificationBell from "@/components/NotificationBell";
 import { Search, ArrowRight, Check, X, SlidersHorizontal, Calendar, Users, Clock, Banknote } from "lucide-react";
@@ -62,7 +64,7 @@ function matchScore(devCompetences: string[], stack: string): number {
   return Math.round((matched.length / techs.length) * 100);
 }
 
-export default function ProjetsPage() {
+function ProjetsPageInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const projectParam = searchParams.get("project");
@@ -86,7 +88,7 @@ export default function ProjetsPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) { router.push("/connexion"); return; }
       const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
       setRole(roleData?.role ?? null);
@@ -169,9 +171,8 @@ export default function ProjetsPage() {
     const projet = projects.find((p) => p.id === projectId);
     const { data: dev } = await supabase.from("profiles_developer").select("nom,email,ecole,competences").eq("id", developerId).maybeSingle();
     if (projet?.profiles_founder?.email && dev) {
-      await fetch("/api/emails", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "nouvelle_candidature", to: projet.profiles_founder.email,
-          data: { projetTitre: projet.titre, projetId: projet.id, devNom: dev.nom, devEcole: dev.ecole, devCompetences: dev.competences?.join(", ") } }) });
+      await sendEmail("nouvelle_candidature", projet.profiles_founder.email,
+        { projetTitre: projet.titre, projetId: projet.id, devNom: dev.nom, devEcole: dev.ecole, devCompetences: dev.competences?.join(", ") });
     }
     const raw = projet as unknown as { founder_id?: string };
     if (raw?.founder_id) {
@@ -476,5 +477,13 @@ export default function ProjetsPage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+export default function ProjetsPage() {
+  return (
+    <Suspense>
+      <ProjetsPageInner />
+    </Suspense>
   );
 }
