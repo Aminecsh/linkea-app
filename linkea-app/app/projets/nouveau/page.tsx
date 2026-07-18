@@ -10,6 +10,10 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const READY_MARKER = /\{"ready_for_fiche"\s*:\s*true\}/;
 
+function stripMarkdown(text: string): string {
+  return text.replace(/\*\*/g, "").replace(/^#+\s*/gm, "").replace(/^[-*]\s+/gm, "");
+}
+
 const STACKS = ["React", "Node.js", "Flutter", "Python", "Vue.js", "Laravel", "Swift", "Kotlin", "Next.js", "TypeScript"];
 
 const DESC_MAX = 500;
@@ -197,18 +201,32 @@ export default function NouveauProjet() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
 
-      setTitre((data.titre ?? "").slice(0, 80));
+      setTitre(stripMarkdown(data.titre ?? "").slice(0, 80));
 
       const mvpLines = Array.isArray(data.fonctionnalites_mvp) && data.fonctionnalites_mvp.length
-        ? `\n\nFonctionnalités clés :\n${data.fonctionnalites_mvp.map((f: string) => `- ${f}`).join("\n")}`
+        ? `\n\nFonctionnalités clés :\n${data.fonctionnalites_mvp.map((f: string) => `- ${stripMarkdown(f)}`).join("\n")}`
         : "";
-      const profil = data.profil_dev_ideal ? `\n\nProfil dev recherché : ${data.profil_dev_ideal}` : "";
-      setDescription(`${data.description ?? ""}${mvpLines}${profil}`.slice(0, DESC_MAX));
+      const profil = data.profil_dev_ideal ? `\n\nProfil dev recherché : ${stripMarkdown(data.profil_dev_ideal)}` : "";
+      setDescription(`${stripMarkdown(data.description ?? "")}${mvpLines}${profil}`.slice(0, DESC_MAX));
 
-      if (data.stack_souhaitee) {
-        const stacks = String(data.stack_souhaitee).split(",").map((s: string) => s.trim()).filter(Boolean);
+      const stackRaw = String(data.stack_souhaitee ?? "").trim();
+      if (stackRaw && !/au choix|pas de préférence|non précisé/i.test(stackRaw)) {
+        const stacks = stackRaw.split(",").map((s: string) => s.trim()).filter(Boolean);
         setSelectedStacks(stacks);
       }
+
+      const semaines = Number(data.delai_semaines);
+      if (Number.isFinite(semaines) && semaines > 0) {
+        const fin = new Date();
+        fin.setDate(fin.getDate() + semaines * 7);
+        setDateFin(fin.toISOString().split("T")[0]);
+      }
+
+      const budgetEstime = Number(data.budget_estime_eur);
+      if (Number.isFinite(budgetEstime) && budgetEstime > 0) {
+        setBudget(String(Math.round(budgetEstime)));
+      }
+
       setLinkeoActive(false);
       setStep(1);
     } catch (e) {
@@ -365,7 +383,7 @@ export default function NouveauProjet() {
                       color: m.role === "user" ? "#fff" : "#1A2138",
                       fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap",
                     }}>
-                      {m.content || (streaming && i === messages.length - 1 ? "…" : "")}
+                      {stripMarkdown(m.content) || (streaming && i === messages.length - 1 ? "…" : "")}
                     </div>
                   </div>
                 ))}
