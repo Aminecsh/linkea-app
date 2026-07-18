@@ -45,7 +45,7 @@ Génère une fiche projet attractive et claire. Réponds UNIQUEMENT en JSON vali
 {
   "titre": "Titre accrocheur du projet (max 60 caractères)",
   "description": "Description claire du projet en 3-4 phrases, sans markdown (pas de ** ni de listes).",
-  "stack_souhaitee": "Liste COURTE de 2 à 4 technologies séparées par des virgules (ex: 'React, Node.js, PostgreSQL'). Si rien n'est précisé ou que le porteur n'a pas de préférence, mets exactement 'Au choix du développeur'. Ne mets JAMAIS une phrase complète ici, uniquement des noms de technologies.",
+  "stack_souhaitee": "Liste COURTE de 2 à 4 technologies séparées par des virgules (ex: 'React, Node.js, PostgreSQL'). Si le texte contient une recommandation technique faite par Linkeo pendant la conversation, reprends exactement ces technologies. Sinon, déduis toi-même 2-3 technologies adaptées au type de projet décrit. Ne mets 'Au choix du développeur' qu'en tout dernier recours, si le projet est vraiment trop vague pour se prononcer. Ne mets JAMAIS une phrase complète ici, uniquement des noms de technologies.",
   "fonctionnalites_mvp": ["Fonctionnalité 1", "Fonctionnalité 2", "Fonctionnalité 3", "Fonctionnalité 4"],
   "profil_dev_ideal": "Description du profil développeur idéal pour ce projet, sans markdown",
   "budget_estime_eur": "Nombre entier en euros si un budget approximatif a été mentionné dans le texte, sinon null",

@@ -215,6 +215,8 @@ export default function NouveauProjet() {
         setSelectedStacks(stacks);
       }
 
+      setDateDebut(todayISO());
+
       const semaines = Number(data.delai_semaines);
       if (Number.isFinite(semaines) && semaines > 0) {
         const fin = new Date();
