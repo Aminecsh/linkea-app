@@ -56,7 +56,7 @@ export const aiRoadmapSchema = z.object({
 });
 
 export const aiFicheSchema = z.object({
-  idee: z.string().trim().min(10, "Décris ton idée en au moins 10 caractères.").max(1000),
+  idee: z.string().trim().min(10, "Décris ton idée en au moins 10 caractères.").max(4000),
   stack: z.string().trim().max(300).optional(),
   deadline: z.string().trim().max(100).optional(),
 });
