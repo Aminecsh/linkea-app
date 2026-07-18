@@ -33,13 +33,13 @@ export async function POST(req: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser(token);
-  if (user) {
-    const { ok, used } = await checkUsage(supabase, user.id);
-    if (!ok) {
-      return new Response(JSON.stringify({
-        error: `Limite mensuelle atteinte (${used.toLocaleString()} / ${MONTHLY_TOKEN_LIMIT.toLocaleString()} tokens). Reviens le mois prochain !`,
-      }), { status: 429 });
-    }
+  if (!user) return new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 });
+
+  const { ok, used } = await checkUsage(supabase, user.id);
+  if (!ok) {
+    return new Response(JSON.stringify({
+      error: `Limite mensuelle atteinte (${used.toLocaleString()} / ${MONTHLY_TOKEN_LIMIT.toLocaleString()} tokens). Reviens le mois prochain !`,
+    }), { status: 429 });
   }
 
   let projectContext = "";
@@ -170,11 +170,9 @@ Agile/Scrum avec sprints de 1-2 semaines, sauf si le founder précise une autre 
           }
           controller.enqueue(encode("data: [DONE]\n\n"));
           // Track token usage after stream
-          if (user) {
-            const final = await response.finalMessage();
-            const total = (final.usage?.input_tokens ?? 0) + (final.usage?.output_tokens ?? 0);
-            if (total > 0) await trackUsage(supabase, user.id, total);
-          }
+          const final = await response.finalMessage();
+          const total = (final.usage?.input_tokens ?? 0) + (final.usage?.output_tokens ?? 0);
+          if (total > 0) await trackUsage(supabase, user.id, total);
         } catch (e) {
           controller.enqueue(encode(`data: ${JSON.stringify({ error: (e as Error).message })}\n\n`));
         } finally {

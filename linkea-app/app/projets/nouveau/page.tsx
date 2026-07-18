@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import React from "react";
-import { ArrowLeft, ArrowRight, AlertCircle, Plus, X, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, AlertCircle, Plus, X, Check, Sparkles, PenLine } from "lucide-react";
 
 const STACKS = ["React", "Node.js", "Flutter", "Python", "Vue.js", "Laravel", "Swift", "Kotlin", "Next.js", "TypeScript"];
 
@@ -29,7 +29,16 @@ export default function NouveauProjet() {
   const [loading, setLoading]           = useState(true);
   const [saving, setSaving]             = useState(false);
   const [error, setError]               = useState("");
-  const [step, setStep]                 = useState<1 | 2>(1);
+  const [step, setStep]                 = useState<0 | 1 | 2>(0);
+
+  // Step 0 · Linkeo intake
+  const [linkeoActive, setLinkeoActive] = useState(false);
+  const [linkeoLoading, setLinkeoLoading] = useState(false);
+  const [linkeoError, setLinkeoError]   = useState("");
+  const [qIdee, setQIdee]               = useState("");
+  const [qMvp, setQMvp]                 = useState("");
+  const [qStack, setQStack]             = useState("");
+  const [qDelai, setQDelai]             = useState("");
 
   // Step 1
   const [titre, setTitre]               = useState("");
@@ -84,6 +93,49 @@ export default function NouveauProjet() {
     if (!titre.trim()) return;
     if (!description.trim()) return;
     setStep(2);
+  }
+
+  async function handleLinkeoGenerate() {
+    if (qIdee.trim().length < 10) {
+      setLinkeoError("Décris ton idée en au moins 10 caractères.");
+      return;
+    }
+    setLinkeoLoading(true);
+    setLinkeoError("");
+
+    const idee = qMvp.trim()
+      ? `${qIdee.trim()}\n\nFonctionnalités indispensables pour le lancement (MVP) : ${qMvp.trim()}`
+      : qIdee.trim();
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/ai/fiche", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+        body: JSON.stringify({ idee, stack: qStack.trim() || undefined, deadline: qDelai.trim() || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
+
+      setTitre((data.titre ?? "").slice(0, 80));
+
+      const mvpLines = Array.isArray(data.fonctionnalites_mvp) && data.fonctionnalites_mvp.length
+        ? `\n\nFonctionnalités clés :\n${data.fonctionnalites_mvp.map((f: string) => `- ${f}`).join("\n")}`
+        : "";
+      const profil = data.profil_dev_ideal ? `\n\nProfil dev recherché : ${data.profil_dev_ideal}` : "";
+      setDescription(`${data.description ?? ""}${mvpLines}${profil}`.slice(0, DESC_MAX));
+
+      if (data.stack_souhaitee) {
+        const stacks = String(data.stack_souhaitee).split(",").map((s: string) => s.trim()).filter(Boolean);
+        setSelectedStacks(stacks);
+      }
+      setLinkeoActive(false);
+      setStep(1);
+    } catch (e) {
+      setLinkeoError((e as Error).message);
+    } finally {
+      setLinkeoLoading(false);
+    }
   }
 
   async function handleSubmit() {
@@ -143,24 +195,148 @@ export default function NouveauProjet() {
         {/* Top nav */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
           <button
-            onClick={() => step === 1 ? router.push("/profil") : setStep(1)}
+            onClick={() => {
+              if (step === 0 && linkeoActive) { setLinkeoActive(false); return; }
+              if (step === 0) { router.push("/profil"); return; }
+              if (step === 1) { setStep(0); return; }
+              setStep(1);
+            }}
             style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#8A8579", padding: 0 }}
           >
             <ArrowLeft size={14} strokeWidth={2} />
-            {step === 1 ? "Retour" : "Étape précédente"}
+            {step === 0 ? "Retour" : "Étape précédente"}
           </button>
 
           {/* Progress dots */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {[1, 2].map((n) => (
-              <div key={n} style={{ height: 4, borderRadius: 99, width: step >= n ? 24 : 10, background: step >= n ? "#D4537E" : "#ECE7DD", transition: "width 0.2s, background 0.2s" }} />
-            ))}
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#8A8579", marginLeft: 4 }}>{step}/2</span>
-          </div>
+          {step > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {[1, 2].map((n) => (
+                <div key={n} style={{ height: 4, borderRadius: 99, width: step >= n ? 24 : 10, background: step >= n ? "#D4537E" : "#ECE7DD", transition: "width 0.2s, background 0.2s" }} />
+              ))}
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#8A8579", marginLeft: 4 }}>{step}/2</span>
+            </div>
+          )}
         </div>
 
         {/* Card */}
         <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 20, padding: "32px 28px" }}>
+
+          {/* ── STEP 0 · CHOIX ── */}
+          {step === 0 && !linkeoActive && (
+            <>
+              <div style={{ marginBottom: 28 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", display: "block", marginBottom: 12 }}>Nouveau projet</span>
+                <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 26, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", letterSpacing: "-0.03em", lineHeight: 1.15 }}>
+                  Comment veux-tu procéder ?
+                </h1>
+                <p style={{ fontSize: 13, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Tu peux te faire aider pour bien cibler ton besoin, ou remplir directement le formulaire.</p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <button
+                  onClick={() => setLinkeoActive(true)}
+                  className="lk-n-chip"
+                  style={{ display: "flex", alignItems: "flex-start", gap: 12, textAlign: "left", padding: "18px 16px", borderRadius: 14, border: "1.5px solid #1A2138", background: "#1A2138", cursor: "pointer" }}
+                >
+                  <Sparkles size={18} strokeWidth={2} style={{ color: "#D4537E", flexShrink: 0, marginTop: 1 }} />
+                  <span>
+                    <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 3 }}>Déposer mon projet avec Linkeo</span>
+                    <span style={{ display: "block", fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.5 }}>Réponds à quelques questions, Linkeo rédige ta fiche projet pour toi.</span>
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setStep(1)}
+                  className="lk-n-chip"
+                  style={{ display: "flex", alignItems: "flex-start", gap: 12, textAlign: "left", padding: "18px 16px", borderRadius: 14, border: "1px solid #ECE7DD", background: "#fff", cursor: "pointer" }}
+                >
+                  <PenLine size={18} strokeWidth={2} style={{ color: "#8A8579", flexShrink: 0, marginTop: 1 }} />
+                  <span>
+                    <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: "#1A2138", marginBottom: 3 }}>Remplir moi-même</span>
+                    <span style={{ display: "block", fontSize: 12, color: "#8A8579", lineHeight: 1.5 }}>Tu connais déjà précisément ton besoin.</span>
+                  </span>
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 0 · Q&R LINKEO ── */}
+          {step === 0 && linkeoActive && (
+            <>
+              <div style={{ marginBottom: 28 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#D4537E", marginBottom: 12 }}>
+                  <Sparkles size={12} strokeWidth={2.5} /> Avec Linkeo
+                </span>
+                <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 26, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", letterSpacing: "-0.03em", lineHeight: 1.15 }}>
+                  Parle-moi de ton projet
+                </h1>
+                <p style={{ fontSize: 13, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Réponds à ces quelques questions, je m&apos;occupe de rédiger la fiche.</p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                <div>
+                  <label style={sLabel}>Quel problème veux-tu résoudre, et pour qui ? <span style={{ color: "#D4537E" }}>*</span></label>
+                  <textarea
+                    value={qIdee}
+                    onChange={(e) => setQIdee(e.target.value)}
+                    placeholder="Ex : Les étudiants ont du mal à trouver des logements meublés près du campus..."
+                    rows={4}
+                    autoFocus
+                    className="lk-n-input"
+                    style={{ ...sInput, resize: "none" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={sLabel}>Quelles fonctionnalités sont indispensables au lancement (MVP) ?</label>
+                  <textarea
+                    value={qMvp}
+                    onChange={(e) => setQMvp(e.target.value)}
+                    placeholder="Ex : recherche par quartier, messagerie, système de réservation..."
+                    rows={3}
+                    className="lk-n-input"
+                    style={{ ...sInput, resize: "none" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={sLabel}>Stack technique en tête ou contrainte particulière ?</label>
+                  <input
+                    value={qStack}
+                    onChange={(e) => setQStack(e.target.value)}
+                    placeholder="Ex : React Native, doit s'intégrer à notre back Supabase..."
+                    className="lk-n-input"
+                    style={sInput}
+                  />
+                </div>
+
+                <div>
+                  <label style={sLabel}>Une deadline ou un délai en tête ?</label>
+                  <input
+                    value={qDelai}
+                    onChange={(e) => setQDelai(e.target.value)}
+                    placeholder="Ex : dans 2 mois, avant la rentrée..."
+                    className="lk-n-input"
+                    style={sInput}
+                  />
+                </div>
+
+                {linkeoError && (
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(212,83,126,0.3)", background: "rgba(212,83,126,0.05)", color: "#D4537E", fontSize: 13 }}>
+                    <AlertCircle size={14} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+                    {linkeoError}
+                  </div>
+                )}
+
+                <button onClick={handleLinkeoGenerate} disabled={linkeoLoading || qIdee.trim().length < 10} className="lk-n-navy" style={{ ...sNavy, marginTop: 4 }}>
+                  {linkeoLoading
+                    ? <div style={{ width: 17, height: 17, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} />
+                    : <>Générer ma fiche projet <Sparkles size={15} strokeWidth={2} /></>
+                  }
+                </button>
+              </div>
+            </>
+          )}
 
           {/* ── STEP 1 ── */}
           {step === 1 && (

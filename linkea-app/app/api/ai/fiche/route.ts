@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { trackUsage } from "@/lib/ai-usage";
+import { checkUsage, trackUsage, MONTHLY_TOKEN_LIMIT } from "@/lib/ai-usage";
 import { aiFicheSchema, validationError } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
@@ -20,6 +20,14 @@ export async function POST(req: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
   const { data: { user } } = await supabase.auth.getUser(token);
+  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const { ok, used } = await checkUsage(supabase, user.id);
+  if (!ok) {
+    return NextResponse.json({
+      error: `Limite mensuelle atteinte (${used.toLocaleString()} / ${MONTHLY_TOKEN_LIMIT.toLocaleString()} tokens). Reviens le mois prochain !`,
+    }, { status: 429 });
+  }
 
   const parsed = aiFicheSchema.safeParse(await req.json());
   if (!parsed.success) return validationError(parsed.error);
@@ -53,10 +61,8 @@ Génère une fiche projet attractive et claire. Réponds UNIQUEMENT en JSON vali
     const content = response.content[0];
     if (content.type !== "text") return NextResponse.json({ error: "Réponse invalide" }, { status: 500 });
 
-    if (user) {
-      const total = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
-      if (total > 0) await trackUsage(supabase, user.id, total);
-    }
+    const total = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
+    if (total > 0) await trackUsage(supabase, user.id, total);
 
     try {
       return NextResponse.json(JSON.parse(content.text.trim()));
