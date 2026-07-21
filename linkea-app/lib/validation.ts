@@ -65,6 +65,12 @@ export const aiHealthSchema = z.object({
   projectId: uuid,
 });
 
+export const githubSyncSchema = z.object({
+  projectId: uuid,
+});
+
+export const githubRepoRegex = /^[\w.-]+\/[\w.-]+$/;
+
 export function validationError(error: z.ZodError) {
   return NextResponse.json(
     { error: "Données invalides", details: error.issues.map((i) => i.message) },

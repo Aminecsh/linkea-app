@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AppNav from "@/components/AppNav";
 import { sendEmail } from "@/lib/sendEmail";
+import { sendNotif } from "@/lib/notifications";
 
 type Candidature = {
   id: string;
@@ -87,6 +88,15 @@ export default function CandidatsPage() {
     await supabase.from("candidatures").update({ statut: "accepted" }).eq("id", candidatureId);
     await supabase.from("candidatures").update({ statut: "refused" }).eq("project_id", id).neq("id", candidatureId);
     await supabase.from("projects").update({ statut: "matched" }).eq("id", id);
+
+    sendNotif({
+      userId: developerUserId,
+      projectId: id,
+      type: "mission_start",
+      title: "Nouvelle mission 🎉",
+      body: "Pense à lier ton repo GitHub pour que Linkeo suive automatiquement ton avancement et le traduise pour le client.",
+      link: `/projets/${id}/gestion`,
+    });
 
     // Créer la conversation
     const fId = founderId ?? (await supabase.from("profiles_founder").select("id").eq("user_id", (await supabase.auth.getUser()).data.user!.id).maybeSingle()).data?.id;

@@ -11,7 +11,7 @@ import {
   Plus, Upload, LayoutGrid, List, CalendarRange, Folder,
   Paperclip, Image as ImageIcon, FileText, FileArchive, Film, FileSpreadsheet,
   Calendar, AlertTriangle, Check, X, Download, ChevronLeft, ChevronRight,
-  Home, Users, MessageCircle, Sparkles, TrendingUp, Clock,
+  Home, Users, MessageCircle, Sparkles, TrendingUp, Clock, GitBranch, RefreshCw, ExternalLink,
 } from "lucide-react";
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
@@ -55,6 +55,13 @@ type Task = {
   priorite: "basse" | "normale" | "haute";
   assigne_a: string | null; due_date?: string | null;
 };
+
+type CommitActivity = {
+  sha: string; message: string; ai_summary: string | null;
+  author_name: string | null; author_login: string | null;
+  url: string; committed_at: string;
+};
+type ActivityDigest = { summary_fr: string; commit_count: number; digest_date: string };
 
 type TaskComment = { id: string; task_id: string; user_id: string; content: string; created_at: string; };
 type TaskChecklist = { id: string; task_id: string; titre: string; done: boolean; ordre: number; };
@@ -191,6 +198,13 @@ export default function GestionPage() {
   // IA
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [healthData, setHealthData] = useState<HealthData | null>(null);
+  const [githubRepo, setGithubRepo] = useState<string | null>(null);
+  const [repoInput, setRepoInput] = useState("");
+  const [linkingRepo, setLinkingRepo] = useState(false);
+  const [repoError, setRepoError] = useState("");
+  const [commits, setCommits] = useState<CommitActivity[]>([]);
+  const [digest, setDigest] = useState<ActivityDigest | null>(null);
+  const [syncingRepo, setSyncingRepo] = useState(false);
 
   // Modal sprint
   const [showSprintModal, setShowSprintModal] = useState(false);
@@ -232,7 +246,7 @@ export default function GestionPage() {
       const [{ data: roleData }, { data: proj }, { data: conv }] = await Promise.all([
         supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
         supabase.from("projects")
-          .select("titre, statut, profiles_founder(nom, user_id)")
+          .select("titre, statut, github_repo, profiles_founder(nom, user_id)")
           .eq("id", projectId).maybeSingle(),
         supabase.from("conversations")
           .select("id, profiles_developer(nom, user_id)")
@@ -245,6 +259,7 @@ export default function GestionPage() {
         router.push(`/projets/${projectId}`); return;
       }
       setProjectTitre(proj.titre);
+      setGithubRepo(proj.github_repo ?? null);
 
       const membersArr: Member[] = [];
       const fp = proj.profiles_founder as unknown as { nom: string; user_id: string } | null;
@@ -278,10 +293,58 @@ export default function GestionPage() {
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
           body: JSON.stringify({ projectId }),
         }).then(r => r.ok ? r.json() : null).then(d => { if (d) setHealthData(d as HealthData); }).catch(() => {});
+
+        if (proj.github_repo) syncGithub(session.access_token);
       }
     }
     load();
   }, [projectId, router]);
+
+  // ── GitHub : liaison + synchronisation ──────────────────────────────────────
+
+  async function syncGithub(accessToken: string) {
+    setSyncingRepo(true);
+    try {
+      const res = await fetch("/api/github/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCommits(data.commits ?? []);
+        setDigest(data.digest ?? null);
+      }
+    } catch (e) {
+      console.error("[GitHub sync]", e);
+    } finally {
+      setSyncingRepo(false);
+    }
+  }
+
+  async function linkGithubRepo() {
+    const cleaned = repoInput.trim()
+      .replace(/^https?:\/\/github\.com\//i, "")
+      .replace(/\.git$/i, "")
+      .replace(/\/+$/, "");
+    if (!/^[\w.-]+\/[\w.-]+$/.test(cleaned)) {
+      setRepoError("Format attendu : owner/repo ou un lien github.com/owner/repo");
+      return;
+    }
+    setRepoError("");
+    setLinkingRepo(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch("/api/github/link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+      body: JSON.stringify({ projectId, repo: cleaned }),
+    });
+    const data = await res.json();
+    setLinkingRepo(false);
+    if (!res.ok) { setRepoError(data.error ?? "Erreur lors de l'enregistrement."); return; }
+    setGithubRepo(cleaned);
+    if (session?.access_token) syncGithub(session.access_token);
+  }
 
   // ── Panel détail ────────────────────────────────────────────────────────────
 
@@ -546,7 +609,9 @@ export default function GestionPage() {
 
   // Résumé en français simple, calculé des vraies données
   const resumePhrases: string[] = [];
-  if (totalTasks === 0) {
+  if (digest) {
+    resumePhrases.push(digest.summary_fr);
+  } else if (totalTasks === 0) {
     resumePhrases.push("Le projet démarre — votre équipe prépare les premières tâches.");
   } else {
     resumePhrases.push(
@@ -810,6 +875,35 @@ export default function GestionPage() {
               </div>
             </div>
 
+            {/* Lier le repo GitHub — dev uniquement, tant que rien n'est lié */}
+            {role === "developer" && !githubRepo && (
+              <div style={{ background: C.surface, borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", padding: 20 }}>
+                <div className="flex items-center gap-2.5 mb-3">
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <GitBranch size={17} strokeWidth={2} style={{ color: C.ink }} />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: 15, fontWeight: 700, color: C.ink, margin: 0 }}>Lier ton repo GitHub</h2>
+                    <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Linkeo traduira automatiquement tes commits pour le client.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <input
+                    value={repoInput}
+                    onChange={(e) => setRepoInput(e.target.value)}
+                    placeholder="owner/repo ou https://github.com/owner/repo"
+                    style={{ flex: 1, minWidth: 220, padding: "10px 13px", borderRadius: 10, border: `1px solid ${C.hairline}`, fontSize: 13, color: C.ink, outline: "none" }}
+                  />
+                  <button onClick={linkGithubRepo} disabled={linkingRepo || !repoInput.trim()}
+                    style={{ ...btnInk, opacity: linkingRepo || !repoInput.trim() ? 0.5 : 1 }}>
+                    {linkingRepo ? "Liaison…" : "Lier"}
+                  </button>
+                </div>
+                {repoError && <p style={{ fontSize: 12, color: "#FF3B30", margin: "8px 0 0" }}>{repoError}</p>}
+                <p style={{ fontSize: 11, color: C.muted, margin: "8px 0 0" }}>Le repo doit être public pour l&apos;instant.</p>
+              </div>
+            )}
+
             {/* Métriques */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {([
@@ -895,6 +989,59 @@ export default function GestionPage() {
                 )}
               </div>
             </div>
+
+            {/* Journal d'activité GitHub */}
+            {githubRepo && (
+              <div style={{ background: C.surface, borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", padding: 20 }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <GitBranch size={17} strokeWidth={2} style={{ color: C.ink }} />
+                    </div>
+                    <div>
+                      <h2 style={{ fontSize: 15, fontWeight: 700, color: C.ink, margin: 0 }}>Journal d&apos;activité</h2>
+                      <a href={`https://github.com/${githubRepo}`} target="_blank" rel="noreferrer"
+                        style={{ fontSize: 12, color: C.muted, display: "inline-flex", alignItems: "center", gap: 3, textDecoration: "none" }}>
+                        {githubRepo} <ExternalLink size={10} strokeWidth={2} />
+                      </a>
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (session?.access_token) syncGithub(session.access_token);
+                    }}
+                    disabled={syncingRepo}
+                    style={{ width: 32, height: 32, borderRadius: 9, border: `1px solid ${C.hairline}`, background: C.surface, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+                    title="Actualiser"
+                  >
+                    <RefreshCw size={14} strokeWidth={2} style={{ color: C.muted, animation: syncingRepo ? "lk-spin 0.8s linear infinite" : "none" }} />
+                  </button>
+                </div>
+                {commits.length === 0 ? (
+                  <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>
+                    {syncingRepo ? "Récupération des commits…" : "Aucun commit détecté pour l'instant."}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {commits.slice(0, 8).map((c) => (
+                      <a key={c.sha} href={c.url} target="_blank" rel="noreferrer"
+                        className="flex items-start gap-3 transition-opacity hover:opacity-70" style={{ textDecoration: "none" }}>
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: C.ink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>{(c.author_name ?? c.author_login ?? "?")[0]?.toUpperCase()}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p style={{ fontSize: 13, color: C.ink, margin: 0, lineHeight: 1.5 }}>{c.ai_summary ?? c.message}</p>
+                          <p style={{ fontSize: 11, color: C.muted, margin: "2px 0 0" }}>
+                            {c.author_name ?? c.author_login ?? "Inconnu"} · {fmtDate(c.committed_at)}
+                          </p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
