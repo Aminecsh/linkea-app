@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { checkUsage, trackUsage, MONTHLY_TOKEN_LIMIT } from "@/lib/ai-usage";
+import { checkUsage, trackUsage } from "@/lib/ai-usage";
 import { githubSyncSchema, validationError } from "@/lib/validation";
 
 type GithubCommit = {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   const { data: project } = await supabase
     .from("projects")
-    .select("id, titre, description, github_repo")
+    .select("id, titre, description, stack_souhaitee, budget, deadline, github_repo")
     .eq("id", projectId)
     .maybeSingle();
 
@@ -160,13 +160,14 @@ ${list}`;
     }
   }
 
-  // 3. Digest du jour (si des commits ont eu lieu aujourd'hui)
+  // 3. Digest du jour (si des commits ont eu lieu aujourd'hui) — Linkeo raisonne comme un chef de projet
   const todayStr = new Date().toISOString().slice(0, 10);
-  const { data: todayCommits } = await supabase
-    .from("project_commits")
-    .select("message, ai_summary, committed_at")
-    .eq("project_id", projectId)
-    .gte("committed_at", `${todayStr}T00:00:00.000Z`);
+  const [{ data: todayCommits }, { data: tasks }, { data: sprints }] = await Promise.all([
+    supabase.from("project_commits").select("message, ai_summary, committed_at")
+      .eq("project_id", projectId).gte("committed_at", `${todayStr}T00:00:00.000Z`),
+    supabase.from("tasks").select("titre, statut, priorite").eq("project_id", projectId),
+    supabase.from("sprints").select("nom, objectif, statut, date_fin").eq("project_id", projectId),
+  ]);
 
   let digest: { summary_fr: string; commit_count: number; digest_date: string } | null = null;
 
@@ -178,13 +179,42 @@ ${list}`;
     if (apiKey && ok) {
       try {
         const anthropic = new Anthropic({ apiKey });
-        const list = todayCommits.map((c) => `- ${c.ai_summary ?? c.message}`).join("\n");
-        const prompt = `Résume ces changements de code effectués aujourd'hui sur le projet "${project.titre}", en 1 à 2 phrases simples en français pour un client non-développeur. Pas de jargon technique, pas de liste, juste un résumé fluide.
 
-${list}`;
+        const doneTasks = (tasks ?? []).filter((t) => t.statut === "done");
+        const remainingTasks = (tasks ?? []).filter((t) => t.statut !== "done");
+        const currentSprint = (sprints ?? []).find((s) => s.statut === "en_cours");
+        const globalPct = tasks && tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : null;
+
+        const contexte = `Projet : ${project.titre}
+Description : ${project.description ?? "Non renseignée"}
+Stack : ${project.stack_souhaitee ?? "Non renseignée"}
+Budget : ${project.budget ? `${project.budget}€` : "Non renseigné"}
+Deadline : ${project.deadline ?? "Non renseignée"}
+Sprint actuel : ${currentSprint ? `${currentSprint.nom}${currentSprint.objectif ? ` — ${currentSprint.objectif}` : ""} (fin prévue le ${currentSprint.date_fin})` : "Aucun sprint en cours"}
+Tâches terminées (${doneTasks.length}) : ${doneTasks.map((t) => t.titre).join(", ") || "aucune"}
+Tâches restantes (${remainingTasks.length}) : ${remainingTasks.map((t) => `${t.titre}${t.priorite === "haute" ? " [priorité haute]" : ""}`).join(", ") || "aucune"}
+Avancement calculé sur les tâches : ${globalPct !== null ? `${globalPct}%` : "pas de tâches créées"}`;
+
+        const commitsList = todayCommits.map((c) => `- ${c.ai_summary ?? c.message}`).join("\n");
+
+        const prompt = `Tu es Linkeo, le chef de projet IA de Linkea. Tu supervises ce projet pour le compte du client (non-développeur) et tu dois lui faire un point d'avancement quotidien, comme un vrai chef de projet le ferait — factuel, structuré, sans jargon technique.
+
+Contexte complet du projet :
+${contexte}
+
+Code effectivement écrit aujourd'hui (commits Git) :
+${commitsList}
+
+Rédige un point d'avancement en français, en 3 courts paragraphes maximum (pas de liste à puces) :
+1. Ce qui a concrètement avancé aujourd'hui, en croisant les commits avec les tâches du projet.
+2. Ce qu'il reste à faire, en priorisant ce qui est important (mentionne 2-3 éléments clés, pas toute la liste).
+3. Ton avis global sur où en est le projet par rapport à sa deadline et son budget, avec une estimation d'avancement en pourcentage.
+
+Ton de voix : professionnel, direct, rassurant mais honnête si ça prend du retard. Pas d'emoji, pas de superlatifs creux.`;
+
         const response = await anthropic.messages.create({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 300,
+          max_tokens: 600,
           messages: [{ role: "user", content: prompt }],
         });
         const content = response.content[0];
