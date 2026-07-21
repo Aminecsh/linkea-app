@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
 import React from "react";
 import { ArrowLeft, ArrowRight, AlertCircle, Plus, X, Check } from "lucide-react";
 
@@ -114,19 +115,20 @@ export default function NouveauProjet() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAF8F4" }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F5F5F7" }}>
         <div style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid #1A2138", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  const sInput: React.CSSProperties = { width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 500, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
-  const sNavy:  React.CSSProperties = { width: "100%", padding: "13px 0", borderRadius: 12, background: "#1A2138", color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
+  const sInput: React.CSSProperties = { width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 500, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
+  const sNavy:  React.CSSProperties = { width: "100%", padding: "13px 0", borderRadius: 12, background: "#D4537E", color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
   const sLabel: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", display: "block", marginBottom: 10 };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FAF8F4", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+    <div className="pl-sidebar" style={{ minHeight: "100vh", background: "#F5F5F7", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+      <AppNav />
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .lk-n-input:focus { outline: 2px solid #D4537E; outline-offset: -1px; border-color: #D4537E !important; }
@@ -151,21 +153,21 @@ export default function NouveauProjet() {
           {/* Progress dots */}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             {[1, 2].map((n) => (
-              <div key={n} style={{ height: 4, borderRadius: 99, width: step >= n ? 24 : 10, background: step >= n ? "#D4537E" : "#ECE7DD", transition: "width 0.2s, background 0.2s" }} />
+              <div key={n} style={{ height: 4, borderRadius: 99, width: step >= n ? 24 : 10, background: step >= n ? "#D4537E" : "#E5E5EA", transition: "width 0.2s, background 0.2s" }} />
             ))}
             <span style={{ fontSize: 11, fontWeight: 700, color: "#8A8579", marginLeft: 4 }}>{step}/2</span>
           </div>
         </div>
 
         {/* Card */}
-        <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 20, padding: "32px 28px" }}>
+        <div style={{ background: "#fff", border: "1px solid #E5E5EA", borderRadius: 20, padding: "32px 28px" }}>
 
           {/* ── STEP 1 ── */}
           {step === 1 && (
             <>
               <div style={{ marginBottom: 28 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", display: "block", marginBottom: 12 }}>Étape 1 · Le projet</span>
-                <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 26, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", letterSpacing: "-0.03em", lineHeight: 1.15 }}>
+                <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 26, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", letterSpacing: "-0.03em", lineHeight: 1.15 }}>
                   Décris ton projet
                 </h1>
                 <p style={{ fontSize: 13, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Sois précis — les meilleurs devs lisent chaque mot.</p>
@@ -200,7 +202,7 @@ export default function NouveauProjet() {
                     className="lk-n-input"
                     style={{ ...sInput, resize: "none" }}
                   />
-                  <div style={{ marginTop: 6, height: 3, borderRadius: 99, background: "#ECE7DD", overflow: "hidden" }}>
+                  <div style={{ marginTop: 6, height: 3, borderRadius: 99, background: "#E5E5EA", overflow: "hidden" }}>
                     <div style={{ height: "100%", borderRadius: 99, transition: "width 0.2s", width: `${(description.length / DESC_MAX) * 100}%`, background: description.length > DESC_MAX * 0.85 ? "#D4537E" : "#1A2138" }} />
                   </div>
                 </div>
@@ -217,7 +219,7 @@ export default function NouveauProjet() {
             <>
               <div style={{ marginBottom: 28 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", display: "block", marginBottom: 12 }}>Étape 2 · Les besoins</span>
-                <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 26, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", letterSpacing: "-0.03em", lineHeight: 1.15 }}>
+                <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 26, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", letterSpacing: "-0.03em", lineHeight: 1.15 }}>
                   Stack & deadline
                 </h1>
                 <p style={{ fontSize: 13, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Les devs filtrent par stack — choisis bien.</p>
@@ -233,7 +235,7 @@ export default function NouveauProjet() {
                       const active = selectedStacks.includes(s);
                       return (
                         <button key={s} type="button" onClick={() => toggleStack(s)} className="lk-n-chip"
-                          style={{ padding: "6px 13px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: active ? "1.5px solid #1A2138" : "1px solid #ECE7DD", background: active ? "#1A2138" : "#fff", color: active ? "#fff" : "#8A8579", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, transition: "all 0.12s" }}>
+                          style={{ padding: "6px 13px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: active ? "1.5px solid #1A2138" : "1px solid #E5E5EA", background: active ? "#1A2138" : "#fff", color: active ? "#fff" : "#8A8579", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, transition: "all 0.12s" }}>
                           {active && <Check size={10} strokeWidth={2.5} />}
                           {s}
                         </button>
@@ -243,14 +245,14 @@ export default function NouveauProjet() {
                     {/* Stacks custom */}
                     {selectedStacks.filter((s) => !STACKS.includes(s)).map((s) => (
                       <button key={s} type="button" onClick={() => removeStack(s)} className="lk-n-chip"
-                        style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1.5px solid #1A2138", background: "#1A2138", color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1.5px solid #1A2138", background: "#D4537E", color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
                         {s} <X size={10} strokeWidth={2.5} />
                       </button>
                     ))}
 
                     {!showCustom && (
                       <button type="button" onClick={() => { setShowCustom(true); setTimeout(() => customInputRef.current?.focus(), 50); }} className="lk-n-chip"
-                        style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1px dashed #ECE7DD", background: "transparent", color: "#8A8579", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1px dashed #E5E5EA", background: "transparent", color: "#8A8579", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
                         <Plus size={11} strokeWidth={2.5} /> Autre
                       </button>
                     )}
@@ -299,7 +301,7 @@ export default function NouveauProjet() {
                         min={dateDebut || todayISO()}
                         onChange={(e) => setDateFin(e.target.value)}
                         className="lk-n-input"
-                        style={{ ...sInput, colorScheme: "light", borderColor: !dateFin ? "#ECE7DD" : "#1A2138" }}
+                        style={{ ...sInput, colorScheme: "light", borderColor: !dateFin ? "#E5E5EA" : "#1A2138" }}
                       />
                       <p style={{ fontSize: 11, color: "#8A8579", margin: "5px 0 0" }}>Requis</p>
                     </div>
@@ -307,7 +309,7 @@ export default function NouveauProjet() {
 
                   {/* Aperçu */}
                   {dateFin && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#FAF8F4" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid #E5E5EA", background: "#F5F5F7" }}>
                       <Check size={13} strokeWidth={2.5} style={{ color: "#1A2138", flexShrink: 0 }} />
                       <span style={{ fontSize: 12, fontWeight: 600, color: "#1A2138" }}>
                         {dateDebut

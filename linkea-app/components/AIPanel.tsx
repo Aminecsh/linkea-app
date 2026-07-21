@@ -83,7 +83,7 @@ function CodeBlock({ children, className }: { children?: React.ReactNode; classN
 function MdMessage({ content, streaming }: { content: string; streaming?: boolean }) {
   const { clean, suggestions: _ } = extractSuggestions(content);
   return (
-    <div className="prose prose-sm max-w-none prose-headings:text-[#1A2138] prose-headings:font-bold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-code:bg-[#ECE7DD] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono prose-table:text-xs prose-hr:my-3">
+    <div className="prose prose-sm max-w-none prose-headings:text-[#1A2138] prose-headings:font-bold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-code:bg-[#E5E5EA] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono prose-table:text-xs prose-hr:my-3">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
@@ -121,7 +121,7 @@ function QuestionForm({ questions, onSubmit, disabled }: {
   return (
     <div className="mt-2 ml-8 flex flex-col gap-2">
       {questions.map((q, i) => (
-        <div key={i} className="bg-white border border-[#ECE7DD] rounded-xl p-3 flex flex-col gap-1.5">
+        <div key={i} className="bg-white border border-[#E5E5EA] rounded-xl p-3 flex flex-col gap-1.5">
           <p className="text-xs font-semibold text-[#1A2138]">{q}</p>
           <input
             type="text"
@@ -130,7 +130,7 @@ function QuestionForm({ questions, onSubmit, disabled }: {
             onKeyDown={e => { if (e.key === "Enter" && allAnswered) handleSubmit(); }}
             placeholder="Ta réponse..."
             disabled={disabled}
-            className="text-sm border border-[#ECE7DD] rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4537E] transition-colors disabled:opacity-50"
+            className="text-sm border border-[#E5E5EA] rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4537E] transition-colors disabled:opacity-50"
           />
         </div>
       ))}
@@ -164,21 +164,21 @@ function MessageActions({ content, onRegenerate, isLast }: {
   return (
     <div className="flex items-center gap-1 mt-1.5 ml-8 opacity-0 group-hover:opacity-100 transition-opacity">
       <button onClick={copy} title="Copier"
-        className="text-[10px] px-2 py-1 rounded-lg bg-[#FAF8F4] hover:bg-[#ECE7DD] text-[#8A8579] transition-colors">
+        className="text-[10px] px-2 py-1 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#8A8579] transition-colors">
         {copied ? "✓ Copié" : "📋 Copier"}
       </button>
       {isLast && onRegenerate && (
         <button onClick={onRegenerate} title="Régénérer"
-          className="text-[10px] px-2 py-1 rounded-lg bg-[#FAF8F4] hover:bg-[#ECE7DD] text-[#8A8579] transition-colors">
+          className="text-[10px] px-2 py-1 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#8A8579] transition-colors">
           🔄 Régénérer
         </button>
       )}
       <button onClick={() => setFeedback("up")}
-        className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${feedback === "up" ? "bg-[#ECE7DD] text-[#1A2138]" : "bg-[#FAF8F4] hover:bg-[#ECE7DD] text-[#8A8579]"}`}>
+        className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${feedback === "up" ? "bg-[#E5E5EA] text-[#1A2138]" : "bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#8A8579]"}`}>
         👍
       </button>
       <button onClick={() => setFeedback("down")}
-        className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${feedback === "down" ? "bg-[#ECE7DD] text-[#1A2138]" : "bg-[#FAF8F4] hover:bg-[#ECE7DD] text-[#8A8579]"}`}>
+        className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${feedback === "down" ? "bg-[#E5E5EA] text-[#1A2138]" : "bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#8A8579]"}`}>
         👎
       </button>
     </div>
@@ -390,21 +390,21 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
         <div className="w-full sm:max-w-lg bg-white sm:rounded-2xl flex flex-col shadow-2xl" style={{ height: "85vh" }}>
 
           {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-[#ECE7DD] shrink-0">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E5EA] shrink-0">
             <div className="w-8 h-8 rounded-xl bg-[#1A2138] flex items-center justify-center text-white text-sm font-bold shrink-0">✦</div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-[#1A2138]">Linkeo · Chef de projet IA</p>
               <p className="text-xs text-[#8A8579] truncate">{projectTitre}</p>
             </div>
-            <button onClick={clearHistory} title="Nouvelle conversation" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#FAF8F4] text-[#8A8579] hover:text-[#1A2138] transition-colors text-sm">↺</button>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#FAF8F4] text-[#8A8579] hover:text-[#1A2138] transition-colors text-lg">✕</button>
+            <button onClick={clearHistory} title="Nouvelle conversation" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F7] text-[#8A8579] hover:text-[#1A2138] transition-colors text-sm">↺</button>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F7] text-[#8A8579] hover:text-[#1A2138] transition-colors text-lg">✕</button>
           </div>
 
           {/* Quick actions */}
-          <div className="px-4 py-2.5 border-b border-[#ECE7DD] flex gap-2 overflow-x-auto scrollbar-hide shrink-0">
+          <div className="px-4 py-2.5 border-b border-[#E5E5EA] flex gap-2 overflow-x-auto scrollbar-hide shrink-0">
             {QUICK_ACTIONS.map((a) => (
               <button key={a.label} onClick={() => sendMessage(a.prompt)} disabled={isLoading}
-                className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border border-[#ECE7DD] bg-white text-[#8A8579] hover:border-[#1A2138] hover:text-[#1A2138] transition-all disabled:opacity-40">
+                className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border border-[#E5E5EA] bg-white text-[#8A8579] hover:border-[#1A2138] hover:text-[#1A2138] transition-all disabled:opacity-40">
                 {a.label}
               </button>
             ))}
@@ -430,7 +430,7 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
                     <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
                       msg.role === "user"
                         ? "bg-[#D4537E] text-white rounded-br-md"
-                        : "bg-[#FAF8F4] text-[#1A2138] rounded-bl-md border border-[#ECE7DD]"
+                        : "bg-[#F5F5F7] text-[#1A2138] rounded-bl-md border border-[#E5E5EA]"
                     }`}>
                       {isAssistant ? (
                         <MdMessage content={msg.content} streaming={isStreamingThis} />
@@ -463,7 +463,7 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
                     <div className="ml-8 mt-2 flex flex-wrap gap-2">
                       {suggestions.map((s, si) => (
                         <button key={si} onClick={() => sendMessage(s)} disabled={isLoading}
-                          className="text-xs px-3 py-1.5 rounded-full border border-[#ECE7DD] text-[#1A2138] bg-white hover:bg-[#FAF8F4] hover:border-[#1A2138] transition-all disabled:opacity-40">
+                          className="text-xs px-3 py-1.5 rounded-full border border-[#E5E5EA] text-[#1A2138] bg-white hover:bg-[#F5F5F7] hover:border-[#1A2138] transition-all disabled:opacity-40">
                           {s}
                         </button>
                       ))}
@@ -476,7 +476,7 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
             {(roadmapLoading || ficheLoading) && (
               <div className="flex justify-start msg-fade">
                 <div className="w-6 h-6 rounded-lg bg-[#1A2138] flex items-center justify-center text-white text-xs font-bold shrink-0 mr-2 mt-1">✦</div>
-                <div className="bg-[#FAF8F4] border border-[#ECE7DD] px-4 py-3 rounded-2xl rounded-bl-md flex gap-1 items-center">
+                <div className="bg-[#F5F5F7] border border-[#E5E5EA] px-4 py-3 rounded-2xl rounded-bl-md flex gap-1 items-center">
                   <span className="w-1.5 h-1.5 bg-[#8A8579] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                   <span className="w-1.5 h-1.5 bg-[#8A8579] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                   <span className="w-1.5 h-1.5 bg-[#8A8579] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
@@ -494,7 +494,7 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
           </div>
 
           {/* Input */}
-          <div className="px-4 py-3 border-t border-[#ECE7DD] shrink-0">
+          <div className="px-4 py-3 border-t border-[#E5E5EA] shrink-0">
             <div className="flex gap-2 items-end">
               <textarea
                 ref={textareaRef}
@@ -504,7 +504,7 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
                 placeholder="Ou écris directement à Linkeo..."
                 rows={1}
                 disabled={isLoading}
-                className="flex-1 resize-none border border-[#ECE7DD] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#D4537E] transition-colors disabled:opacity-50 overflow-hidden"
+                className="flex-1 resize-none border border-[#E5E5EA] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#D4537E] transition-colors disabled:opacity-50 overflow-hidden"
                 style={{ minHeight: 40, maxHeight: 96 }}
               />
               <button

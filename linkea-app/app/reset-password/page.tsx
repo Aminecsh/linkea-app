@@ -52,7 +52,7 @@ export default function ResetPasswordPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white px-4">
         <div className="text-center">
-          <div className="w-6 h-6 rounded-full border-2 border-[#ECE7DD] border-t-[#1A2138] animate-spin mx-auto mb-4" />
+          <div className="w-6 h-6 rounded-full border-2 border-[#E5E5EA] border-t-[#1A2138] animate-spin mx-auto mb-4" />
           <p className="text-[#8A8579] text-sm">Vérification du lien en cours...</p>
         </div>
       </div>
@@ -63,7 +63,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-white px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8">
-          <span className="label-tag bg-white border border-[#ECE7DD] text-[#8A8579] mb-4 inline-flex">
+          <span className="label-tag bg-white border border-[#E5E5EA] text-[#8A8579] mb-4 inline-flex">
             Nouveau mot de passe
           </span>
           <h1 className="text-3xl font-black text-[#1A2138] tracking-tight">

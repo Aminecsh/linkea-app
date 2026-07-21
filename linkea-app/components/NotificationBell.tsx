@@ -216,9 +216,9 @@ export default function NotificationBell() {
                               isApplied ? "cursor-default" : "btn-primary"
                             )}
                             style={isApplied ? {
-                              background: "#FAF8F4",
+                              background: "#F5F5F7",
                               color: "#1A2138",
-                              border: "1px solid #ECE7DD",
+                              border: "1px solid #E5E5EA",
                             } : { padding: "5px 10px", fontSize: 11 }}
                           >
                             {applying === projectId ? "..." : isApplied

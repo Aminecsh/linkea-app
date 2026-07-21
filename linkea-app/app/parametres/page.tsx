@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
 import { logAudit } from "@/lib/audit";
 import {
   Shield, Download, Trash2, LogOut, ChevronLeft,
@@ -170,15 +171,16 @@ export default function ParametresPage() {
 
   const verifiedFactor = factors.find(f => f.status === "verified");
 
-  const sCard:  React.CSSProperties = { background: "#fff", border: "1px solid #ECE7DD", borderRadius: 16, overflow: "hidden" };
+  const sCard:  React.CSSProperties = { background: "#fff", border: "1px solid #E5E5EA", borderRadius: 16, overflow: "hidden" };
   const sEye:   React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579" };
-  const sInput: React.CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 500, outline: "none", boxSizing: "border-box" };
-  const sNavy:  React.CSSProperties = { width: "100%", padding: "11px 0", borderRadius: 10, background: "#1A2138", color: "#fff", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
-  const sGhost: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 10, background: "#fff", color: "#1A2138", border: "1px solid #ECE7DD", fontSize: 13, fontWeight: 600, cursor: "pointer" };
+  const sInput: React.CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 500, outline: "none", boxSizing: "border-box" };
+  const sNavy:  React.CSSProperties = { width: "100%", padding: "11px 0", borderRadius: 10, background: "#D4537E", color: "#fff", border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
+  const sGhost: React.CSSProperties = { flex: 1, padding: "11px 0", borderRadius: 10, background: "#fff", color: "#1A2138", border: "1px solid #E5E5EA", fontSize: 13, fontWeight: 600, cursor: "pointer" };
   const sDanger:React.CSSProperties = { width: "100%", padding: "11px 0", borderRadius: 10, background: "#fff", color: "#D4537E", border: "1px solid rgba(212,83,126,0.3)", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FAF8F4", paddingBottom: 40 }}>
+    <div className="pl-sidebar" style={{ minHeight: "100vh", background: "#F5F5F7", paddingBottom: 40 }}>
+      <AppNav />
       <style>{`
         .lk-p-input:focus { outline: 2px solid #D4537E; outline-offset: -1px; border-color: #D4537E !important; }
         .lk-p-navy:hover  { background: #2A3252 !important; }
@@ -188,12 +190,12 @@ export default function ParametresPage() {
       `}</style>
 
       {/* Header */}
-      <div style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(255,255,255,0.94)", backdropFilter: "blur(20px)", borderBottom: "1px solid #ECE7DD", padding: "12px 20px" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(255,255,255,0.94)", backdropFilter: "blur(20px)", borderBottom: "1px solid #E5E5EA", padding: "12px 20px" }}>
         <div style={{ maxWidth: 520, margin: "0 auto", display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={() => router.back()} style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8579", display: "flex", alignItems: "center", padding: 0 }}>
             <ChevronLeft size={20} strokeWidth={2} />
           </button>
-          <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, color: "#1A2138", margin: 0, letterSpacing: "-0.02em" }}>
+          <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, color: "#1A2138", margin: 0, letterSpacing: "-0.02em" }}>
             Paramètres & Sécurité
           </h1>
         </div>
@@ -203,7 +205,7 @@ export default function ParametresPage() {
 
         {/* Compte */}
         <section style={sCard}>
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid #ECE7DD" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #E5E5EA" }}>
             <p style={sEye}>Mon compte</p>
           </div>
           <div style={{ padding: "16px 20px" }}>
@@ -214,7 +216,7 @@ export default function ParametresPage() {
 
         {/* Mot de passe */}
         <section style={sCard}>
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid #ECE7DD" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #E5E5EA" }}>
             <p style={sEye}>Changer de mot de passe</p>
           </div>
           <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -245,7 +247,7 @@ export default function ParametresPage() {
 
         {/* 2FA */}
         <section style={sCard}>
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid #ECE7DD", display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #E5E5EA", display: "flex", alignItems: "center", gap: 8 }}>
             <Shield size={14} strokeWidth={2} style={{ color: "#8A8579" }} />
             <p style={{ ...sEye, margin: 0 }}>Double authentification (2FA)</p>
             {verifiedFactor && (
@@ -268,7 +270,7 @@ export default function ParametresPage() {
                   <>
                     <p style={{ fontSize: 12, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Scanne ce QR code avec Google Authenticator ou Authy, puis entre le code à 6 chiffres.</p>
                     <div style={{ display: "flex", justifyContent: "center" }}>
-                      <img src={qrUri} alt="QR Code 2FA" style={{ width: 160, height: 160, borderRadius: 12, border: "1px solid #ECE7DD" }} />
+                      <img src={qrUri} alt="QR Code 2FA" style={{ width: 160, height: 160, borderRadius: 12, border: "1px solid #E5E5EA" }} />
                     </div>
                     <input
                       type="text"
@@ -318,7 +320,7 @@ export default function ParametresPage() {
 
         {/* Données RGPD */}
         <section style={sCard}>
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid #ECE7DD" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #E5E5EA" }}>
             <p style={sEye}>Mes données (RGPD)</p>
           </div>
           <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -376,7 +378,7 @@ export default function ParametresPage() {
 
             {deleteStep === "deleting" && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "8px 0", fontSize: 13, color: "#8A8579" }}>
-                <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid #ECE7DD", borderTopColor: "#D4537E", animation: "lk-spin 0.8s linear infinite" }} />
+                <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid #E5E5EA", borderTopColor: "#D4537E", animation: "lk-spin 0.8s linear infinite" }} />
                 Suppression en cours…
               </div>
             )}

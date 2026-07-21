@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
 import { generateMatchPdf } from "@/lib/generateMatchPdf";
 import { ArrowLeft, Download, PenLine, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
@@ -93,7 +94,8 @@ export default function ContratPage() {
   const stacks       = d.projet.stack_souhaitee?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
 
   return (
-    <div className="min-h-screen pb-28" style={{ background: "var(--bg)" }}>
+    <div className="min-h-screen pb-28 pl-sidebar" style={{ background: "var(--bg)" }}>
+      <AppNav />
 
       {/* Header */}
       <div className="sticky top-0 z-20 px-4 py-3"
@@ -367,7 +369,7 @@ export default function ContratPage() {
               </p>
             </div>
             <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3"
-              style={{ background: "#FAF8F4", border: "1px solid #ECE7DD" }}>
+              style={{ background: "#F5F5F7", border: "1px solid #E5E5EA" }}>
               <AlertCircle size={14} style={{ color: "#8A8579", marginTop: 1 }} strokeWidth={2} />
               <p className="text-xs leading-relaxed" style={{ color: "#8A8579" }}>
                 Cette action est définitive et ne peut pas être annulée.

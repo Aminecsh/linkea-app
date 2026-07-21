@@ -16,7 +16,7 @@ type SupportConv = { id: string; user_id: string; created_at: string; nom?: stri
 type ActiveBan   = { id: string; user_id: string; type: "temp" | "permanent"; raison: string; expires_at: string | null; created_at: string; nom?: string; role?: string; };
 type Tab = "analytics" | "projets" | "founders" | "developers" | "matchings" | "signalements" | "bans" | "support";
 
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" };
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" };
 
 const STATUTS = ["pending", "matched", "en_cours", "livre", "suspendu"];
 const statutLabels: Record<string, string> = { pending: "En attente", matched: "Matchée", en_cours: "En cours", livre: "Livré", suspendu: "Suspendu" };
@@ -187,12 +187,12 @@ export default function AdminDashboard() {
             <div style={{ width: 1, height: 32, background: C.hairline }} />
             <div>
               <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase", color: C.muted, margin: "0 0 4px" }}>Admin</p>
-              <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", color: C.ink, margin: 0, lineHeight: 1 }}>Dashboard</h1>
+              <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", color: C.ink, margin: 0, lineHeight: 1 }}>Dashboard</h1>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => router.push("/messages")} className="lk-btn-ghost">Messagerie</button>
-            <button onClick={handleLogout} style={{ cursor: "pointer", padding: "9px 18px", fontSize: 13, fontWeight: 600, borderRadius: 9, color: "#fff", background: C.ink, border: "none" }}>
+            <button onClick={handleLogout} style={{ cursor: "pointer", padding: "9px 18px", fontSize: 13, fontWeight: 600, borderRadius: 9, color: "#fff", background: C.rose, border: "none" }}>
               Déconnexion
             </button>
           </div>
@@ -211,7 +211,7 @@ export default function AdminDashboard() {
             { label: "Signalements", val: pendingReports.length },
           ].map((s, i, arr) => (
             <div key={s.label} className="lk-kpi-item" style={{ flex: 1, padding: "24px 20px", borderRight: i < arr.length - 1 ? `1.5px solid ${C.hairline}` : "none", textAlign: "center" }}>
-              <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", lineHeight: 1, color: C.ink, margin: "0 0 7px", fontVariantNumeric: "tabular-nums" }}>{s.val}</p>
+              <p style={{ fontFamily: "var(--font-sans)", fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", lineHeight: 1, color: C.ink, margin: "0 0 7px", fontVariantNumeric: "tabular-nums" }}>{s.val}</p>
               <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted, margin: 0 }}>{s.label}</p>
             </div>
           ))}
@@ -243,7 +243,7 @@ export default function AdminDashboard() {
               <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "32px 36px" }}>
                 <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted, margin: "0 0 6px" }}>Taux de match</p>
                 <div style={{ width: 24, height: 2, background: C.rose, marginBottom: 18 }} />
-                <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 58, fontWeight: 600, letterSpacing: "-0.04em", color: C.ink, lineHeight: 1, margin: "0 0 10px", fontVariantNumeric: "tabular-nums" }}>
+                <p style={{ fontFamily: "var(--font-sans)", fontSize: 58, fontWeight: 600, letterSpacing: "-0.04em", color: C.ink, lineHeight: 1, margin: "0 0 10px", fontVariantNumeric: "tabular-nums" }}>
                   {tauxMatch}<span style={{ fontSize: 28 }}>%</span>
                 </p>
                 <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{projectsMatched} projet{projectsMatched !== 1 ? "s" : ""} matchés sur {projects.length} publiés</p>
@@ -252,7 +252,7 @@ export default function AdminDashboard() {
               {/* Taux de complétion */}
               <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "32px 28px" }}>
                 <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted, margin: "0 0 22px" }}>Taux de complétion</p>
-                <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 38, fontWeight: 600, letterSpacing: "-0.04em", color: C.ink, lineHeight: 1, margin: "0 0 10px", fontVariantNumeric: "tabular-nums" }}>
+                <p style={{ fontFamily: "var(--font-sans)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.04em", color: C.ink, lineHeight: 1, margin: "0 0 10px", fontVariantNumeric: "tabular-nums" }}>
                   {tauxCompletion}<span style={{ fontSize: 20 }}>%</span>
                 </p>
                 <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{projectsLivre} livré{projectsLivre !== 1 ? "s" : ""}</p>
@@ -261,7 +261,7 @@ export default function AdminDashboard() {
               {/* Utilisateurs */}
               <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "32px 28px" }}>
                 <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted, margin: "0 0 22px" }}>Utilisateurs</p>
-                <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 38, fontWeight: 600, letterSpacing: "-0.04em", color: C.ink, lineHeight: 1, margin: "0 0 10px", fontVariantNumeric: "tabular-nums" }}>
+                <p style={{ fontFamily: "var(--font-sans)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.04em", color: C.ink, lineHeight: 1, margin: "0 0 10px", fontVariantNumeric: "tabular-nums" }}>
                   {totalUsers}
                 </p>
                 <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>{founders.length} founders · {developers.length} devs</p>
@@ -273,7 +273,7 @@ export default function AdminDashboard() {
 
               {/* Funnel de conversion */}
               <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "28px 32px" }}>
-                <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em", color: C.ink, margin: "0 0 24px" }}>Funnel de conversion</h2>
+                <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em", color: C.ink, margin: "0 0 24px" }}>Funnel de conversion</h2>
                 {([
                   { label: "Projets publiés", val: projects.length,   prev: null,              navy: 1    },
                   { label: "Matchés",          val: projectsMatched,   prev: projects.length,   navy: 0.58 },
@@ -286,7 +286,7 @@ export default function AdminDashboard() {
                     <div key={label} style={{ marginBottom: i < 2 ? 20 : 0 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: isLast ? C.rose : C.ink }}>{label}</span>
-                        <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, fontWeight: 600, color: isLast ? C.rose : C.ink, fontVariantNumeric: "tabular-nums" }}>{val}</span>
+                        <span style={{ fontFamily: "var(--font-sans)", fontSize: 20, fontWeight: 600, color: isLast ? C.rose : C.ink, fontVariantNumeric: "tabular-nums" }}>{val}</span>
                       </div>
                       <div style={{ height: 8, borderRadius: 4, background: C.hairline, overflow: "hidden" }}>
                         <div style={{ height: "100%", borderRadius: 4, width: `${barW}%`, background: `rgba(26,33,56,${navy})` }} />
@@ -301,7 +301,7 @@ export default function AdminDashboard() {
 
               {/* Activité récente */}
               <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "28px 32px" }}>
-                <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em", color: C.ink, margin: "0 0 4px" }}>Activité récente</h2>
+                <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em", color: C.ink, margin: "0 0 4px" }}>Activité récente</h2>
                 {recentActivity.length === 0 ? (
                   <p style={{ fontSize: 13, color: C.muted, padding: "20px 0" }}>Aucune activité récente.</p>
                 ) : recentActivity.map((a, i) => (

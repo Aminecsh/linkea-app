@@ -7,7 +7,7 @@ import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { Eye, EyeOff, AlertCircle, Rocket, Code2, Check } from "lucide-react";
 
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" };
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" };
 
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "13px 16px", borderRadius: 10,
@@ -212,7 +212,7 @@ export default function Inscription() {
               )}
 
               <button type="submit" disabled={loading}
-                style={{ padding: "14px", borderRadius: 10, background: C.ink, color: "#fff", fontSize: 14, fontWeight: 600, border: "none", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "opacity 0.2s", marginTop: 4 }}>
+                style={{ padding: "14px", borderRadius: 10, background: C.rose, color: "#fff", fontSize: 14, fontWeight: 600, border: "none", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "opacity 0.2s", marginTop: 4 }}>
                 {loading ? "Création en cours…" : "Créer mon compte →"}
               </button>
             </form>

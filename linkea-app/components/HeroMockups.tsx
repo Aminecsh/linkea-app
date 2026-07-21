@@ -3,12 +3,12 @@
 import React from "react";
 
 const C = {
-  canvas:   "#FAF8F4",
+  canvas:   "#F5F5F7",
   surface:  "#FFFFFF",
   ink:      "#1A2138",
   rose:     "#D4537E",
   muted:    "#8A8579",
-  hairline: "#ECE7DD",
+  hairline: "#E5E5EA",
   green:    "#3F7A5E",
 } as const;
 
@@ -47,12 +47,12 @@ function ScreenMatch() {
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "1.5px", color: C.rose, textTransform: "uppercase" }}>
           Match trouvé
         </div>
-        <h3 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 25, lineHeight: 1.12, fontWeight: 600, color: C.ink, margin: "10px 0 0", letterSpacing: "-0.4px" }}>
+        <h3 style={{ fontFamily: "var(--font-sans)", fontSize: 25, lineHeight: 1.12, fontWeight: 600, color: C.ink, margin: "10px 0 0", letterSpacing: "-0.4px" }}>
           Wandr · app rando
         </h3>
 
         <div style={{ marginTop: 22, background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 18, padding: "20px 18px", display: "flex", alignItems: "baseline", gap: 10 }}>
-          <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 46, fontWeight: 600, color: C.ink, lineHeight: 1 }}>
+          <span style={{ fontFamily: "var(--font-sans)", fontSize: 46, fontWeight: 600, color: C.ink, lineHeight: 1 }}>
             92<span style={{ fontSize: 24, color: C.rose }}>%</span>
           </span>
           <span style={{ fontSize: 13, color: C.muted, lineHeight: 1.3 }}>
@@ -102,7 +102,7 @@ function ScreenBuild() {
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "1.5px", color: C.muted, textTransform: "uppercase" }}>
           Mon projet
         </div>
-        <h3 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 25, lineHeight: 1.12, fontWeight: 600, color: C.ink, margin: "10px 0 0", letterSpacing: "-0.4px" }}>
+        <h3 style={{ fontFamily: "var(--font-sans)", fontSize: 25, lineHeight: 1.12, fontWeight: 600, color: C.ink, margin: "10px 0 0", letterSpacing: "-0.4px" }}>
           Studio Émeraude
         </h3>
 
@@ -126,7 +126,7 @@ function ScreenBuild() {
         <div style={{ marginTop: 28, background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 18, padding: "18px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <span style={{ fontSize: 13, color: C.muted }}>MVP en cours</span>
-            <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 15, fontWeight: 600, color: C.ink }}>Sem. 3 / 6</span>
+            <span style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 600, color: C.ink }}>Sem. 3 / 6</span>
           </div>
           <div style={{ marginTop: 12, height: 8, borderRadius: 5, background: C.hairline, overflow: "hidden" }}>
             <div style={{ width: "50%", height: "100%", background: C.rose }} />
@@ -136,7 +136,7 @@ function ScreenBuild() {
         <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
           {[{ n: "3", l: "membres" }, { n: "12", l: "tâches livrées" }].map((s) => (
             <div key={s.l} style={{ flex: 1, background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 14, padding: "14px 16px" }}>
-              <div style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 24, fontWeight: 600, color: C.ink }}>{s.n}</div>
+              <div style={{ fontFamily: "var(--font-sans)", fontSize: 24, fontWeight: 600, color: C.ink }}>{s.n}</div>
               <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{s.l}</div>
             </div>
           ))}

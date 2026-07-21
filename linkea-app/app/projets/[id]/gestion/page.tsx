@@ -3,17 +3,19 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
 import AIPanel, { type RoadmapSprint } from "@/components/AIPanel";
 import { sendNotif } from "@/lib/notifications";
 import {
-  ArrowLeft, Plus, Upload, LayoutGrid, List, CalendarRange, Folder,
+  Plus, Upload, LayoutGrid, List, CalendarRange, Folder,
   Paperclip, Image as ImageIcon, FileText, FileArchive, Film, FileSpreadsheet,
   Calendar, AlertTriangle, Check, X, Download, ChevronLeft, ChevronRight,
+  Home, Users, MessageCircle, Sparkles, TrendingUp, Clock,
 } from "lucide-react";
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
 
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" } as const;
 
 const inp: React.CSSProperties = {
   width: "100%", padding: "10px 13px", borderRadius: 11,
@@ -27,8 +29,8 @@ const lbl: React.CSSProperties = {
 };
 
 const btnInk: React.CSSProperties = {
-  padding: "9px 16px", borderRadius: 11, background: C.ink, color: "#fff",
-  border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer",
+  padding: "9px 16px", borderRadius: 10, background: C.rose, color: "#fff",
+  border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer",
   display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
 };
 
@@ -65,38 +67,52 @@ type Deliverable = {
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const COLONNES: { key: Task["statut"]; label: string; dot: string }[] = [
-  { key: "todo",      label: "À faire",  dot: C.hairline },
-  { key: "en_cours",  label: "En cours", dot: C.rose },
-  { key: "review",    label: "Review",   dot: C.muted },
-  { key: "done",      label: "Terminé",  dot: C.ink },
+  { key: "todo",      label: "À faire",  dot: "#C7C7CC"  },
+  { key: "en_cours",  label: "En cours", dot: "#4A7BF7"  },
+  { key: "review",    label: "Review",   dot: "#FF9500"  },
+  { key: "done",      label: "Terminé",  dot: "#34C759"  },
 ];
 
 function prioStyle(p: Task["priorite"]): React.CSSProperties {
+  const map: Record<Task["priorite"], { bg: string; color: string }> = {
+    haute:   { bg: "rgba(255,59,48,0.12)",  color: "#D70015" },
+    normale: { bg: "rgba(74,123,247,0.10)", color: "#3565DB" },
+    basse:   { bg: "rgba(0,0,0,0.05)",      color: C.muted   },
+  };
   return {
-    fontSize: 11, fontWeight: p === "haute" ? 700 : 600, padding: "2px 8px", borderRadius: 6,
-    border: p === "haute" ? `1px solid ${C.ink}` : `1px solid ${C.hairline}`,
-    background: C.surface, color: p === "haute" ? C.ink : C.muted,
+    fontSize: 11, fontWeight: p === "haute" ? 700 : 600, padding: "2px 9px", borderRadius: 100,
+    border: "none", background: map[p].bg, color: map[p].color,
     textTransform: "capitalize",
   };
 }
 
 function statutBadge(s: Sprint["statut"] | Task["statut"]): React.CSSProperties {
+  const map: Record<string, { bg: string; color: string }> = {
+    en_cours: { bg: "rgba(74,123,247,0.12)", color: "#3565DB" },
+    done:     { bg: "rgba(52,199,89,0.14)",  color: "#248A3D" },
+    termine:  { bg: "rgba(52,199,89,0.14)",  color: "#248A3D" },
+    review:   { bg: "rgba(255,149,0,0.14)",  color: "#C93400" },
+    a_venir:  { bg: "rgba(0,0,0,0.05)",      color: C.muted   },
+    todo:     { bg: "rgba(0,0,0,0.05)",      color: C.muted   },
+  };
+  const v = map[s] ?? { bg: "rgba(0,0,0,0.05)", color: C.muted };
   return {
-    fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6,
-    border: `1px solid ${C.hairline}`, background: C.surface,
-    color: s === "en_cours" || s === "done" || s === "termine" ? C.ink : C.muted,
+    fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 100,
+    border: "none", background: v.bg, color: v.color,
   };
 }
 
-const TABS = ["kanban", "liste", "roadmap", "fichiers"] as const;
+const TABS = ["apercu", "taches", "roadmap", "fichiers"] as const;
 type Tab = typeof TABS[number];
 
 const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
-  kanban:   { label: "Kanban",   icon: <LayoutGrid    size={12} strokeWidth={2} /> },
-  liste:    { label: "Liste",    icon: <List          size={12} strokeWidth={2} /> },
-  roadmap:  { label: "Roadmap",  icon: <CalendarRange size={12} strokeWidth={2} /> },
-  fichiers: { label: "Fichiers", icon: <Folder        size={12} strokeWidth={2} /> },
+  apercu:   { label: "Vue d'ensemble", icon: <Home          size={12} strokeWidth={2} /> },
+  taches:   { label: "Tâches",         icon: <LayoutGrid    size={12} strokeWidth={2} /> },
+  roadmap:  { label: "Roadmap",        icon: <CalendarRange size={12} strokeWidth={2} /> },
+  fichiers: { label: "Fichiers",       icon: <Folder        size={12} strokeWidth={2} /> },
 };
+
+const PHASES = ["Cadrage", "Build", "Tests", "Livré"] as const;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -144,8 +160,11 @@ export default function GestionPage() {
   const [tasks, setTasks]             = useState<Task[]>([]);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [selectedSprintId, setSelectedSprintId] = useState<string | "all">("all");
-  const [activeTab, setActiveTab]     = useState<Tab>("kanban");
+  const [activeTab, setActiveTab]     = useState<Tab>("apercu");
+  const [taskView, setTaskView]       = useState<"kanban" | "liste">("kanban");
+  const [convId, setConvId]           = useState<string | null>(null);
   const [loading, setLoading]         = useState(true);
+  const [now] = useState(() => Date.now());
 
   // Filtres kanban / liste
   const [filterAssigne, setFilterAssigne] = useState<string>("all");
@@ -223,10 +242,11 @@ export default function GestionPage() {
 
       const { data: conv } = await supabase
         .from("conversations")
-        .select("profiles_developer(nom, user_id)")
+        .select("id, profiles_developer(nom, user_id)")
         .eq("project_id", projectId).maybeSingle();
       const dp = conv?.profiles_developer as unknown as { nom: string; user_id: string } | null;
       if (dp) membersArr.push({ user_id: dp.user_id, nom: dp.nom, role: "developer" });
+      if (conv?.id) setConvId(conv.id);
       setMembers(membersArr);
 
       const [{ data: sprintsData }, { data: tasksData }, { data: deliData }] = await Promise.all([
@@ -486,7 +506,46 @@ export default function GestionPage() {
   const donePct = sprintFiltered.length > 0
     ? Math.round(sprintFiltered.filter((t) => t.statut === "done").length / sprintFiltered.length * 100) : 0;
   const daysLeft = selectedSprint
-    ? Math.ceil((new Date(selectedSprint.date_fin).getTime() - Date.now()) / 86400000) : null;
+    ? Math.ceil((new Date(selectedSprint.date_fin).getTime() - now) / 86400000) : null;
+
+  // ── Vue d'ensemble : dérivations ─────────────────────────────────────────────
+
+  const totalTasks    = tasks.length;
+  const doneTasks     = tasks.filter((t) => t.statut === "done").length;
+  const inProgTasks   = tasks.filter((t) => t.statut === "en_cours").length;
+  const globalPct     = totalTasks > 0 ? Math.round(doneTasks / totalTasks * 100) : 0;
+  const sprintsDone   = sprints.filter((s) => s.statut === "termine").length;
+  const currentSprint = sprints.find((s) => s.statut === "en_cours");
+  const currentDaysLeft = currentSprint
+    ? Math.max(0, Math.ceil((new Date(currentSprint.date_fin).getTime() - now) / 86400000)) : null;
+
+  // Phase du projet : 0 Cadrage, 1 Build, 2 Tests, 3 Livré
+  const phase =
+    sprints.length === 0 || (sprintsDone === 0 && !currentSprint) ? 0
+    : sprintsDone === sprints.length && globalPct === 100 ? 3
+    : globalPct >= 80 ? 2
+    : 1;
+
+  // Résumé en français simple, calculé des vraies données
+  const resumePhrases: string[] = [];
+  if (totalTasks === 0) {
+    resumePhrases.push("Le projet démarre — votre équipe prépare les premières tâches.");
+  } else {
+    resumePhrases.push(
+      `${doneTasks} tâche${doneTasks > 1 ? "s" : ""} terminée${doneTasks > 1 ? "s" : ""} sur ${totalTasks}` +
+      (inProgTasks > 0 ? `, ${inProgTasks} en cours en ce moment.` : ".")
+    );
+  }
+  if (currentSprint) {
+    resumePhrases.push(
+      `Étape en cours : ${currentSprint.nom}` +
+      (currentSprint.objectif ? ` — ${currentSprint.objectif}` : "") +
+      (currentDaysLeft !== null ? ` (fin prévue le ${fmtDate(currentSprint.date_fin)}).` : ".")
+    );
+  }
+  if (deliverables.length > 0) {
+    resumePhrases.push(`Dernier fichier partagé : ${deliverables[0].nom}, le ${fmtDate(deliverables[0].created_at)}.`);
+  }
 
   // ── Loading ──────────────────────────────────────────────────────────────────
 
@@ -502,22 +561,21 @@ export default function GestionPage() {
   // ══════════════════════════════════════════════════════════════════════════════
 
   return (
-    <div style={{ minHeight: "100vh", background: C.canvas }}>
+    <div className="pl-sidebar" style={{ minHeight: "100vh", background: C.canvas }}>
+      <AppNav />
       <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-20 px-4 py-3" style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderBottom: `1px solid ${C.hairline}` }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-3 mb-3">
-            <button onClick={() => router.push("/messages")}
-              style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.muted, padding: 0, flexShrink: 0 }}>
-              <ArrowLeft size={14} strokeWidth={2} /> Messages
-            </button>
             <div className="flex-1 min-w-0">
-              <h1 className="truncate" style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 700, color: C.ink, margin: 0 }}>{projectTitre}</h1>
-              <p style={{ fontSize: 11, color: C.muted, margin: 0 }}>Gestion de projet</p>
+              <h1 className="truncate" style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 700, color: C.ink, margin: 0 }}>{projectTitre}</h1>
+              <p style={{ fontSize: 11, color: C.muted, margin: 0 }}>
+                {PHASES[phase]} · {globalPct}% réalisé
+              </p>
             </div>
-            {activeTab !== "fichiers" && activeTab !== "roadmap" && (
+            {activeTab === "taches" && (
               <button onClick={() => setShowTaskModal(true)} style={{ ...btnInk, flexShrink: 0 }}><Plus size={13} strokeWidth={2.5} /> Tâche</button>
             )}
             {activeTab === "fichiers" && (
@@ -525,12 +583,12 @@ export default function GestionPage() {
                 <Upload size={13} strokeWidth={2} /> Fichier <input type="file" className="hidden" onChange={onFileSelect} />
               </label>
             )}
-            {role === "founder" && activeTab !== "fichiers" && (
+            {role === "founder" && activeTab === "taches" && (
               <button onClick={() => setShowSprintModal(true)} style={{ ...btnGhost, flexShrink: 0 }}><Plus size={13} strokeWidth={2} /> Sprint</button>
             )}
             <button
               onClick={() => setShowAIPanel(true)}
-              style={{ flexShrink: 0, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 11, background: C.ink, color: "#fff", fontSize: 15, border: "none", cursor: "pointer" }}
+              style={{ flexShrink: 0, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 11, background: C.rose, color: "#fff", fontSize: 15, border: "none", cursor: "pointer" }}
               title="Assistant IA"
             >
               ✦
@@ -558,7 +616,7 @@ export default function GestionPage() {
       <div className="max-w-7xl mx-auto px-4 py-5">
 
         {/* ── Sprint selector + info ─────────────────────────────────────── */}
-        {activeTab !== "fichiers" && (
+        {(activeTab === "taches" || activeTab === "roadmap") && (
           <>
             <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
               <button onClick={() => setSelectedSprintId("all")}
@@ -583,7 +641,7 @@ export default function GestionPage() {
               <div className="flex flex-wrap gap-4 items-center" style={{ background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 16, padding: 16, marginBottom: 16 }}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 700, color: C.ink, margin: 0 }}>{selectedSprint.nom}</h2>
+                    <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 700, color: C.ink, margin: 0 }}>{selectedSprint.nom}</h2>
                     <span style={statutBadge(selectedSprint.statut)}>
                       {selectedSprint.statut === "en_cours" ? "En cours" : selectedSprint.statut === "termine" ? "Terminé" : "À venir"}
                     </span>
@@ -605,7 +663,7 @@ export default function GestionPage() {
                     <span>Avancement</span><span style={{ fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{donePct}%</span>
                   </div>
                   <div style={{ height: 5, background: C.hairline, borderRadius: 99, overflow: "hidden" }}>
-                    <div style={{ height: "100%", background: C.ink, borderRadius: 99, transition: "width 0.3s", width: `${donePct}%` }} />
+                    <div style={{ height: "100%", background: "#4A7BF7", borderRadius: 99, transition: "width 0.3s", width: `${donePct}%` }} />
                   </div>
                   <p style={{ fontSize: 11, color: C.muted, margin: "4px 0 0", fontVariantNumeric: "tabular-nums" }}>{sprintFiltered.filter((t) => t.statut === "done").length}/{sprintFiltered.length} tâches</p>
                 </div>
@@ -613,7 +671,7 @@ export default function GestionPage() {
                   <div className="flex gap-2">
                     {selectedSprint.statut === "a_venir" && (
                       <button onClick={() => updateSprintStatut(selectedSprint, "en_cours")}
-                        style={{ fontSize: 12, fontWeight: 700, color: "#fff", background: C.ink, border: "none", padding: "7px 14px", borderRadius: 9, cursor: "pointer" }}>Démarrer</button>
+                        style={{ fontSize: 12, fontWeight: 600, color: "#fff", background: C.rose, border: "none", padding: "7px 14px", borderRadius: 9, cursor: "pointer" }}>Démarrer</button>
                     )}
                     {selectedSprint.statut === "en_cours" && (
                       <button onClick={() => updateSprintStatut(selectedSprint, "termine")}
@@ -626,9 +684,23 @@ export default function GestionPage() {
               </div>
             )}
 
-            {/* Filtres */}
-            {activeTab !== "roadmap" && (
+            {/* Filtres + bascule kanban/liste */}
+            {activeTab === "taches" && (
               <div className="flex gap-2 mb-4 flex-wrap">
+                <div className="flex" style={{ background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 9, padding: 2 }}>
+                  {(["kanban", "liste"] as const).map((v) => (
+                    <button key={v} onClick={() => setTaskView(v)}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600,
+                        padding: "5px 12px", borderRadius: 7, cursor: "pointer", border: "none",
+                        background: taskView === v ? C.ink : "transparent",
+                        color: taskView === v ? "#fff" : C.muted,
+                      }}>
+                      {v === "kanban" ? <LayoutGrid size={11} strokeWidth={2} /> : <List size={11} strokeWidth={2} />}
+                      {v === "kanban" ? "Kanban" : "Liste"}
+                    </button>
+                  ))}
+                </div>
                 <select value={filterAssigne} onChange={(e) => setFilterAssigne(e.target.value)}
                   style={{ fontSize: 12, fontWeight: 600, border: `1px solid ${C.hairline}`, borderRadius: 9, padding: "6px 12px", background: C.surface, color: C.muted, outline: "none" }}>
                   <option value="all">Tous les membres</option>
@@ -651,8 +723,154 @@ export default function GestionPage() {
           </>
         )}
 
+        {/* ══ Vue d'ensemble ══════════════════════════════════════════════════ */}
+        {activeTab === "apercu" && (
+          <div className="flex flex-col gap-4">
+
+            {/* Timeline projet — 4 étapes */}
+            <div style={{ background: C.surface, borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", padding: "24px 24px 20px" }}>
+              <div className="flex items-center" style={{ maxWidth: 640, margin: "0 auto" }}>
+                {PHASES.map((p, i) => {
+                  const done    = i < phase;
+                  const current = i === phase;
+                  return (
+                    <div key={p} className="flex items-center" style={{ flex: i < PHASES.length - 1 ? 1 : "none" }}>
+                      <div className="flex flex-col items-center gap-1.5" style={{ flexShrink: 0 }}>
+                        <div style={{
+                          width: 30, height: 30, borderRadius: "50%",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          background: done ? "#34C759" : current ? C.rose : "#EDEDF0",
+                          boxShadow: current ? "0 0 0 5px rgba(212,83,126,0.15)" : "none",
+                          transition: "box-shadow 0.3s",
+                        }}>
+                          {done
+                            ? <Check size={14} strokeWidth={3} color="#fff" />
+                            : <span style={{ width: 8, height: 8, borderRadius: "50%", background: current ? "#fff" : "#C7C7CC" }} />
+                          }
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: current ? 700 : 600, color: done ? "#248A3D" : current ? C.rose : C.muted, whiteSpace: "nowrap" }}>
+                          {p}
+                        </span>
+                      </div>
+                      {i < PHASES.length - 1 && (
+                        <div style={{ flex: 1, height: 3, borderRadius: 99, margin: "0 10px", marginBottom: 22, background: i < phase ? "#34C759" : "#EDEDF0" }} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {sprints.length > 0 && (
+                <p className="text-center" style={{ fontSize: 12, color: C.muted, margin: "14px 0 0", fontVariantNumeric: "tabular-nums" }}>
+                  Sprint {Math.min(sprintsDone + (currentSprint ? 1 : 0), sprints.length) || 1}/{sprints.length} · {globalPct}% du projet réalisé
+                </p>
+              )}
+            </div>
+
+            {/* Où en est le projet ? */}
+            <div style={{ background: C.surface, borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", padding: 20 }}>
+              <div className="flex items-center gap-2.5 mb-3">
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(212,83,126,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Sparkles size={17} strokeWidth={2} style={{ color: C.rose }} />
+                </div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: C.ink, margin: 0 }}>Où en est le projet ?</h2>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {resumePhrases.map((p, i) => (
+                  <p key={i} style={{ fontSize: 14, lineHeight: 1.6, color: "#454C61", margin: 0 }}>{p}</p>
+                ))}
+              </div>
+            </div>
+
+            {/* Métriques */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {([
+                { label: "Avancement",  value: `${globalPct}%`,                            icon: TrendingUp, color: "#4A7BF7", bg: "rgba(74,123,247,0.12)"  },
+                { label: "Tâches",      value: `${doneTasks}/${totalTasks}`,               icon: Check,      color: "#34C759", bg: "rgba(52,199,89,0.12)"   },
+                { label: "Jours restants", value: currentDaysLeft !== null ? `${currentDaysLeft}j` : "—", icon: Clock, color: "#FF9500", bg: "rgba(255,149,0,0.12)" },
+                { label: "Livrables",   value: `${deliverables.length}`,                   icon: Folder,     color: C.rose,    bg: "rgba(212,83,126,0.12)"  },
+              ] as { label: string; value: string; icon: React.ElementType; color: string; bg: string }[]).map((kpi) => (
+                <div key={kpi.label} style={{ background: C.surface, borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", padding: "16px 18px" }}>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: kpi.bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+                    <kpi.icon size={16} strokeWidth={2} style={{ color: kpi.color }} />
+                  </div>
+                  <p style={{ fontSize: 24, fontWeight: 700, color: C.ink, margin: "0 0 2px", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{kpi.value}</p>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: C.muted, margin: 0 }}>{kpi.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-4">
+              {/* Mon équipe */}
+              <div style={{ background: C.surface, borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", padding: 20 }}>
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(74,123,247,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Users size={17} strokeWidth={2} style={{ color: "#4A7BF7" }} />
+                  </div>
+                  <h2 style={{ fontSize: 15, fontWeight: 700, color: C.ink, margin: 0 }}>Mon équipe</h2>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {members.map((m) => (
+                    <div key={m.user_id} className="flex items-center gap-3">
+                      <div style={{ width: 38, height: 38, borderRadius: "50%", background: C.ink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{m.nom[0]?.toUpperCase()}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate" style={{ fontSize: 14, fontWeight: 600, color: C.ink, margin: 0 }}>
+                          {m.nom}{m.user_id === userId ? " (vous)" : ""}
+                        </p>
+                        <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>{m.role === "founder" ? "Client" : "Développeur"}</p>
+                      </div>
+                      {m.user_id !== userId && (
+                        <button
+                          onClick={() => router.push(convId ? `/messages/${convId}` : "/messages")}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, padding: "7px 13px", borderRadius: 9, background: "rgba(212,83,126,0.10)", color: C.rose, border: "none", cursor: "pointer", flexShrink: 0 }}>
+                          <MessageCircle size={12} strokeWidth={2} /> Contacter
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {members.length === 0 && <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>Équipe en cours de constitution.</p>}
+                </div>
+              </div>
+
+              {/* Derniers livrables */}
+              <div style={{ background: C.surface, borderRadius: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", padding: 20 }}>
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(52,199,89,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Folder size={17} strokeWidth={2} style={{ color: "#34C759" }} />
+                  </div>
+                  <h2 style={{ fontSize: 15, fontWeight: 700, color: C.ink, margin: 0 }}>Derniers fichiers</h2>
+                </div>
+                {deliverables.length === 0 ? (
+                  <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>Aucun fichier pour l&apos;instant — ils apparaîtront ici dès qu&apos;un membre en partage un.</p>
+                ) : (
+                  <div className="flex flex-col gap-2.5">
+                    {deliverables.slice(0, 3).map((d) => (
+                      <a key={d.id} href={d.file_url} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-3 transition-opacity hover:opacity-70" style={{ textDecoration: "none" }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: "#F5F5F7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <FileIcon t={d.file_type} size={16} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate" style={{ fontSize: 13, fontWeight: 600, color: C.ink, margin: 0 }}>{d.nom}</p>
+                          <p style={{ fontSize: 11, color: C.muted, margin: 0 }}>{fmtDate(d.created_at)}{d.file_size ? ` · ${fileSize(d.file_size)}` : ""}</p>
+                        </div>
+                        <Download size={14} strokeWidth={2} style={{ color: C.muted, flexShrink: 0 }} />
+                      </a>
+                    ))}
+                    <button onClick={() => setActiveTab("fichiers")}
+                      style={{ alignSelf: "flex-start", fontSize: 12, fontWeight: 600, color: C.rose, background: "none", border: "none", cursor: "pointer", padding: "4px 0", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      Voir tous les fichiers <ChevronRight size={12} strokeWidth={2.2} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ══ Vue Kanban ══════════════════════════════════════════════════════ */}
-        {activeTab === "kanban" && (
+        {activeTab === "taches" && taskView === "kanban" && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {COLONNES.map((col) => {
               const colTasks = filtered.filter((t) => t.statut === col.key);
@@ -687,7 +905,7 @@ export default function GestionPage() {
         )}
 
         {/* ══ Vue Liste ════════════════════════════════════════════════════════ */}
-        {activeTab === "liste" && (
+        {activeTab === "taches" && taskView === "liste" && (
           <div style={{ background: C.surface, borderRadius: 16, border: `1px solid ${C.hairline}`, overflow: "hidden" }}>
             {filtered.length === 0 ? (
               <div className="text-center py-16" style={{ color: C.muted, fontSize: 13 }}>Aucune tâche.</div>
@@ -724,7 +942,7 @@ export default function GestionPage() {
                         <td className="px-4 py-3 hidden md:table-cell">
                           {member ? (
                             <div className="flex items-center gap-1.5">
-                              <div style={{ width: 20, height: 20, borderRadius: 7, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <div style={{ width: 20, height: 20, borderRadius: 7, background: "#34C759", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                 <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{member.nom[0].toUpperCase()}</span>
                               </div>
                               <span style={{ fontSize: 12, color: C.ink }}>{member.nom}</span>
@@ -789,7 +1007,7 @@ export default function GestionPage() {
                         <div className="flex items-center justify-between mb-3">
                           <div>
                             <div className="flex items-center gap-2">
-                              <h3 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 15, fontWeight: 700, color: C.ink, margin: 0 }}>{s.nom}</h3>
+                              <h3 style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 700, color: C.ink, margin: 0 }}>{s.nom}</h3>
                               <span style={statutBadge(s.statut)}>{s.statut === "en_cours" ? "En cours" : s.statut === "termine" ? "Terminé" : "À venir"}</span>
                             </div>
                             {s.objectif && <p style={{ fontSize: 11, color: C.muted, margin: "2px 0 0" }}>{s.objectif}</p>}
@@ -898,7 +1116,7 @@ export default function GestionPage() {
                   <ChevronLeft size={12} strokeWidth={2} /> Reculer
                 </button>
                 <button onClick={() => moveTask(panelTask, "next")} disabled={panelTask.statut === "done"}
-                  style={{ fontSize: 12, fontWeight: 700, padding: "6px 12px", borderRadius: 9, background: C.ink, color: "#fff", border: "none", cursor: "pointer", opacity: panelTask.statut === "done" ? 0.3 : 1, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 9, background: "#34C759", color: "#fff", border: "none", cursor: "pointer", opacity: panelTask.statut === "done" ? 0.3 : 1, display: "inline-flex", alignItems: "center", gap: 4 }}>
                   Avancer <ChevronRight size={12} strokeWidth={2} />
                 </button>
               </div>
@@ -922,7 +1140,7 @@ export default function GestionPage() {
 
               {/* Titre */}
               <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
-                style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, fontWeight: 700, color: C.ink, background: "transparent", border: "none", borderBottom: `2px solid transparent`, outline: "none", paddingBottom: 4, width: "100%" }}
+                style={{ fontFamily: "var(--font-sans)", fontSize: 20, fontWeight: 700, color: C.ink, background: "transparent", border: "none", borderBottom: `2px solid transparent`, outline: "none", paddingBottom: 4, width: "100%" }}
                 onFocus={(e) => { e.target.style.borderBottomColor = C.rose; }}
                 onBlur={(e) => { e.target.style.borderBottomColor = "transparent"; }}
                 placeholder="Titre de la tâche" />
@@ -977,7 +1195,7 @@ export default function GestionPage() {
                 </div>
                 {panelChecklist.length > 0 && (
                   <div className="overflow-hidden mb-3" style={{ height: 5, background: C.hairline, borderRadius: 99 }}>
-                    <div style={{ height: "100%", background: C.ink, borderRadius: 99, transition: "width 0.3s", width: `${Math.round(panelChecklist.filter((c) => c.done).length / panelChecklist.length * 100)}%` }} />
+                    <div style={{ height: "100%", background: "#4A7BF7", borderRadius: 99, transition: "width 0.3s", width: `${Math.round(panelChecklist.filter((c) => c.done).length / panelChecklist.length * 100)}%` }} />
                   </div>
                 )}
                 <div className="flex flex-col gap-1.5 mb-2">
@@ -1066,7 +1284,7 @@ export default function GestionPage() {
       {showFileModal && pendingFile && (
         <div className="fixed inset-0 flex items-end justify-center z-50 p-4" style={{ background: "rgba(26,33,56,0.35)" }}>
           <div className="w-full max-w-sm flex flex-col gap-4" style={{ background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 24 }}>
-            <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 700, color: C.ink, margin: 0 }}>Partager un fichier</h2>
+            <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 18, fontWeight: 700, color: C.ink, margin: 0 }}>Partager un fichier</h2>
             <div className="flex items-center gap-3" style={{ background: C.canvas, border: `1px solid ${C.hairline}`, borderRadius: 12, padding: "12px 16px" }}>
               <FileIcon t={pendingFile.type} size={22} />
               <div className="flex-1 min-w-0">
@@ -1099,7 +1317,7 @@ export default function GestionPage() {
       {showSprintModal && (
         <div className="fixed inset-0 flex items-end justify-center z-50 p-4" style={{ background: "rgba(26,33,56,0.35)" }}>
           <div className="w-full max-w-sm flex flex-col gap-4" style={{ background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 24 }}>
-            <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 700, color: C.ink, margin: 0 }}>Nouveau sprint</h2>
+            <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 18, fontWeight: 700, color: C.ink, margin: 0 }}>Nouveau sprint</h2>
             <input placeholder="Nom (ex: Sprint 1 – Auth)" value={sprintNom} onChange={(e) => setSprintNom(e.target.value)} style={inp} />
             <input placeholder="Objectif (optionnel)" value={sprintObj} onChange={(e) => setSprintObj(e.target.value)} style={inp} />
             <div className="grid grid-cols-2 gap-3">
@@ -1121,7 +1339,7 @@ export default function GestionPage() {
       {showTaskModal && (
         <div className="fixed inset-0 flex items-end justify-center z-50 p-4" style={{ background: "rgba(26,33,56,0.35)" }}>
           <div className="w-full max-w-sm flex flex-col gap-4 max-h-[90vh] overflow-y-auto" style={{ background: C.surface, borderRadius: 20, border: `1px solid ${C.hairline}`, padding: 24 }}>
-            <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 700, color: C.ink, margin: 0 }}>Nouvelle tâche</h2>
+            <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 18, fontWeight: 700, color: C.ink, margin: 0 }}>Nouvelle tâche</h2>
             <input placeholder="Titre" value={taskTitre} onChange={(e) => setTaskTitre(e.target.value)} style={inp} />
             <textarea placeholder="Description (optionnel)" value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} rows={2} style={{ ...inp, resize: "none" }} />
             <div className="grid grid-cols-2 gap-3">
@@ -1197,7 +1415,7 @@ function KanbanCard({ task, members, sprints, showSprint, onOpen, onMove, onDele
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {member && (
-            <div style={{ width: 20, height: 20, borderRadius: 7, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 20, height: 20, borderRadius: 7, background: "#34C759", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", lineHeight: 1 }}>{member.nom[0].toUpperCase()}</span>
             </div>
           )}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
 
 type Candidature = {
   id: string;
@@ -234,8 +235,8 @@ export default function CandidatsPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#FAF8F4", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid #ECE7DD", borderTopColor: "#1A2138", animation: "lk-spin 0.8s linear infinite" }} />
+      <div style={{ minHeight: "100vh", background: "#F5F5F7", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid #E5E5EA", borderTopColor: "#1A2138", animation: "lk-spin 0.8s linear infinite" }} />
         <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -246,21 +247,22 @@ export default function CandidatsPage() {
   const refused = candidatures.filter((c) => c.statut === "refused");
 
   return (
-    <div className="min-h-screen pb-10" style={{ background: "#FAF8F4" }}>
+    <div className="min-h-screen pb-10 pl-sidebar" style={{ background: "#F5F5F7" }}>
+      <AppNav />
 
       {/* Header */}
-      <div className="px-4 py-4 sticky top-0 z-10" style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderBottom: "1px solid #ECE7DD" }}>
+      <div className="px-4 py-4 sticky top-0 z-10" style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderBottom: "1px solid #E5E5EA" }}>
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <button onClick={() => router.push("/profil")}
             style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#8A8579", padding: 0 }}>
             ← Retour
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="truncate" style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 700, color: "#1A2138", margin: 0 }}>{project?.titre}</h1>
+            <h1 className="truncate" style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 700, color: "#1A2138", margin: 0 }}>{project?.titre}</h1>
             <p style={{ fontSize: 11, color: "#8A8579", margin: 0, fontVariantNumeric: "tabular-nums" }}>{candidatures.length} candidature{candidatures.length > 1 ? "s" : ""}</p>
           </div>
           {project?.statut === "matched" && (
-            <span className="shrink-0" style={{ fontSize: 11, fontWeight: 600, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", padding: "4px 11px", borderRadius: 7 }}>
+            <span className="shrink-0" style={{ fontSize: 11, fontWeight: 600, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138", padding: "4px 11px", borderRadius: 7 }}>
               Matchée
             </span>
           )}
@@ -270,7 +272,7 @@ export default function CandidatsPage() {
       <div className="max-w-2xl mx-auto px-4 py-6 flex flex-col gap-6">
 
         {candidatures.length === 0 && (
-          <div className="text-center py-20" style={{ background: "#fff", borderRadius: 16, border: "1px solid #ECE7DD" }}>
+          <div className="text-center py-20" style={{ background: "#fff", borderRadius: 16, border: "1px solid #E5E5EA" }}>
             <p style={{ fontSize: 13, color: "#8A8579", margin: 0 }}>Aucune candidature pour l&apos;instant.</p>
             <p style={{ fontSize: 13, color: "#8A8579", margin: "4px 0 0" }}>Les devs intéressés apparaîtront ici.</p>
           </div>
@@ -345,13 +347,13 @@ function CandidatCard({
 }) {
   const dev = c.profiles_developer;
   return (
-    <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ECE7DD", padding: 20 }}>
+    <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #E5E5EA", padding: 20 }}>
       <div className="flex items-start gap-4">
         {dev.avatar_url ? (
-          <img src={dev.avatar_url} alt={dev.nom} className="shrink-0" style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", border: "1px solid #ECE7DD" }} />
+          <img src={dev.avatar_url} alt={dev.nom} className="shrink-0" style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", border: "1px solid #E5E5EA" }} />
         ) : (
           <div className="shrink-0" style={{ width: 44, height: 44, borderRadius: 12, background: "#1A2138", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{dev.nom?.[0]?.toUpperCase() ?? "?"}</span>
+            <span style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{dev.nom?.[0]?.toUpperCase() ?? "?"}</span>
           </div>
         )}
         <div className="flex-1 min-w-0">
@@ -361,7 +363,7 @@ function CandidatCard({
           {dev.competences?.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
               {dev.competences.map((comp) => (
-                <span key={comp} style={{ fontSize: 11, fontWeight: 600, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", padding: "3px 9px", borderRadius: 7 }}>
+                <span key={comp} style={{ fontSize: 11, fontWeight: 600, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138", padding: "3px 9px", borderRadius: 7 }}>
                   {comp}
                 </span>
               ))}
@@ -385,7 +387,7 @@ function CandidatCard({
           <div className="flex gap-2 flex-wrap">
             <a
               href={`/profil/${dev.user_id}`}
-              style={{ display: "inline-flex", alignItems: "center", padding: "8px 16px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#fff", color: "#8A8579", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
+              style={{ display: "inline-flex", alignItems: "center", padding: "8px 16px", borderRadius: 10, border: "1px solid #E5E5EA", background: "#fff", color: "#8A8579", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
             >
               Voir le profil
             </a>
@@ -394,14 +396,14 @@ function CandidatCard({
                 <button
                   onClick={onAccept}
                   disabled={acting === c.id}
-                  style={{ padding: "8px 20px", borderRadius: 10, background: "#1A2138", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: acting === c.id ? 0.6 : 1 }}
+                  style={{ padding: "8px 20px", borderRadius: 10, background: "#D4537E", color: "#fff", border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: acting === c.id ? 0.6 : 1 }}
                 >
                   {acting === c.id ? "..." : "Accepter"}
                 </button>
                 <button
                   onClick={onRefuse}
                   disabled={acting === c.id}
-                  style={{ padding: "8px 20px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#fff", color: "#8A8579", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: acting === c.id ? 0.6 : 1 }}
+                  style={{ padding: "8px 20px", borderRadius: 10, border: "1px solid #E5E5EA", background: "#fff", color: "#8A8579", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: acting === c.id ? 0.6 : 1 }}
                 >
                   Refuser
                 </button>

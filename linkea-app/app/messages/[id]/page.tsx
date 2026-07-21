@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import {
   ArrowLeft, ArrowUp, Paperclip, Smile, FileText, ImageIcon,
@@ -87,7 +88,7 @@ function parseCallContent(content: string): CallData | null {
   try { return JSON.parse(content.slice(9)); } catch { return null; }
 }
 
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" } as const;
 
 function MeetingCard({ data }: { data: MeetingData }) {
   const d = new Date(data.scheduled_at);
@@ -113,7 +114,7 @@ function MeetingCard({ data }: { data: MeetingData }) {
       <div style={{ borderTop: `1px solid ${C.hairline}` }} className="px-3 py-2.5">
         <a
           href={url} target="_blank" rel="noreferrer"
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "9px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#fff", background: C.ink, opacity: isPast ? 0.6 : 1, textDecoration: "none" }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: "9px 0", borderRadius: 10, fontSize: 12, fontWeight: 600, color: "#fff", background: C.rose, opacity: isPast ? 0.6 : 1, textDecoration: "none" }}
         >
           <Video size={12} strokeWidth={2} /> {isPast ? "Voir le replay" : "Rejoindre le call"}
           <ExternalLink size={10} style={{ opacity: 0.7 }} />
@@ -510,7 +511,8 @@ export default function ChatPage() {
   const hasText     = content.trim().length > 0;
 
   return (
-    <div className="flex flex-col" style={{ height: "100dvh", background: "var(--bg)" }}>
+    <div className="flex flex-col pl-sidebar" style={{ height: "100dvh", background: "var(--bg)" }}>
+      <AppNav />
 
       {/* ── Appel Jitsi in-app ── */}
       {activeCall && (
@@ -549,7 +551,7 @@ export default function ChatPage() {
                 style={{ width: 36, height: 36, borderRadius: 11, objectFit: "cover", border: `1px solid ${C.hairline}`, display: "block" }} />
             ) : (
               <div style={{ width: 36, height: 36, borderRadius: 11, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 14, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{otherNom?.[0]?.toUpperCase() ?? "?"}</span>
+                <span style={{ fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{otherNom?.[0]?.toUpperCase() ?? "?"}</span>
               </div>
             )}
           </button>
@@ -994,7 +996,7 @@ export default function ChatPage() {
                   <Video size={18} strokeWidth={1.8} style={{ color: "#fff" }} />
                 </div>
                 <div>
-                  <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: C.ink, margin: 0 }}>Appel vidéo</p>
+                  <p style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 600, color: C.ink, margin: 0 }}>Appel vidéo</p>
                   <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>via Jitsi Meet</p>
                 </div>
               </div>
@@ -1022,7 +1024,7 @@ export default function ChatPage() {
                   <Calendar size={18} strokeWidth={1.8} style={{ color: "#fff" }} />
                 </div>
                 <div>
-                  <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: C.ink, margin: 0 }}>Planifier une réunion</p>
+                  <p style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 600, color: C.ink, margin: 0 }}>Planifier une réunion</p>
                   <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>Lien Jitsi généré automatiquement</p>
                 </div>
               </div>
@@ -1063,7 +1065,7 @@ export default function ChatPage() {
             </div>
 
             <button onClick={scheduleMeeting} disabled={meetingCreating || !meetingDate || !meetingTime}
-              style={{ width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 14, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.ink, border: "none", cursor: "pointer", opacity: (meetingCreating || !meetingDate || !meetingTime) ? 0.4 : 1 }}>
+              style={{ width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 14, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.rose, border: "none", cursor: "pointer", opacity: (meetingCreating || !meetingDate || !meetingTime) ? 0.4 : 1 }}>
               {meetingCreating
                 ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
                 : <><Calendar size={15} strokeWidth={2} /> Planifier la réunion</>}

@@ -37,9 +37,9 @@ const TYPE_COLOR: Record<string, string> = {
   nouveau_message:      "border-l-[#D4537E]",
   nouveau_candidat:     "border-l-[#D4537E]",
   candidature_acceptee: "border-l-[#1A2138]",
-  candidature_refusee:  "border-l-[#ECE7DD]",
+  candidature_refusee:  "border-l-[#E5E5EA]",
   contrat_disponible:   "border-l-[#1A2138]",
-  default:              "border-l-[#ECE7DD]",
+  default:              "border-l-[#E5E5EA]",
 };
 
 export default function NotifToast() {
@@ -142,7 +142,7 @@ export default function NotifToast() {
             <div key={t.id} className={`${t.visible ? "toast-in" : "toast-out"} pointer-events-auto w-full max-w-sm`}>
               <div
                 onClick={() => clickable && navigate(t)}
-                className={`flex items-start gap-3 bg-white rounded-2xl border border-[#ECE7DD] border-l-4 ${color} px-4 py-3 transition-transform ${clickable ? "cursor-pointer active:scale-[0.98]" : ""}`}
+                className={`flex items-start gap-3 bg-white rounded-2xl border border-[#E5E5EA] border-l-4 ${color} px-4 py-3 transition-transform ${clickable ? "cursor-pointer active:scale-[0.98]" : ""}`}
                 style={{ boxShadow: "0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.05)" }}
               >
                 <span className="text-xl shrink-0 mt-0.5">{TYPE_ICON[t.type] ?? TYPE_ICON.default}</span>
@@ -152,7 +152,7 @@ export default function NotifToast() {
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); dismiss(t.id); }}
-                  className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#FAF8F4] text-[#8A8579] hover:text-[#1A2138] transition-colors text-xs mt-0.5"
+                  className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full hover:bg-[#F5F5F7] text-[#8A8579] hover:text-[#1A2138] transition-colors text-xs mt-0.5"
                 >✕</button>
               </div>
             </div>

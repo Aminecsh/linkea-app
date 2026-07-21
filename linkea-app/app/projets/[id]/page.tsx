@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AppNav from "@/components/AppNav";
 import { ArrowLeft, Calendar, Check, Send } from "lucide-react";
 
 const C = {
   ink:      "#1A2138",
   rose:     "#D4537E",
   muted:    "#8A8579",
-  hairline: "#ECE7DD",
-  canvas:   "#FAF8F4",
+  hairline: "#E5E5EA",
+  canvas:   "#F5F5F7",
   surface:  "#FFFFFF",
 } as const;
 
@@ -123,7 +124,8 @@ export default function ProjectDetailPage() {
   const founder = project.profiles_founder;
 
   return (
-    <div style={{ minHeight: "100vh", background: C.canvas, paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }}>
+    <div className="pl-sidebar" style={{ minHeight: "100vh", background: C.canvas, paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }}>
+      <AppNav />
       <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Header sticky */}
@@ -159,7 +161,7 @@ export default function ProjectDetailPage() {
                 style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", border: `1px solid ${C.hairline}`, flexShrink: 0 }} />
             ) : (
               <div style={{ width: 44, height: 44, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 600, color: "#fff" }}>
+                <span style={{ fontFamily: "var(--font-sans)", fontSize: 18, fontWeight: 600, color: "#fff" }}>
                   {founder?.nom?.[0]?.toUpperCase() ?? "?"}
                 </span>
               </div>
@@ -174,7 +176,7 @@ export default function ProjectDetailPage() {
           </button>
 
           {/* Titre */}
-          <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 26, fontWeight: 700, color: C.ink, margin: "0 0 16px", lineHeight: 1.2 }}>
+          <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 26, fontWeight: 700, color: C.ink, margin: "0 0 16px", lineHeight: 1.2 }}>
             {project.titre}
           </h1>
 
@@ -213,7 +215,7 @@ export default function ProjectDetailPage() {
         {isOwner && project.statut === "pending" && (
           <button
             onClick={() => router.push(`/projets/${id}/modifier`)}
-            style={{ width: "100%", padding: "14px 0", borderRadius: 14, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            style={{ width: "100%", padding: "14px 0", borderRadius: 14, background: C.rose, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
           >
             Modifier ce projet
           </button>

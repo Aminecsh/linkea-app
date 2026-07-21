@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function CguPage() {
   return (
-    <div className="min-h-screen bg-[#FAF8F4] px-4 py-12">
+    <div className="min-h-screen bg-[#F5F5F7] px-4 py-12">
       <div className="max-w-2xl mx-auto">
         <Link href="/" className="text-sm text-[#8A8579] hover:text-[#1A2138] mb-8 inline-block">← Retour</Link>
 
@@ -78,7 +78,7 @@ export default function CguPage() {
 
         </div>
 
-        <div className="mt-12 pt-8 border-t border-[#ECE7DD] flex gap-4 text-xs text-[#8A8579]">
+        <div className="mt-12 pt-8 border-t border-[#E5E5EA] flex gap-4 text-xs text-[#8A8579]">
           <Link href="/confidentialite" className="hover:text-[#1A2138]">Politique de confidentialité</Link>
           <Link href="/parametres" className="hover:text-[#1A2138]">Mes paramètres</Link>
         </div>

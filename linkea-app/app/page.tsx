@@ -4,7 +4,7 @@ import { FileText } from "lucide-react";
 import HeroMockups from "@/components/HeroMockups";
 import StatCounter from "@/components/StatCounter";
 
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" };
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" };
 
 export default function Home() {
   return (
@@ -43,7 +43,7 @@ export default function Home() {
           <Link href="/connexion" style={{ padding: "9px 18px", fontSize: 14, fontWeight: 600, borderRadius: 10, color: C.ink, textDecoration: "none", border: `1.5px solid ${C.hairline}`, background: "transparent" }}>
             Se connecter
           </Link>
-          <Link href="/inscription" style={{ padding: "9px 20px", fontSize: 14, fontWeight: 600, borderRadius: 10, color: "#fff", textDecoration: "none", background: C.ink }}>
+          <Link href="/inscription" style={{ padding: "9px 20px", fontSize: 14, fontWeight: 600, borderRadius: 10, color: "#fff", textDecoration: "none", background: C.rose }}>
             Commencer
           </Link>
         </div>
@@ -55,7 +55,7 @@ export default function Home() {
 
           {/* Left */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: "clamp(36px, 4.5vw, 58px)", fontWeight: 600, letterSpacing: "-0.035em", lineHeight: 1.05, color: C.ink, margin: "0 0 20px" }}>
+            <h1 style={{ fontFamily: "var(--font-sans)", fontSize: "clamp(36px, 4.5vw, 58px)", fontWeight: 600, letterSpacing: "-0.035em", lineHeight: 1.05, color: C.ink, margin: "0 0 20px" }}>
               Ton projet mérite<br />le bon développeur
             </h1>
 
@@ -67,7 +67,7 @@ export default function Home() {
             </p>
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 52 }}>
-              <Link href="/inscription?role=founder" className="lk-cta-primary" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", fontSize: 15, fontWeight: 600, borderRadius: 12, color: "#fff", textDecoration: "none", background: C.ink }}>
+              <Link href="/inscription?role=founder" className="lk-cta-primary" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", fontSize: 15, fontWeight: 600, borderRadius: 12, color: "#fff", textDecoration: "none", background: C.rose }}>
                 Déposer un projet <span className="lk-arrow">→</span>
               </Link>
               <Link href="/inscription?role=developer" className="lk-cta-secondary" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", fontSize: 15, fontWeight: 600, borderRadius: 12, color: C.ink, textDecoration: "none", background: C.surface, border: `1px solid ${C.rose}` }}>
@@ -97,7 +97,7 @@ export default function Home() {
               <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "1.5px", color: C.rose, textTransform: "uppercase", marginBottom: 16 }}>
                 Comment ça marche
               </p>
-              <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, color: C.ink, letterSpacing: "-0.03em", lineHeight: 1.1, margin: "0 0 36px" }}>
+              <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 30, fontWeight: 600, color: C.ink, letterSpacing: "-0.03em", lineHeight: 1.1, margin: "0 0 36px" }}>
                 De l&apos;idée au MVP,<br />en quelques semaines
               </h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -107,7 +107,7 @@ export default function Home() {
                   { n: "03", title: "Construisez ensemble", desc: "Contrat signé, gestion de projet et livrables inclus." },
                 ].map(({ n, title, desc }) => (
                   <div key={n} style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-                    <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 13, fontWeight: 600, color: C.rose, flexShrink: 0, marginTop: 2, letterSpacing: "0.02em" }}>{n}</span>
+                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: C.rose, flexShrink: 0, marginTop: 2, letterSpacing: "0.02em" }}>{n}</span>
                     <div>
                       <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>{title}</p>
                       <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.55, margin: 0 }}>{desc}</p>
@@ -126,7 +126,7 @@ export default function Home() {
               </div>
 
               <div style={{ flex: 1, background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 18, padding: "28px 30px" }}>
-                <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 44, fontWeight: 600, color: C.rose, lineHeight: 1, margin: "0 0 10px" }}>24h</p>
+                <p style={{ fontFamily: "var(--font-sans)", fontSize: 44, fontWeight: 600, color: C.rose, lineHeight: 1, margin: "0 0 10px" }}>24h</p>
                 <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: "0 0 6px" }}>Délai moyen de match</p>
                 <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.55, margin: 0 }}>Les devs candidatent dès le lendemain de la publication.</p>
               </div>

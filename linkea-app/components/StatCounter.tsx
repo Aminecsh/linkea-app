@@ -29,7 +29,7 @@ function Counter({ n, suffix = "", label, start }: Item & { start: boolean }) {
   const count = useCountUp(n, 1400, start);
   return (
     <div>
-      <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, letterSpacing: "-0.04em", color: "#1A2138", lineHeight: 1, marginBottom: 5 }}>
+      <p style={{ fontFamily: "var(--font-sans)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.04em", color: "#1A2138", lineHeight: 1, marginBottom: 5 }}>
         {count}{suffix}
       </p>
       <p style={{ fontSize: 12, color: "#8A8579" }}>{label}</p>

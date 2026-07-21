@@ -54,14 +54,14 @@ export default function BanniPage() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="w-6 h-6 rounded-full border-2 border-[#ECE7DD] border-t-[#1A2138] animate-spin" />
+      <div className="w-6 h-6 rounded-full border-2 border-[#E5E5EA] border-t-[#1A2138] animate-spin" />
     </div>
   );
 
   if (!ban) return null;
 
   return (
-    <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center px-4">
       <div className="max-w-md w-full">
 
         {/* Card principale */}
@@ -85,7 +85,7 @@ export default function BanniPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-[#FAF8F4] rounded-xl p-3 border border-[#ECE7DD]">
+              <div className="bg-[#F5F5F7] rounded-xl p-3 border border-[#E5E5EA]">
                 <p className="text-xs text-[#8A8579] mb-1">Décision le</p>
                 <p className="text-xs font-semibold text-[#1A2138]">{fmtDate(ban.created_at)}</p>
               </div>
@@ -97,7 +97,7 @@ export default function BanniPage() {
               </div>
             </div>
 
-            <div className="bg-[#FAF8F4] rounded-2xl p-4 border border-[#ECE7DD] text-sm text-[#8A8579] leading-relaxed">
+            <div className="bg-[#F5F5F7] rounded-2xl p-4 border border-[#E5E5EA] text-sm text-[#8A8579] leading-relaxed">
               Si tu penses que cette décision est une erreur, contacte-nous à{" "}
               <a href="mailto:support@linkea.fr" className="text-[#D4537E] font-semibold hover:underline">
                 support@linkea.fr

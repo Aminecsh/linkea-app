@@ -56,12 +56,12 @@ export default function ReportModal({ isOpen, onClose, targetType, targetId, tar
       <div className="bg-white rounded-2xl w-full max-w-sm flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="px-5 pt-5 pb-4 border-b border-[#ECE7DD] flex items-center justify-between">
+        <div className="px-5 pt-5 pb-4 border-b border-[#E5E5EA] flex items-center justify-between">
           <div>
             <h2 className="text-base font-black text-[#1A2138]">Signaler</h2>
             {targetNom && <p className="text-xs text-[#8A8579] mt-0.5">{targetType === "profile" ? "Profil" : "Projet"} · {targetNom}</p>}
           </div>
-          <button onClick={close} className="text-[#8A8579] hover:text-[#1A2138] w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#FAF8F4]">✕</button>
+          <button onClick={close} className="text-[#8A8579] hover:text-[#1A2138] w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F7]">✕</button>
         </div>
 
         {done ? (
@@ -77,7 +77,7 @@ export default function ReportModal({ isOpen, onClose, targetType, targetId, tar
               <p className="text-xs font-bold uppercase tracking-widest text-[#8A8579] mb-2">Raison du signalement</p>
               <div className="flex flex-col gap-2">
                 {RAISONS.map((r) => (
-                  <label key={r.value} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${raison === r.value ? "border-[#1A2138] bg-[#FAF8F4]" : "border-[#ECE7DD] hover:border-[#8A8579]"}`}>
+                  <label key={r.value} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${raison === r.value ? "border-[#1A2138] bg-[#F5F5F7]" : "border-[#E5E5EA] hover:border-[#8A8579]"}`}>
                     <input type="radio" name="raison" value={r.value} checked={raison === r.value} onChange={() => setRaison(r.value)} className="mt-0.5 accent-[#D4537E] shrink-0" />
                     <div>
                       <p className="text-sm font-bold text-[#1A2138]">{r.label}</p>

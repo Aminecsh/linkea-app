@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import BottomNav from "@/components/BottomNav";
+import AppNav from "@/components/AppNav";
 import NotificationBell from "@/components/NotificationBell";
 import {
   Search, Clock, Star, Check, AlertTriangle,
@@ -269,11 +269,11 @@ export default function DevsPage() {
   const pinCount    = currentPins.size;
   const pinsLeft    = 3 - pinCount;
 
-  const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#fff" };
+  const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#fff" };
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: C.canvas, paddingBottom: 80 }}>
+      <div className="pl-sidebar" style={{ minHeight: "100vh", background: C.canvas, paddingBottom: 80 }}>
         <div style={{ background: C.surface, borderBottom: `1px solid ${C.hairline}`, padding: "16px 20px 12px", position: "sticky", top: 0, zIndex: 40 }}>
           <div style={{ maxWidth: 672, margin: "0 auto" }}>
             <div style={{ height: 14, width: 80, borderRadius: 6, background: C.hairline, marginBottom: 12 }} />
@@ -286,13 +286,13 @@ export default function DevsPage() {
         <div style={{ maxWidth: 672, margin: "0 auto", padding: "20px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
           {[...Array(4)].map((_, i) => <div key={i} style={{ height: 176, borderRadius: 20, background: C.hairline }} />)}
         </div>
-        <BottomNav />
+        <AppNav />
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: C.canvas, paddingBottom: 80 }}>
+    <div className="pl-sidebar" style={{ minHeight: "100vh", background: C.canvas, paddingBottom: 80 }}>
       <style>{`
         .lk-d-input:focus { outline: 2px solid ${C.rose}; outline-offset: -1px; border-color: ${C.rose} !important; }
         .lk-d-chip:focus-visible { outline: 2px solid ${C.rose}; outline-offset: 2px; }
@@ -324,7 +324,7 @@ export default function DevsPage() {
                     style={{ width: 44, height: 44, borderRadius: 12, objectFit: "cover", border: `1px solid ${C.hairline}`, flexShrink: 0 }} />
                 ) : (
                   <div style={{ width: 44, height: 44, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 600, color: "#fff" }}>{confirmDev.nom?.[0]?.toUpperCase() ?? "?"}</span>
+                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 18, fontWeight: 600, color: "#fff" }}>{confirmDev.nom?.[0]?.toUpperCase() ?? "?"}</span>
                   </div>
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -391,7 +391,7 @@ export default function DevsPage() {
 
             <div style={{ padding: "12px 20px 20px", borderTop: `1px solid ${C.hairline}`, flexShrink: 0 }}>
               <button onClick={confirmPin} disabled={pinning || !modalProjectId} className="lk-d-navy lk-d-btn"
-                style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.rose, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 {pinning
                   ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
                   : <><Pin size={13} strokeWidth={2} /> Pinner ce dev</>
@@ -478,7 +478,7 @@ export default function DevsPage() {
                   onClick={runAiMatching}
                   disabled={aiLoading || !selectedProjectId}
                   title="Scorer les devs avec l'IA"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: C.ink, color: "#fff", border: "none", cursor: "pointer", opacity: (aiLoading || !selectedProjectId) ? 0.4 : 1 }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 10, fontSize: 12, fontWeight: 700, background: C.rose, color: "#fff", border: "none", cursor: "pointer", opacity: (aiLoading || !selectedProjectId) ? 0.4 : 1 }}
                 >
                   {aiLoading
                     ? <div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
@@ -547,7 +547,7 @@ export default function DevsPage() {
                           style={{ width: 48, height: 48, borderRadius: 12, objectFit: "cover", border: `1px solid ${C.hairline}`, display: "block" }} />
                       ) : (
                         <div style={{ width: 48, height: 48, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 20, fontWeight: 600, color: "#fff" }}>{dev.nom?.[0]?.toUpperCase() ?? "?"}</span>
+                          <span style={{ fontFamily: "var(--font-sans)", fontSize: 20, fontWeight: 600, color: "#fff" }}>{dev.nom?.[0]?.toUpperCase() ?? "?"}</span>
                         </div>
                       )}
                       {isNew && (
@@ -655,7 +655,7 @@ export default function DevsPage() {
                         background: C.surface, border: `1px solid ${C.hairline}`, color: C.muted, cursor: "default",
                       } : canPin ? {
                         display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                        background: C.ink, border: "none", color: "#fff", cursor: "pointer",
+                        background: C.rose, border: "none", color: "#fff", cursor: "pointer",
                       } : {
                         display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
                         background: C.surface, border: `1px solid ${C.hairline}`, color: C.muted, cursor: "not-allowed", opacity: 0.5,
@@ -677,7 +677,7 @@ export default function DevsPage() {
         </div>
       </div>
       <style>{`@keyframes lk-spin { to { transform: rotate(360deg); } }`}</style>
-      <BottomNav />
+      <AppNav />
     </div>
   );
 }

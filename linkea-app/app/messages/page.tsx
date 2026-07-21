@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import BottomNav from "@/components/BottomNav";
+import AppNav from "@/components/AppNav";
 import NotificationBell from "@/components/NotificationBell";
 import { MessageCircle, Briefcase, ChevronDown, ChevronUp, Send, Users, Plus, X, Ban } from "lucide-react";
 
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" } as const;
 
 type Conversation = {
   id: string;
@@ -253,7 +253,7 @@ export default function MessagesPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col" style={{ background: "var(--bg)" }}>
+      <div className="min-h-screen flex flex-col pl-sidebar" style={{ background: "var(--bg)" }}>
         <div className="page-header px-4 py-4">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
             <div>
@@ -281,7 +281,7 @@ export default function MessagesPage() {
   // ── Vue banni ────────────────────────────────────────────────────────────────
   if (isBanned) {
     return (
-      <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+      <div className="min-h-screen pb-nav pl-sidebar" style={{ background: "var(--bg)" }}>
         <div className="page-header px-4 py-4">
           <div className="max-w-2xl mx-auto">
             <p className="label mb-1" style={{ color: "var(--rose)" }}>Compte suspendu</p>
@@ -323,7 +323,7 @@ export default function MessagesPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 16, background: C.surface, border: `1px solid ${C.hairline}` }}>
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   <div style={{ width: 44, height: 44, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: "#fff", lineHeight: 1 }}>L</span>
+                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 600, color: "#fff", lineHeight: 1 }}>L</span>
                   </div>
                   {supportConv.unreadCount > 0 && (
                     <div style={{ position: "absolute", top: -3, right: -3, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", borderRadius: 999, padding: "0 4px", background: C.rose, fontSize: 10, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
@@ -357,7 +357,7 @@ export default function MessagesPage() {
             Se déconnecter
           </button>
         </div>
-        <BottomNav />
+        <AppNav />
       </div>
     );
   }
@@ -366,7 +366,7 @@ export default function MessagesPage() {
   if (role === "admin") {
     const totalUnreadAdmin = adminSupportConvs.reduce((s, c) => s + c.unreadCount, 0);
     return (
-      <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+      <div className="min-h-screen pb-nav pl-sidebar" style={{ background: "var(--bg)" }}>
         <div className="page-header px-4 py-4">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -406,7 +406,7 @@ export default function MessagesPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 16, background: C.surface, border: c.unreadCount > 0 ? `1px solid ${C.rose}` : `1px solid ${C.hairline}` }}>
                 <div style={{ position: "relative", flexShrink: 0 }}>
                   <div style={{ width: 44, height: 44, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{c.nom[0]?.toUpperCase() ?? "?"}</span>
+                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{c.nom[0]?.toUpperCase() ?? "?"}</span>
                   </div>
                   {c.unreadCount > 0 && (
                     <div style={{ position: "absolute", top: -3, right: -3, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", borderRadius: 999, padding: "0 4px", background: C.rose, fontSize: 10, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>
@@ -432,7 +432,7 @@ export default function MessagesPage() {
             </div>
           ))}
         </div>
-        <BottomNav />
+        <AppNav />
       </div>
     );
   }
@@ -472,7 +472,7 @@ export default function MessagesPage() {
               />
             ) : (
               <div style={{ width: 44, height: 44, borderRadius: 12, background: isArchived ? C.hairline : C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: isArchived ? C.muted : "#fff", lineHeight: 1 }}>{initial}</span>
+                <span style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 600, color: isArchived ? C.muted : "#fff", lineHeight: 1 }}>{initial}</span>
               </div>
             )}
             {/* Badge non-lu */}
@@ -538,7 +538,7 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+    <div className="min-h-screen pb-nav pl-sidebar" style={{ background: "var(--bg)" }}>
 
       {/* Header */}
       <div className="page-header px-4 py-4">
@@ -676,7 +676,7 @@ export default function MessagesPage() {
         )}
       </div>
 
-      <BottomNav />
+      <AppNav />
 
       {/* ── Modal nouveau groupe ── */}
       {showNewGroup && (
@@ -688,7 +688,7 @@ export default function MessagesPage() {
                 <div style={{ width: 40, height: 40, borderRadius: 12, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Users size={18} strokeWidth={1.8} style={{ color: "#fff" }} />
                 </div>
-                <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: C.ink, margin: 0 }}>Nouveau groupe</p>
+                <p style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 600, color: C.ink, margin: 0 }}>Nouveau groupe</p>
               </div>
               <button onClick={() => setShowNewGroup(false)} style={{ width: 32, height: 32, borderRadius: 10, background: C.canvas, border: `1px solid ${C.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: C.muted }}>
                 <X size={16} />
@@ -768,7 +768,7 @@ export default function MessagesPage() {
                 setCreatingGroup(false);
               }}
               disabled={creatingGroup || !newGroupProjectId}
-              style={{ width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 14, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.ink, border: "none", cursor: "pointer", opacity: (creatingGroup || !newGroupProjectId) ? 0.4 : 1 }}
+              style={{ width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 14, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.rose, border: "none", cursor: "pointer", opacity: (creatingGroup || !newGroupProjectId) ? 0.4 : 1 }}
             >
               {creatingGroup
                 ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />

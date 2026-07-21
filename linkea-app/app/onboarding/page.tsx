@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Camera, ArrowRight } from "lucide-react";
 
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" } as const;
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -161,7 +161,7 @@ export default function Onboarding() {
           <span style={{ display: "inline-block", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted, border: `1px solid ${C.hairline}`, background: C.surface, borderRadius: 7, padding: "4px 10px", marginBottom: 16 }}>
             {role === "founder" ? "Founder" : "Développeur"}
           </span>
-          <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 700, color: C.ink, margin: 0, lineHeight: 1.15 }}>
+          <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 30, fontWeight: 700, color: C.ink, margin: 0, lineHeight: 1.15 }}>
             Complète ton profil
           </h1>
           <p style={{ fontSize: 14, color: C.muted, margin: "10px 0 0", lineHeight: 1.5 }}>
@@ -187,7 +187,7 @@ export default function Onboarding() {
               ) : (
                 <div style={{ width: 80, height: 80, borderRadius: 20, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {initiale
-                    ? <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{initiale}</span>
+                    ? <span style={{ fontFamily: "var(--font-sans)", fontSize: 30, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{initiale}</span>
                     : <Camera size={24} strokeWidth={1.5} style={{ color: "rgba(255,255,255,0.75)" }} />
                   }
                 </div>
@@ -279,7 +279,7 @@ export default function Onboarding() {
             type="submit"
             disabled={saving}
             className="lk-input"
-            style={{ width: "100%", padding: "14px 0", borderRadius: 12, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 600, cursor: saving ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 6, opacity: saving ? 0.6 : 1 }}
+            style={{ width: "100%", padding: "14px 0", borderRadius: 12, background: C.rose, color: "#fff", border: "none", fontSize: 14, fontWeight: 600, cursor: saving ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 6, opacity: saving ? 0.6 : 1 }}
           >
             {saving
               ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />

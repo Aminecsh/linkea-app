@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { logAudit } from "@/lib/audit";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" };
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" };
 
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "13px 16px", borderRadius: 10,
@@ -75,7 +75,7 @@ export default function Connexion() {
 
           {/* Timeline Dépose → Match → Build — une seule chose */}
           <div>
-            <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, color: "#fff", letterSpacing: "-0.03em", lineHeight: 1.15, margin: "0 0 52px" }}>
+            <p style={{ fontFamily: "var(--font-sans)", fontSize: 30, fontWeight: 600, color: "#fff", letterSpacing: "-0.03em", lineHeight: 1.15, margin: "0 0 52px" }}>
               Des projets qui<br />prennent vie
             </p>
 
@@ -118,7 +118,7 @@ export default function Connexion() {
           </div>
 
           <div style={{ width: "100%", maxWidth: 360 }}>
-            <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, color: C.ink, letterSpacing: "-0.03em", margin: "0 0 8px", lineHeight: 1.1 }}>
+            <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 30, fontWeight: 600, color: C.ink, letterSpacing: "-0.03em", margin: "0 0 8px", lineHeight: 1.1 }}>
               Content de te revoir
             </h1>
             <p style={{ fontSize: 14, color: C.muted, margin: "0 0 32px" }}>
@@ -153,7 +153,7 @@ export default function Connexion() {
               </div>
 
               <button type="submit" disabled={loading}
-                style={{ padding: "14px", borderRadius: 10, background: C.ink, color: "#fff", fontSize: 14, fontWeight: 600, border: "none", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "opacity 0.2s" }}>
+                style={{ padding: "14px", borderRadius: 10, background: C.rose, color: "#fff", fontSize: 14, fontWeight: 600, border: "none", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "opacity 0.2s" }}>
                 {loading ? "Connexion…" : "Se connecter →"}
               </button>
             </form>

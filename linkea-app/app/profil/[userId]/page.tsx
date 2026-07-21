@@ -9,7 +9,7 @@ import {
   Award, Zap, Pin, X, ChevronRight, Flag, Camera, Save, FileText, LogOut,
 } from "lucide-react";
 import ReportModal from "@/components/ReportModal";
-import BottomNav from "@/components/BottomNav";
+import AppNav from "@/components/AppNav";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Experience     = { id: string; titre: string; entreprise: string; date_debut: string; date_fin?: string; description?: string; };
@@ -53,7 +53,7 @@ function StarRating({ rating, count, size = "sm" }: { rating: number; count?: nu
         {[1,2,3,4,5].map((s) => (
           <Star key={s} size={sz} strokeWidth={1.5}
             fill={s <= rating ? "#1A2138" : "transparent"}
-            style={{ color: s <= rating ? "#1A2138" : "#ECE7DD" }} />
+            style={{ color: s <= rating ? "#1A2138" : "#E5E5EA" }} />
         ))}
       </div>
       {count !== undefined && <span style={{ fontSize: 11, color: "var(--subtle)" }}>({count})</span>}
@@ -62,7 +62,7 @@ function StarRating({ rating, count, size = "sm" }: { rating: number; count?: nu
 }
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", surface: "#FFFFFF" };
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", surface: "#FFFFFF" };
 
 const STATUT_CAND_LABEL: Record<string, string> = { pending: "En attente", accepted: "Acceptée", refused: "Refusée" };
 const MY_DEV_TABS: { key: MyDevFilterKey; label: string }[] = [
@@ -84,6 +84,23 @@ function CandStatusPill({ statut }: { statut: string }) {
       border: `1px solid ${isGood ? "rgba(26,33,56,0.25)" : isBad ? "rgba(212,83,126,0.25)" : C.hairline}`,
       color: isGood ? C.ink : isBad ? C.rose : C.muted }}>
       {STATUT_CAND_LABEL[statut] ?? statut}
+    </span>
+  );
+}
+
+const PROJECT_STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  pending:   { label: "En attente", color: "var(--lk-orange)", bg: "rgba(255,149,0,0.14)"  },
+  matched:   { label: "Matchée",    color: "var(--lk-blue)",   bg: "rgba(74,123,247,0.14)" },
+  en_cours:  { label: "En cours",   color: "var(--lk-blue)",   bg: "rgba(74,123,247,0.14)" },
+  livre:     { label: "Livré",      color: "var(--lk-green)",  bg: "rgba(52,199,89,0.14)"  },
+  termine:   { label: "Livré",      color: "var(--lk-green)",  bg: "rgba(52,199,89,0.14)"  },
+};
+
+function ProjectStatusPill({ statut }: { statut: string }) {
+  const s = PROJECT_STATUS_STYLE[statut] ?? { label: statut, color: "#8A8579", bg: "rgba(0,0,0,0.05)" };
+  return (
+    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 100, background: s.bg, color: s.color, flexShrink: 0 }}>
+      {s.label}
     </span>
   );
 }
@@ -446,30 +463,30 @@ export default function PublicProfilePage() {
     const isFounderEdit = targetRole === "founder";
     const prof = devProfile ?? founderProfile;
 
-    const sCard:  React.CSSProperties = { background: "#fff", border: "1px solid #ECE7DD", borderRadius: 16, padding: "20px 20px" };
+    const sCard:  React.CSSProperties = { background: "#fff", border: "1px solid #E5E5EA", borderRadius: 16, padding: "20px 20px" };
     const sEye:   React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", margin: "0 0 14px" };
     const sLabel: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#8A8579", display: "block", marginBottom: 6 };
-    const sInput: React.CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 500, outline: "none", boxSizing: "border-box" };
-    const sNavy:  React.CSSProperties = { background: "#1A2138", color: "#fff", border: "none", borderRadius: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 };
-    const sGhost: React.CSSProperties = { background: "#fff", color: "#1A2138", border: "1px solid #ECE7DD", borderRadius: 12, fontWeight: 600, cursor: "pointer" };
-    const sIconBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 8, border: "1px solid #ECE7DD", background: "#fff", color: "#8A8579", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
+    const sInput: React.CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 500, outline: "none", boxSizing: "border-box" };
+    const sNavy:  React.CSSProperties = { background: "#D4537E", color: "#fff", border: "none", borderRadius: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 };
+    const sGhost: React.CSSProperties = { background: "#fff", color: "#1A2138", border: "1px solid #E5E5EA", borderRadius: 12, fontWeight: 600, cursor: "pointer" };
+    const sIconBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 8, border: "1px solid #E5E5EA", background: "#fff", color: "#8A8579", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 };
 
     return (
-      <div style={{ minHeight: "100vh", background: "#FAF8F4", paddingBottom: 40 }}>
+      <div style={{ minHeight: "100vh", background: "#F5F5F7", paddingBottom: 40 }}>
         <style>{`
           .lk-edit-input:focus { outline: 2px solid #D4537E; outline-offset: -1px; border-color: #D4537E !important; }
           .lk-edit-navy:hover  { background: #2A3252 !important; }
           .lk-edit-ghost:hover { border-color: #1A2138 !important; }
-          .lk-edit-icon:hover  { background: #FAF8F4 !important; border-color: #1A2138 !important; }
+          .lk-edit-icon:hover  { background: #F5F5F7 !important; border-color: #1A2138 !important; }
         `}</style>
 
         {/* Header sticky */}
-        <div style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(255,255,255,0.94)", backdropFilter: "blur(20px)", borderBottom: "1px solid #ECE7DD", padding: "12px 20px" }}>
+        <div style={{ position: "sticky", top: 0, zIndex: 10, background: "rgba(255,255,255,0.94)", backdropFilter: "blur(20px)", borderBottom: "1px solid #E5E5EA", padding: "12px 20px" }}>
           <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <button onClick={() => setEditing(false)} className="lk-edit-ghost" style={{ ...sGhost, padding: "8px 14px", fontSize: 13 }}>
               Annuler
             </button>
-            <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, color: "#1A2138", margin: 0, letterSpacing: "-0.02em" }}>
+            <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, color: "#1A2138", margin: 0, letterSpacing: "-0.02em" }}>
               Modifier le profil
             </h1>
             <button onClick={saveEdit} disabled={saving} className="lk-edit-navy" style={{ ...sNavy, padding: "8px 16px", fontSize: 13, opacity: saving ? 0.6 : 1 }}>
@@ -488,7 +505,7 @@ export default function PublicProfilePage() {
                 <div style={{ width: 72, height: 72, borderRadius: 12, background: "#1A2138", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {prof?.avatar_url
                     ? <img src={prof.avatar_url} alt={prof.nom} style={{ width: 72, height: 72, objectFit: "cover" }} />
-                    : <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 28, fontWeight: 600, color: "#fff", userSelect: "none", lineHeight: 1 }}>{prof?.nom?.[0]?.toUpperCase() ?? "?"}</span>
+                    : <span style={{ fontFamily: "var(--font-sans)", fontSize: 28, fontWeight: 600, color: "#fff", userSelect: "none", lineHeight: 1 }}>{prof?.nom?.[0]?.toUpperCase() ?? "?"}</span>
                   }
                 </div>
                 <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s" }}
@@ -545,7 +562,7 @@ export default function PublicProfilePage() {
               <p style={sEye}>Compétences</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {editComp.map((c) => (
-                  <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 8, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138" }}>
+                  <span key={c} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 8, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138" }}>
                     {c}
                     <button onClick={() => setEditComp(editComp.filter((x) => x !== c))}
                       style={{ background: "none", border: "none", cursor: "pointer", color: "#8A8579", padding: 0, display: "flex", alignItems: "center", lineHeight: 1 }}>
@@ -578,7 +595,7 @@ export default function PublicProfilePage() {
               ? <p style={{ fontSize: 13, color: "#8A8579", fontStyle: "italic", margin: 0 }}>Aucune expérience</p>
               : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {editExps.map((exp) => (
-                    <div key={exp.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 12, background: "#FAF8F4", border: "1px solid #ECE7DD" }}>
+                    <div key={exp.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 12, background: "#F5F5F7", border: "1px solid #E5E5EA" }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ fontSize: 13, fontWeight: 600, color: "#1A2138", margin: "0 0 3px" }}>{exp.titre}</p>
                         <p style={{ fontSize: 12, color: "#8A8579", margin: 0 }}>{exp.entreprise} · {exp.date_debut}{exp.date_fin ? ` → ${exp.date_fin}` : " → Présent"}</p>
@@ -605,7 +622,7 @@ export default function PublicProfilePage() {
               ? <p style={{ fontSize: 13, color: "#8A8579", fontStyle: "italic", margin: 0 }}>Aucune formation</p>
               : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {editForms.map((f) => (
-                    <div key={f.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 12, background: "#FAF8F4", border: "1px solid #ECE7DD" }}>
+                    <div key={f.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 12, background: "#F5F5F7", border: "1px solid #E5E5EA" }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ fontSize: 13, fontWeight: 600, color: "#1A2138", margin: "0 0 3px" }}>{f.diplome}</p>
                         <p style={{ fontSize: 12, color: "#8A8579", margin: 0 }}>{f.etablissement}{f.annee ? ` · ${f.annee}` : ""}</p>
@@ -632,8 +649,8 @@ export default function PublicProfilePage() {
         {/* Modal expérience */}
         {showExpModal && (
           <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.45)" }}>
-            <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 20, padding: 24, width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: 12 }}>
-              <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: "#1A2138", margin: 0 }}>{editingExp ? "Modifier" : "Ajouter"} une expérience</h2>
+            <div style={{ background: "#fff", border: "1px solid #E5E5EA", borderRadius: 20, padding: 24, width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: 12 }}>
+              <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 600, color: "#1A2138", margin: 0 }}>{editingExp ? "Modifier" : "Ajouter"} une expérience</h2>
               <input value={expF.titre} onChange={(e) => setExpF({ ...expF, titre: e.target.value })} placeholder="Titre du poste" className="lk-edit-input" style={sInput} />
               <input value={expF.entreprise} onChange={(e) => setExpF({ ...expF, entreprise: e.target.value })} placeholder="Entreprise" className="lk-edit-input" style={sInput} />
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -650,8 +667,8 @@ export default function PublicProfilePage() {
         {/* Modal formation */}
         {showFormModal && (
           <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: 16, background: "rgba(0,0,0,0.45)" }}>
-            <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 20, padding: 24, width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: 12 }}>
-              <h2 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 600, color: "#1A2138", margin: 0 }}>{editingForm ? "Modifier" : "Ajouter"} une formation</h2>
+            <div style={{ background: "#fff", border: "1px solid #E5E5EA", borderRadius: 20, padding: 24, width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", gap: 12 }}>
+              <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 600, color: "#1A2138", margin: 0 }}>{editingForm ? "Modifier" : "Ajouter"} une formation</h2>
               <input value={formF.diplome} onChange={(e) => setFormF({ ...formF, diplome: e.target.value })} placeholder="Diplôme" className="lk-edit-input" style={sInput} />
               <input value={formF.etablissement} onChange={(e) => setFormF({ ...formF, etablissement: e.target.value })} placeholder="École" className="lk-edit-input" style={sInput} />
               <input value={formF.annee} onChange={(e) => setFormF({ ...formF, annee: e.target.value })} placeholder="Année" className="lk-edit-input" style={sInput} />
@@ -667,7 +684,7 @@ export default function PublicProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen pb-16" style={{ background: "var(--bg)" }}>
+      <div className="min-h-screen pb-16 pl-sidebar" style={{ background: "var(--bg)" }}>
         <div className="h-52 skeleton" style={{ borderRadius: 0 }} />
         <div className="max-w-2xl mx-auto px-4">
           <div className="flex items-end justify-between -mt-14 mb-5">
@@ -685,8 +702,8 @@ export default function PublicProfilePage() {
   if (!profile) return null;
 
   const accentColor  = "#1A2138";
-  const accentSoft   = "#FAF8F4";
-  const accentBorder = "#ECE7DD";
+  const accentSoft   = "#F5F5F7";
+  const accentBorder = "#E5E5EA";
   const heroBg       = "#1A2138";
   const doneProjects   = projects.filter((p) => ["livre","termine"].includes(p.statut));
   const activeProjects = projects.filter((p) => ["pending","matched","en_cours"].includes(p.statut));
@@ -698,27 +715,27 @@ export default function PublicProfilePage() {
     dispo ? {
       icon: <Zap size={11} strokeWidth={2} />,
       text: `${dispo}h/sem`,
-      color: "#1A2138", bg: "#FFFFFF", border: "#ECE7DD",
+      color: "#1A2138", bg: "#FFFFFF", border: "#E5E5EA",
     } : null,
     doneProjects.length > 0 ? {
       icon: <Check size={11} strokeWidth={2.5} />,
       text: `${doneProjects.length} livré${doneProjects.length > 1 ? "s" : ""}`,
-      color: "#1A2138", bg: "#FFFFFF", border: "#ECE7DD",
+      color: "#1A2138", bg: "#FFFFFF", border: "#E5E5EA",
     } : null,
     score !== null ? {
       icon: <Star size={11} strokeWidth={1.5} fill="#1A2138" style={{ color: "#1A2138" }} />,
       text: `${score}/5`,
-      color: "#1A2138", bg: "#FFFFFF", border: "#ECE7DD",
+      color: "#1A2138", bg: "#FFFFFF", border: "#E5E5EA",
     } : null,
     devProfile?.competences?.[0] ? {
       icon: null,
       text: devProfile.competences[0],
-      color: "#1A2138", bg: "#FFFFFF", border: "#ECE7DD",
+      color: "#1A2138", bg: "#FFFFFF", border: "#E5E5EA",
     } : null,
   ].filter((h): h is NonNullable<typeof h> => h !== null) as Highlight[];
 
   return (
-    <div className="min-h-screen" style={{ background: "#FAF8F4", paddingBottom: canPin || convId ? 88 : 40 }}>
+    <div className="min-h-screen pl-sidebar" style={{ background: "#F5F5F7", paddingBottom: canPin || convId ? 88 : 40 }}>
 
       {/* ── Modal pin ── */}
       {showPinModal && (
@@ -776,11 +793,11 @@ export default function PublicProfilePage() {
                           disabled={p.alreadyPinned}
                           className="flex items-center justify-between px-4 py-3 rounded-2xl text-left transition-all"
                           style={p.alreadyPinned ? {
-                            background: "#FAF8F4", border: "1px solid #ECE7DD", opacity: 0.65,
+                            background: "#F5F5F7", border: "1px solid #E5E5EA", opacity: 0.65,
                           } : active ? {
-                            background: "#FAF8F4", border: "1.5px solid #1A2138",
+                            background: "#F5F5F7", border: "1.5px solid #1A2138",
                           } : {
-                            background: "#fff", border: "1px solid #ECE7DD",
+                            background: "#fff", border: "1px solid #E5E5EA",
                           }}
                         >
                           <div>
@@ -801,13 +818,13 @@ export default function PublicProfilePage() {
                   </div>
                   <div className="flex gap-3">
                     <button onClick={() => setShowPinModal(false)}
-                      style={{ flex: 1, padding: "11px 0", fontSize: 14, fontWeight: 600, borderRadius: 12, border: "1px solid #ECE7DD", background: "#fff", color: "#8A8579", cursor: "pointer" }}>
+                      style={{ flex: 1, padding: "11px 0", fontSize: 14, fontWeight: 600, borderRadius: 12, border: "1px solid #E5E5EA", background: "#fff", color: "#8A8579", cursor: "pointer" }}>
                       Annuler
                     </button>
                     <button
                       onClick={confirmPin}
                       disabled={pinLoading || !pinProjectId || selectedPinProj?.alreadyPinned}
-                      style={{ flex: 1, padding: "11px 0", fontSize: 14, fontWeight: 700, borderRadius: 12, background: "#1A2138", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (pinLoading || !pinProjectId || selectedPinProj?.alreadyPinned) ? 0.4 : 1 }}
+                      style={{ flex: 1, padding: "11px 0", fontSize: 14, fontWeight: 700, borderRadius: 12, background: "#D4537E", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: (pinLoading || !pinProjectId || selectedPinProj?.alreadyPinned) ? 0.4 : 1 }}
                     >
                       {pinLoading
                         ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "lk-spin 0.8s linear infinite" }} />
@@ -838,7 +855,7 @@ export default function PublicProfilePage() {
           <div style={{ width: 28, height: 28, borderRadius: 7, background: "#1A2138", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {profile.avatar_url
               ? <img src={profile.avatar_url} alt={profile.nom} style={{ width: 28, height: 28, objectFit: "cover" }} />
-              : <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 13, fontWeight: 600, color: "#fff", userSelect: "none", lineHeight: 1 }}>{profile.nom?.[0]?.toUpperCase() ?? "?"}</span>
+              : <span style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: "#fff", userSelect: "none", lineHeight: 1 }}>{profile.nom?.[0]?.toUpperCase() ?? "?"}</span>
             }
           </div>
           <div className="flex-1 min-w-0">
@@ -858,7 +875,7 @@ export default function PublicProfilePage() {
             {canPin && !pinDone && (
               <button
                 onClick={openPinModal}
-                style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#1A2138", color: "#fff", border: "none", borderRadius: 9, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#D4537E", color: "#fff", border: "none", borderRadius: 9, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
               >
                 <Pin size={11} strokeWidth={2} /> Pinner
               </button>
@@ -905,7 +922,7 @@ export default function PublicProfilePage() {
             <div style={{ width: 72, height: 72, borderRadius: 12, background: "#1A2138", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {profile.avatar_url
                 ? <img src={profile.avatar_url} alt={profile.nom} style={{ width: 72, height: 72, objectFit: "cover" }} />
-                : <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 30, fontWeight: 600, color: "#fff", userSelect: "none", lineHeight: 1 }}>
+                : <span style={{ fontFamily: "var(--font-sans)", fontSize: 30, fontWeight: 600, color: "#fff", userSelect: "none", lineHeight: 1 }}>
                     {profile.nom?.[0]?.toUpperCase() ?? "?"}
                   </span>
               }
@@ -915,15 +932,15 @@ export default function PublicProfilePage() {
             {isMe && (
               <div style={{ display: "flex", gap: 8, paddingTop: 4, flexShrink: 0 }}>
                 <button onClick={openEdit} className="lk-ghost"
-                  style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "border-color 0.14s" }}>
+                  style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "border-color 0.14s" }}>
                   Modifier
                 </button>
                 <button onClick={() => router.push("/parametres")} className="lk-ghost"
-                  style={{ padding: "7px 12px", borderRadius: 9, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, transition: "border-color 0.14s" }}>
+                  style={{ padding: "7px 12px", borderRadius: 9, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, transition: "border-color 0.14s" }}>
                   <span style={{ fontSize: 14, lineHeight: 1 }}>⚙</span>
                 </button>
                 <button onClick={async () => { await supabase.auth.signOut(); router.push("/connexion"); }} className="lk-ghost"
-                  style={{ padding: "7px 10px", borderRadius: 9, border: "1px solid #ECE7DD", background: "#fff", color: "#8A8579", cursor: "pointer", display: "flex", alignItems: "center", transition: "border-color 0.14s" }}>
+                  style={{ padding: "7px 10px", borderRadius: 9, border: "1px solid #E5E5EA", background: "#fff", color: "#8A8579", cursor: "pointer", display: "flex", alignItems: "center", transition: "border-color 0.14s" }}>
                   <LogOut size={14} strokeWidth={2} />
                 </button>
               </div>
@@ -931,7 +948,7 @@ export default function PublicProfilePage() {
           </div>
 
           {/* Nom */}
-          <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 34, fontWeight: 600, color: "#1A2138", margin: "0 0 5px", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+          <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 34, fontWeight: 600, color: "#1A2138", margin: "0 0 5px", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
             {profile.nom}
           </h1>
 
@@ -940,17 +957,16 @@ export default function PublicProfilePage() {
             <p style={{ fontSize: 14, color: "#8A8579", margin: "0 0 6px" }}>{profile.ecole}</p>
           )}
 
-          {/* Rôle + dispo — une ligne muted, pas de pill */}
-          <p style={{ fontSize: 13, color: "#8A8579", margin: "0 0 14px" }}>
-            {isDevProfile
-              ? [
-                  "Développeur",
-                  (dispo ?? 0) >= 10 ? "Disponible" : null,
-                  dispo ? `${dispo}h/sem` : null,
-                ].filter(Boolean).join(" · ")
-              : "Founder"
-            }
-          </p>
+          {/* Rôle + dispo — dev uniquement, une ligne muted, pas de pill */}
+          {isDevProfile && (
+            <p style={{ fontSize: 13, color: "#8A8579", margin: "0 0 14px" }}>
+              {[
+                "Développeur",
+                (dispo ?? 0) >= 10 ? "Disponible" : null,
+                dispo ? `${dispo}h/sem` : null,
+              ].filter(Boolean).join(" · ")}
+            </p>
+          )}
 
           {/* Bio */}
           {profile.bio && (
@@ -966,7 +982,7 @@ export default function PublicProfilePage() {
                   target="_blank"
                   rel="noreferrer"
                   className="lk-extlink"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 9, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 12, fontWeight: 600 }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 9, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138", fontSize: 12, fontWeight: 600 }}
                 >
                   GitHub <ExternalLink size={10} strokeWidth={2} />
                 </a>
@@ -977,7 +993,7 @@ export default function PublicProfilePage() {
                   target="_blank"
                   rel="noreferrer"
                   className="lk-extlink"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 9, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", fontSize: 12, fontWeight: 600 }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 9, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138", fontSize: 12, fontWeight: 600 }}
                 >
                   LinkedIn <ExternalLink size={10} strokeWidth={2} />
                 </a>
@@ -986,15 +1002,18 @@ export default function PublicProfilePage() {
           )}
         </div>
 
-        {/* ── BANDE TRACK-RECORD ── surface blanche, 3 col, filets hairline ── */}
-        <div style={{ display: "flex", background: "#fff", border: "1.5px solid #ECE7DD", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
+        {/* ── BANDE TRACK-RECORD ── surface blanche, 3 col, icônes pastel ── */}
+        <div style={{ display: "flex", background: "#fff", border: "1.5px solid #E5E5EA", borderRadius: 14, overflow: "hidden", marginBottom: 16 }}>
           {([
-            { label: "Missions", value: projects.length      },
-            { label: "Livrés",   value: doneProjects.length  },
-            { label: "Avis",     value: reviews.length       },
-          ] as { label: string; value: number }[]).map((kpi, i) => (
-            <div key={kpi.label} style={{ flex: 1, padding: "18px 0", textAlign: "center", borderLeft: i > 0 ? "1px solid #ECE7DD" : "none" }}>
-              <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 40, fontWeight: 600, color: "#1A2138", margin: "0 0 3px", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+            { label: "Missions", value: projects.length,     icon: Briefcase, color: "var(--lk-blue)",   bg: "rgba(74,123,247,0.12)"  },
+            { label: "Livrés",   value: doneProjects.length,  icon: Check,     color: "var(--lk-green)",  bg: "rgba(52,199,89,0.12)"   },
+            { label: "Avis",     value: reviews.length,       icon: Star,      color: "var(--lk-accent)", bg: "rgba(212,83,126,0.12)"  },
+          ] as { label: string; value: number; icon: React.ElementType; color: string; bg: string }[]).map((kpi, i) => (
+            <div key={kpi.label} style={{ flex: 1, padding: "18px 0", textAlign: "center", borderLeft: i > 0 ? "1px solid #E5E5EA" : "none" }}>
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: kpi.bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px" }}>
+                <kpi.icon size={16} strokeWidth={2} style={{ color: kpi.color }} />
+              </div>
+              <p style={{ fontFamily: "var(--font-sans)", fontSize: 32, fontWeight: 700, color: "#1A2138", margin: "0 0 3px", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                 {kpi.value}
               </p>
               <p style={{ fontSize: 10, fontWeight: 700, color: "#8A8579", margin: 0, textTransform: "uppercase", letterSpacing: "1.2px" }}>
@@ -1008,11 +1027,11 @@ export default function PublicProfilePage() {
 
           {/* Stack */}
           {!isFounder && devProfile?.competences && devProfile.competences.length > 0 && (
-            <div style={{ background: "#fff", border: "1.5px solid #ECE7DD", borderRadius: 14, padding: "18px 20px" }}>
+            <div style={{ background: "#fff", border: "1.5px solid #E5E5EA", borderRadius: 14, padding: "18px 20px" }}>
               <p style={{ fontSize: 10, fontWeight: 700, color: "#8A8579", textTransform: "uppercase", letterSpacing: "1.2px", margin: "0 0 12px" }}>Stack</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
                 {devProfile.competences.map((c) => (
-                  <span key={c} style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 8, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138" }}>
+                  <span key={c} style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 8, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138" }}>
                     {c}
                   </span>
                 ))}
@@ -1031,7 +1050,7 @@ export default function PublicProfilePage() {
                   { label: "Acceptées",    value: myDevAccepted          },
                 ].map((kpi, i) => (
                   <div key={kpi.label} style={{ flex: 1, padding: "14px 0", textAlign: "center", borderLeft: i > 0 ? `1px solid ${C.hairline}` : "none" }}>
-                    <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 26, fontWeight: 600, color: C.ink, margin: "0 0 2px", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+                    <p style={{ fontFamily: "var(--font-sans)", fontSize: 26, fontWeight: 600, color: C.ink, margin: "0 0 2px", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                       {kpi.value}
                     </p>
                     <p style={{ fontSize: 10, fontWeight: 600, color: C.muted, margin: 0, textTransform: "uppercase", letterSpacing: "0.8px" }}>{kpi.label}</p>
@@ -1059,10 +1078,10 @@ export default function PublicProfilePage() {
               {/* Empty state */}
               {myCandidatures.length === 0 && (
                 <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
-                  <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 18, fontWeight: 600, color: C.ink, margin: "0 0 8px" }}>Aucune candidature</p>
+                  <p style={{ fontFamily: "var(--font-sans)", fontSize: 18, fontWeight: 600, color: C.ink, margin: "0 0 8px" }}>Aucune candidature</p>
                   <p style={{ fontSize: 13, color: C.muted, margin: "0 0 20px" }}>Explore les projets et candidate pour être mis en relation avec un fondateur.</p>
                   <button onClick={() => router.push("/projets")}
-                    style={{ padding: "10px 18px", borderRadius: 10, background: C.ink, color: "#fff", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    style={{ padding: "10px 18px", borderRadius: 10, background: C.rose, color: "#fff", fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
                     Voir les projets <ArrowRight size={14} strokeWidth={2.2} />
                   </button>
                 </div>
@@ -1084,7 +1103,7 @@ export default function PublicProfilePage() {
                     return (
                       <div key={cand.id} style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 14, padding: "16px 18px" }}>
                         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
-                          <h3 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 15, fontWeight: 600, color: C.ink, margin: 0, letterSpacing: "-0.01em", lineHeight: 1.25, flex: 1 }}>
+                          <h3 style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 600, color: C.ink, margin: 0, letterSpacing: "-0.01em", lineHeight: 1.25, flex: 1 }}>
                             {cand.projects.titre}
                           </h3>
                           <CandStatusPill statut={cand.statut} />
@@ -1137,7 +1156,7 @@ export default function PublicProfilePage() {
                   <div style={i < arr.length - 1 ? { paddingBottom: 20, flex: 1 } : { flex: 1 }}>
                     <div className="flex items-start gap-2">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                        style={{ background: "#FAF8F4", border: "1px solid #ECE7DD" }}>
+                        style={{ background: "#F5F5F7", border: "1px solid #E5E5EA" }}>
                         <Briefcase size={13} strokeWidth={1.8} style={{ color: "#1A2138" }} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1173,7 +1192,7 @@ export default function PublicProfilePage() {
                   <div style={i < arr.length - 1 ? { paddingBottom: 20, flex: 1 } : { flex: 1 }}>
                     <div className="flex items-start gap-2">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                        style={{ background: "#FAF8F4", border: "1px solid #ECE7DD" }}>
+                        style={{ background: "#F5F5F7", border: "1px solid #E5E5EA" }}>
                         <GraduationCap size={13} strokeWidth={1.8} style={{ color: "#1A2138" }} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1193,19 +1212,17 @@ export default function PublicProfilePage() {
 
           {/* Projets actifs */}
           {activeProjects.length > 0 && (
-            <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 14, padding: "18px 20px" }}>
+            <div style={{ background: "#fff", border: "1px solid #E5E5EA", borderRadius: 14, padding: "18px 20px" }}>
               <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", margin: "0 0 14px" }}>En cours</p>
               {activeProjects.map((p, i, arr) => (
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12,
-                  ...(i < arr.length - 1 ? { paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #ECE7DD" } : {}) }}>
+                  ...(i < arr.length - 1 ? { paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #E5E5EA" } : {}) }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#8A8579", flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: "#1A2138", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.titre}</p>
                     {p.stack_souhaitee && <p style={{ fontSize: 11, color: "#8A8579", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.stack_souhaitee}</p>}
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 7, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138", flexShrink: 0 }}>
-                    {p.statut === "en_cours" ? "En cours" : p.statut === "matched" ? "Matchée" : "En attente"}
-                  </span>
+                  <ProjectStatusPill statut={p.statut} />
                   {isMe && p.statut === "pending" && (
                     <button onClick={() => router.push(`/projets/${p.id}/modifier`)}
                       style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#8A8579", padding: "3px 6px", flexShrink: 0, textDecoration: "underline" }}>
@@ -1225,19 +1242,20 @@ export default function PublicProfilePage() {
 
           {/* Missions livrées */}
           {doneProjects.length > 0 && (
-            <div style={{ background: "#fff", border: "1px solid #ECE7DD", borderRadius: 14, padding: "18px 20px" }}>
+            <div style={{ background: "#fff", border: "1px solid #E5E5EA", borderRadius: 14, padding: "18px 20px" }}>
               <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", margin: "0 0 14px" }}>{isFounder ? "Projets livrés" : "Missions réalisées"}</p>
               {doneProjects.map((p, i, arr) => (
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12,
-                  ...(i < arr.length - 1 ? { paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #ECE7DD" } : {}) }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 7, border: "1px solid #ECE7DD", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Check size={11} strokeWidth={2.5} style={{ color: "#1A2138" }} />
+                  ...(i < arr.length - 1 ? { paddingBottom: 12, marginBottom: 12, borderBottom: "1px solid #E5E5EA" } : {}) }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 7, background: "rgba(52,199,89,0.14)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Check size={11} strokeWidth={2.5} style={{ color: "var(--lk-green)" }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: "#1A2138", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.titre}</p>
                     {p.stack_souhaitee && <p style={{ fontSize: 11, color: "#8A8579", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.stack_souhaitee}</p>}
                   </div>
                   {p.deadline && <span style={{ fontSize: 11, color: "#8A8579", flexShrink: 0 }}>{p.deadline}</span>}
+                  <ProjectStatusPill statut={p.statut} />
                 </div>
               ))}
             </div>
@@ -1251,7 +1269,7 @@ export default function PublicProfilePage() {
               </p>
               {score !== null && (
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                  <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 22, fontWeight: 600, color: "#1A2138", fontVariantNumeric: "tabular-nums" }}>{score}</span>
+                  <span style={{ fontFamily: "var(--font-sans)", fontSize: 22, fontWeight: 600, color: "#1A2138", fontVariantNumeric: "tabular-nums" }}>{score}</span>
                   <span style={{ fontSize: 12, color: "#8A8579" }}>/&nbsp;5</span>
                 </div>
               )}
@@ -1261,10 +1279,10 @@ export default function PublicProfilePage() {
             {keywords.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 12 }}>
                 {keywords.map(({ word, count }) => (
-                  <span key={word} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 8, border: "1px solid #ECE7DD", background: "#fff", color: "#1A2138" }}>
+                  <span key={word} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 8, border: "1px solid #E5E5EA", background: "#fff", color: "#1A2138" }}>
                     {word}
                     {count > 1 && (
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 5, background: "#ECE7DD", color: "#8A8579" }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 5px", borderRadius: 5, background: "#E5E5EA", color: "#8A8579" }}>
                         ×{count}
                       </span>
                     )}
@@ -1288,7 +1306,7 @@ export default function PublicProfilePage() {
                         onClick={() => router.push(`/profil/${r.reviewer_id}`)}
                         style={{ width: 40, height: 40, borderRadius: 10, background: "#1A2138", border: "none", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
                       >
-                        <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{r.reviewer_nom?.[0]?.toUpperCase() ?? "?"}</span>
+                        <span style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{r.reviewer_nom?.[0]?.toUpperCase() ?? "?"}</span>
                       </button>
                       <div className="flex-1 min-w-0">
                         <button onClick={() => router.push(`/profil/${r.reviewer_id}`)}
@@ -1297,7 +1315,7 @@ export default function PublicProfilePage() {
                           {r.reviewer_nom}
                         </button>
                         <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
-                          {r.reviewer_role === "founder" ? "Founder" : "Développeur"}
+                          {r.reviewer_role === "founder" ? "Client" : "Développeur"}
                           {r.project_titre && <> · <em>{r.project_titre}</em></>}
                           {" · "}{fmtDate(r.created_at)}
                         </p>
@@ -1311,7 +1329,7 @@ export default function PublicProfilePage() {
                     </div>
                     {r.comment && (
                       <p className="text-sm leading-relaxed px-4 py-3 rounded-xl"
-                        style={{ background: "#FAF8F4", color: "#1A2138", borderLeft: "3px solid #ECE7DD" }}>
+                        style={{ background: "#F5F5F7", color: "#1A2138", borderLeft: "3px solid #E5E5EA" }}>
                         &ldquo;{r.comment}&rdquo;
                       </p>
                     )}
@@ -1324,7 +1342,7 @@ export default function PublicProfilePage() {
         </div>
       </div>
 
-      <BottomNav />
+      <AppNav />
 
       {/* ── Sticky bottom bar visiteur (au-dessus de la BottomNav) ── */}
       {(!isMe && (convId || canPin)) && (
@@ -1355,11 +1373,11 @@ export default function PublicProfilePage() {
                 disabled={alreadyPinned || pinDone}
                 style={alreadyPinned || pinDone ? {
                   flex: 1, padding: "12px 0", fontSize: 14, fontWeight: 600, borderRadius: 14,
-                  background: "#fff", color: "#8A8579", border: "1px solid #ECE7DD", cursor: "default",
+                  background: "#fff", color: "#8A8579", border: "1px solid #E5E5EA", cursor: "default",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 } : {
                   flex: 1, padding: "12px 0", fontSize: 14, fontWeight: 700, borderRadius: 14,
-                  background: "#1A2138", color: "#fff", border: "none", cursor: "pointer",
+                  background: "#D4537E", color: "#fff", border: "none", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 }}
               >
@@ -1379,15 +1397,15 @@ export default function PublicProfilePage() {
           onClick={() => router.push("/projets/nouveau")}
           style={{
             position: "fixed", bottom: 76, right: 20, zIndex: 40,
-            background: "#1A2138", color: "#fff", border: "none",
-            borderRadius: 14, padding: "12px 18px",
-            fontSize: 13, fontWeight: 700, cursor: "pointer",
+            background: "#D4537E", color: "#fff", border: "none",
+            borderRadius: 12, padding: "12px 18px",
+            fontSize: 13, fontWeight: 600, cursor: "pointer",
             display: "flex", alignItems: "center", gap: 8,
-            boxShadow: "0 4px 16px rgba(26,33,56,0.28)",
+            boxShadow: "0 4px 16px rgba(212,83,126,0.30)",
             transition: "background 0.14s, transform 0.12s",
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#2A3252"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#1A2138"; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#B8436A"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#D4537E"; }}
         >
           <span style={{ fontSize: 18, lineHeight: 1, marginTop: -1 }}>+</span> Déposer un projet
         </button>

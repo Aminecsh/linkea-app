@@ -142,17 +142,17 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden">
-        <div className="px-5 pt-5 pb-4 border-b border-[#ECE7DD] flex items-center justify-between">
+        <div className="px-5 pt-5 pb-4 border-b border-[#E5E5EA] flex items-center justify-between">
           <div>
             <h2 className="text-base font-black text-[#1A2138]">Sanctionner</h2>
             <p className="text-xs text-[#8A8579] mt-0.5">{targetNom}</p>
           </div>
-          <button onClick={close} className="text-[#8A8579] hover:text-[#1A2138] w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#FAF8F4]">✕</button>
+          <button onClick={close} className="text-[#8A8579] hover:text-[#1A2138] w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F7]">✕</button>
         </div>
 
         {done ? (
           <div className="px-5 py-10 text-center flex flex-col items-center gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-[#FAF8F4] border border-[#ECE7DD] flex items-center justify-center text-xl text-[#D4537E]">✕</div>
+            <div className="w-14 h-14 rounded-2xl bg-[#F5F5F7] border border-[#E5E5EA] flex items-center justify-center text-xl text-[#D4537E]">✕</div>
             <p className="font-bold text-[#1A2138]">Sanction appliquée</p>
             <p className="text-sm text-[#8A8579]">{targetNom} a été notifié(e).</p>
             <button onClick={close} className="btn-pink mt-2 px-8 py-2.5">Fermer</button>
@@ -165,7 +165,7 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
               <p className="text-xs font-bold uppercase tracking-widest text-[#8A8579] mb-2">Type de sanction</p>
               <div className="grid grid-cols-2 gap-2">
                 {([["temp", "⏸ Suspension", "Durée limitée"], ["permanent", "🚫 Ban définitif", "Accès permanent bloqué"]] as const).map(([val, label, desc]) => (
-                  <label key={val} className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${type === val ? "border-[#D4537E] bg-[#FAF8F4]" : "border-[#ECE7DD] hover:border-[#8A8579]"}`}>
+                  <label key={val} className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${type === val ? "border-[#D4537E] bg-[#F5F5F7]" : "border-[#E5E5EA] hover:border-[#8A8579]"}`}>
                     <input type="radio" name="type" value={val} checked={type === val} onChange={() => {
                       setType(val);
                       if (raison) setMessage(getTemplate(raison, val, val === "permanent" ? 0 : dureeJours));
@@ -187,7 +187,7 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
                       setDureePreset(d.days);
                       if (raison && d.days > 0) setMessage(getTemplate(raison, "temp", d.days));
                     }}
-                      className={`text-sm font-semibold px-3 py-1.5 rounded-full border transition-all ${dureePreset === d.days ? "bg-[#1A2138] text-white border-[#1A2138]" : "bg-white text-[#8A8579] border-[#ECE7DD] hover:border-[#8A8579]"}`}>
+                      className={`text-sm font-semibold px-3 py-1.5 rounded-full border transition-all ${dureePreset === d.days ? "bg-[#1A2138] text-white border-[#1A2138]" : "bg-white text-[#8A8579] border-[#E5E5EA] hover:border-[#8A8579]"}`}>
                       {d.label}
                     </button>
                   ))}
@@ -206,7 +206,7 @@ export default function BanModal({ isOpen, onClose, targetUserId, targetNom, adm
               <p className="text-xs font-bold uppercase tracking-widest text-[#8A8579] mb-2">Raison</p>
               <div className="flex flex-col gap-1.5">
                 {RAISONS.map((r) => (
-                  <label key={r} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${raison === r ? "border-[#D4537E] bg-[#FAF8F4]" : "border-[#ECE7DD] hover:border-[#8A8579]"}`}>
+                  <label key={r} className={`flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${raison === r ? "border-[#D4537E] bg-[#F5F5F7]" : "border-[#E5E5EA] hover:border-[#8A8579]"}`}>
                     <input type="radio" name="raison" value={r} checked={raison === r} onChange={() => {
                       setRaison(r);
                       setMessage(getTemplate(r, type, dureeJours));

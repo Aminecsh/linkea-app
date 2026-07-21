@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ArrowLeft, Lock, Check } from "lucide-react";
 
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" } as const;
 
 type OtherParty = { nom: string; ecole?: string; user_id: string; };
 
@@ -147,9 +147,9 @@ export default function ReviewPage() {
         <div style={{ width: 48, height: 48, borderRadius: 14, border: `1px solid ${C.hairline}`, background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
           <Lock size={20} strokeWidth={1.5} style={{ color: C.muted }} />
         </div>
-        <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>Accès non autorisé</p>
+        <p style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>Accès non autorisé</p>
         <p style={{ fontSize: 13, color: C.muted, margin: "0 0 24px" }}>Ce projet n&apos;est pas encore terminé ou tu n&apos;y es pas associé.</p>
-        <button onClick={() => router.push("/profil")} style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Retour au profil</button>
+        <button onClick={() => router.push("/profil")} style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.rose, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Retour au profil</button>
       </div>
     </div>
   );
@@ -160,9 +160,9 @@ export default function ReviewPage() {
         <div style={{ width: 48, height: 48, borderRadius: 14, border: `1px solid ${C.hairline}`, background: C.canvas, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
           <Check size={20} strokeWidth={2} style={{ color: C.ink }} />
         </div>
-        <p style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 17, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>Avis déjà soumis</p>
+        <p style={{ fontFamily: "var(--font-sans)", fontSize: 17, fontWeight: 700, color: C.ink, margin: "0 0 4px" }}>Avis déjà soumis</p>
         <p style={{ fontSize: 13, color: C.muted, margin: "0 0 24px" }}>Tu as déjà laissé un avis pour ce projet.</p>
-        <button onClick={() => router.push("/profil")} style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Retour au profil</button>
+        <button onClick={() => router.push("/profil")} style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.rose, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Retour au profil</button>
       </div>
     </div>
   );
@@ -182,7 +182,7 @@ export default function ReviewPage() {
         {/* En-tête */}
         <div className="mb-6">
           <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: C.muted }}>Avis post-projet</span>
-          <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 22, fontWeight: 700, color: C.ink, margin: "6px 0 0" }}>Note {targetLabel}</h1>
+          <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 22, fontWeight: 700, color: C.ink, margin: "6px 0 0" }}>Note {targetLabel}</h1>
           <p style={{ fontSize: 13, color: C.muted, margin: "6px 0 0" }}>Projet : <span style={{ fontWeight: 600, color: C.ink }}>{projetTitre}</span></p>
         </div>
 
@@ -190,7 +190,7 @@ export default function ReviewPage() {
         {other && (
           <div className="flex items-center gap-3 mb-6" style={{ background: C.canvas, borderRadius: 12, border: `1px solid ${C.hairline}`, padding: 16 }}>
             <div style={{ width: 40, height: 40, borderRadius: 11, background: C.ink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 16, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{other.nom?.[0]?.toUpperCase() ?? "?"}</span>
+              <span style={{ fontFamily: "var(--font-sans)", fontSize: 16, fontWeight: 600, color: "#fff", lineHeight: 1 }}>{other.nom?.[0]?.toUpperCase() ?? "?"}</span>
             </div>
             <div>
               <p style={{ fontSize: 14, fontWeight: 700, color: C.ink, margin: 0 }}>{other.nom}</p>
@@ -230,7 +230,7 @@ export default function ReviewPage() {
         </div>
 
         <button onClick={handleSubmit} disabled={rating === 0 || submitting}
-          style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.ink, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (rating === 0 || submitting) ? 0.4 : 1 }}>
+          style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: C.rose, color: "#fff", border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: (rating === 0 || submitting) ? 0.4 : 1 }}>
           {submitting ? "Envoi..." : "Envoyer l'avis"}
         </button>
       </div>

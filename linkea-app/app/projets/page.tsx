@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import BottomNav from "@/components/BottomNav";
+import AppNav from "@/components/AppNav";
 import NotificationBell from "@/components/NotificationBell";
 import { Search, ArrowRight, Check, X, SlidersHorizontal, Calendar, Users, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,13 +26,13 @@ type Project = {
   };
 };
 
-const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#ECE7DD", canvas: "#FAF8F4", surface: "#FFFFFF" } as const;
+const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" } as const;
 
 function ProjectThumbnail({ titre, size = 48 }: { titre: string; size?: number }) {
   const r = size >= 56 ? 16 : 14;
   return (
     <div style={{ width: size, height: size, borderRadius: r, background: C.hairline, border: `1px solid ${C.hairline}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-      <span style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: Math.round(size * 0.38), fontWeight: 600, color: C.ink, lineHeight: 1 }}>
+      <span style={{ fontFamily: "var(--font-sans)", fontSize: Math.round(size * 0.38), fontWeight: 600, color: C.ink, lineHeight: 1 }}>
         {titre?.[0]?.toUpperCase() ?? "?"}
       </span>
     </div>
@@ -187,7 +187,7 @@ export default function ProjetsPage() {
   const hasFilter = !!(activeDeadline || activeStack);
 
   if (loading) return (
-    <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+    <div className="min-h-screen pb-nav pl-sidebar" style={{ background: "var(--bg)" }}>
       <div className="max-w-6xl mx-auto px-4 py-5 flex flex-col gap-3">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="card p-4 flex gap-4">
@@ -200,7 +200,7 @@ export default function ProjetsPage() {
           </div>
         ))}
       </div>
-      <BottomNav />
+      <AppNav />
     </div>
   );
 
@@ -210,7 +210,7 @@ export default function ProjetsPage() {
   const founderProjectCount = rawSelected?.founder_id ? (founderCounts[rawSelected.founder_id] ?? 1) : 1;
 
   return (
-    <div className="min-h-screen pb-nav" style={{ background: "var(--bg)" }}>
+    <div className="min-h-screen pb-nav pl-sidebar" style={{ background: "var(--bg)" }}>
 
       {/* ── Header ── */}
       <div className="sticky top-0 z-20 px-4 py-3"
@@ -387,7 +387,7 @@ export default function ProjetsPage() {
                       </div>
                       {/* Barre */}
                       <div style={{ height: 4, borderRadius: 99, background: C.hairline, overflow: "hidden" }}>
-                        <div style={{ height: "100%", borderRadius: 99, transition: "width 0.4s ease", width: `${score}%`, background: C.ink }} />
+                        <div style={{ height: "100%", borderRadius: 99, transition: "width 0.4s ease", width: `${score}%`, background: "#4A7BF7" }} />
                       </div>
                       <p className="text-xs mt-2" style={{ color: C.muted }}>
                         {score >= 75
@@ -442,7 +442,7 @@ export default function ProjetsPage() {
                           display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "default",
                         } : {
                           width: "100%", padding: "13px 0", borderRadius: 12, fontSize: 14, fontWeight: 600,
-                          background: C.ink, color: "#fff", border: "none",
+                          background: C.rose, color: "#fff", border: "none",
                           display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer",
                         }}
                       >
@@ -463,7 +463,7 @@ export default function ProjetsPage() {
         )}
       </div>
 
-      <BottomNav />
+      <AppNav />
     </div>
   );
 }
