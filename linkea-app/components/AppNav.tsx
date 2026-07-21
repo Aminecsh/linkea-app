@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
+import { getAuthUser } from "@/lib/auth";
 import {
   Users,
   MessageCircle,
@@ -14,6 +15,7 @@ import {
   ShieldCheck,
   FolderKanban,
   ChevronDown,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import NotifToast from "@/components/NotifToast";
@@ -57,19 +59,25 @@ export default function AppNav() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      // getSession() is local (no network) — use it for identity
+      const user = await getAuthUser();
       if (!user) return;
 
-      const now = new Date().toISOString();
-      const { data: ban } = await supabase
-        .from("bans").select("id").eq("user_id", user.id).eq("is_active", true)
-        .or(`expires_at.is.null,expires_at.gt.${now}`).limit(1).maybeSingle();
-      if (ban) {
-        setIsBanned(true);
-        if (!pathname.startsWith("/messages") && !pathname.startsWith("/support")) {
-          router.push("/messages");
+      // Ban check: only once per session
+      const banChecked = sessionStorage.getItem("lk_ban_ok");
+      if (!banChecked) {
+        const now = new Date().toISOString();
+        const { data: ban } = await supabase
+          .from("bans").select("id").eq("user_id", user.id).eq("is_active", true)
+          .or(`expires_at.is.null,expires_at.gt.${now}`).limit(1).maybeSingle();
+        if (ban) {
+          setIsBanned(true);
+          if (!pathname.startsWith("/messages") && !pathname.startsWith("/support")) {
+            router.push("/messages");
+          }
+          return;
         }
-        return;
+        sessionStorage.setItem("lk_ban_ok", "1");
       }
 
       const { data: roleData } = await supabase
@@ -118,16 +126,21 @@ export default function AppNav() {
       const convIds = convQuery?.data?.map((c: { id: string }) => c.id) ?? [];
       if (convIds.length === 0) return;
 
+      // Batched query instead of N sequential ones
+      const earliestRead = convIds
+        .map((id) => localStorage.getItem(`lastRead_${id}`) ?? "1970-01-01")
+        .sort()[0];
+      const { data: unreadMsgs } = await supabase
+        .from("messages")
+        .select("conversation_id, created_at")
+        .in("conversation_id", convIds)
+        .neq("sender_id", user.id)
+        .gt("created_at", earliestRead);
+
       let total = 0;
       for (const convId of convIds) {
         const lastRead = localStorage.getItem(`lastRead_${convId}`) ?? "1970-01-01";
-        const { count } = await supabase
-          .from("messages")
-          .select("*", { count: "exact", head: true })
-          .eq("conversation_id", convId)
-          .neq("sender_id", user.id)
-          .gt("created_at", lastRead);
-        total += count ?? 0;
+        total += unreadMsgs?.filter((m) => m.conversation_id === convId && m.created_at > lastRead).length ?? 0;
       }
       setUnreadCount(total);
     }
@@ -219,6 +232,7 @@ export default function AppNav() {
         { label: "Projets",     icon: Search,          href: "/projets"  },
         ...(singleGestionTab ? [singleGestionTab] : []),
         { label: "Messages",    icon: MessageCircle,   href: "/messages" },
+        { label: "Wallet",      icon: Wallet,          href: "/wallet"   },
         { label: "Profil",      icon: User,            href: "/profil"   },
       ];
 

@@ -1,13 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { createClient } from "@supabase/supabase-js";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const DEV_MODE = process.env.NODE_ENV !== "production";
 const DEV_EMAIL = "amine.chamssan@gmail.com";
 
+const ALLOWED_TYPES = new Set(["nouvelle_candidature", "candidature_acceptee", "candidature_refusee"]);
+
+function escapeHtml(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function POST(req: NextRequest) {
-  const { type, to, data } = await req.json();
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  }
+  const token = authHeader.slice(7);
+
+  const supabaseUser = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+  const { data: { user }, error: userErr } = await supabaseUser.auth.getUser();
+  if (userErr || !user) {
+    return NextResponse.json({ error: "Session invalide" }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const { type, to, data: rawData } = body;
+
+  if (typeof type !== "string" || !ALLOWED_TYPES.has(type)) {
+    return NextResponse.json({ error: "Type invalide" }, { status: 400 });
+  }
+  if (typeof to !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    return NextResponse.json({ error: "Destinataire invalide" }, { status: 400 });
+  }
+
+  // Échappe tous les champs texte injectés dans le HTML de l'email (anti-injection)
+  const data: Record<string, string> = {};
+  for (const [key, value] of Object.entries(rawData ?? {})) {
+    data[key] = escapeHtml(value);
+  }
+
   const recipient = DEV_MODE ? DEV_EMAIL : to;
 
   try {

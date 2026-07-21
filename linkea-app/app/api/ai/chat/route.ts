@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { checkUsage, trackUsage, MONTHLY_TOKEN_LIMIT } from "@/lib/ai-usage";
+import { aiChatSchema } from "@/lib/validation";
 
 const STATUT_LABELS: Record<string, string> = {
   a_venir: "À venir", en_cours: "En cours", termine: "Terminé",
@@ -19,8 +20,11 @@ export async function POST(req: NextRequest) {
   }
   const token = authHeader.slice(7);
 
-  const { messages, projectId } = await req.json();
-  if (!messages?.length) return new Response(JSON.stringify({ error: "Messages manquants" }), { status: 400 });
+  const parsed = aiChatSchema.safeParse(await req.json());
+  if (!parsed.success) {
+    return new Response(JSON.stringify({ error: "Données invalides", details: parsed.error.issues.map((i) => i.message) }), { status: 400 });
+  }
+  const { messages, projectId } = parsed.data;
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,13 +33,13 @@ export async function POST(req: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser(token);
-  if (user) {
-    const { ok, used } = await checkUsage(supabase, user.id);
-    if (!ok) {
-      return new Response(JSON.stringify({
-        error: `Limite mensuelle atteinte (${used.toLocaleString()} / ${MONTHLY_TOKEN_LIMIT.toLocaleString()} tokens). Reviens le mois prochain !`,
-      }), { status: 429 });
-    }
+  if (!user) return new Response(JSON.stringify({ error: "Non autorisé" }), { status: 401 });
+
+  const { ok, used } = await checkUsage(supabase, user.id);
+  if (!ok) {
+    return new Response(JSON.stringify({
+      error: `Limite mensuelle atteinte (${used.toLocaleString()} / ${MONTHLY_TOKEN_LIMIT.toLocaleString()} tokens). Reviens le mois prochain !`,
+    }), { status: 429 });
   }
 
   let projectContext = "";
@@ -90,7 +94,38 @@ Statut : ${project.statut}`;
     }
   }
 
-  const systemPrompt = `Tu es Linkeo, un chef de projet expert avec 15 ans d'expérience dans la gestion de projets tech, SaaS et produits digitaux. Tu combines la rigueur des méthodes classiques (Waterfall, PMI) avec l'agilité des méthodes modernes (Scrum, Kanban, SAFe).
+  const isIntake = !projectId;
+
+  const intakeSystemPrompt = `Tu es Linkeo, l'assistant qui aide les porteurs de projet à déposer leur besoin sur Linkea, une plateforme qui met en relation des porteurs de projet avec des développeurs freelances.
+
+La personne en face de toi n'y connaît souvent RIEN en informatique. Ton seul but : l'aider à exprimer son besoin par des questions simples, sans AUCUN jargon technique.
+
+## RÈGLES DE LANGAGE (très important)
+- N'utilise JAMAIS les mots "stack", "MVP", "roadmap", "sprint", "backlog", "scope", "feature"
+- Remplace-les toujours par du langage courant : au lieu de "stack technique" dis "des outils ou technologies en particulier" ; au lieu de "MVP" dis "la version de départ, l'essentiel pour démarrer" ; au lieu de "feature" dis "fonctionnalité" ou "truc que ça doit faire"
+- N'utilise JAMAIS de markdown : pas d'astérisques pour du gras (**texte**), pas de listes à puces avec des tirets, pas de titres avec #. Écris en phrases simples et naturelles, comme dans un message texte.
+- Sois chaleureux, patient, jamais condescendant — comme si tu expliquais à un ami qui n'y connaît rien
+- Pose UNE SEULE question à la fois (deux maximum), jamais une liste de questions d'un coup
+- Donne un exemple concret dans ta question si ça peut aider la personne à répondre plus facilement
+
+## CE QUE TU DOIS COMPRENDRE (dans cet ordre, sans lister ça à l'utilisateur)
+1. Le problème résolu et pour qui (à qui ça sert)
+2. Les 2-3 choses les plus importantes que le projet doit faire dès le départ
+3. Le type concret de projet (site vitrine, appli mobile, boutique en ligne, plateforme avec comptes utilisateurs, etc.) — c'est TOI qui en déduis les technologies adaptées, ne demande JAMAIS "quelle stack veux-tu". Si la personne mentionne déjà une contrainte technique précise (ex: "ça doit marcher avec mon site Shopify"), prends-la en compte.
+4. Budget approximatif et délai souhaité — optionnel aussi
+
+## RECOMMANDATION TECHNIQUE (important)
+Une fois que tu comprends bien le type de projet, propose TOI-MÊME 2-3 technologies adaptées, dans une phrase simple, en expliquant en une ligne pourquoi (ex: "Pour ton appli mobile, je partirais sur Flutter — ça permet de sortir une version iPhone et Android en même temps, donc moins cher et plus rapide" ou "Pour ton site avec des réservations, je te propose React et Node.js, des technologies solides et très utilisées par les développeurs freelances ici"). Ne demande jamais à la personne de choisir elle-même une technologie qu'elle ne connaît pas — c'est ton rôle de la conseiller. Préfère autant que possible des technologies parmi celles-ci, qui sont les plus demandées sur la plateforme : React, Next.js, Node.js, TypeScript, Vue.js, Flutter, Swift, Kotlin, Python, Laravel.
+
+## QUAND TU AS ASSEZ D'INFOS
+Dès que tu as compris les points 1 et 2, ET que tu as proposé ta recommandation technique (point 3) dans la conversation, termine ta réponse par cette ligne exacte, seule, sur sa propre ligne :
+{"ready_for_fiche":true}
+Ne mets cette ligne que quand tu es vraiment prêt — jamais dès le premier message.
+
+## PREMIER MESSAGE
+Si c'est le tout premier message de la conversation, présente-toi en une phrase et pose directement la première question (le problème résolu / pour qui), sans jargon et sans liste.`;
+
+  const systemPrompt = isIntake ? intakeSystemPrompt : `Tu es Linkeo, un chef de projet expert avec 15 ans d'expérience dans la gestion de projets tech, SaaS et produits digitaux. Tu combines la rigueur des méthodes classiques (Waterfall, PMI) avec l'agilité des méthodes modernes (Scrum, Kanban, SAFe).
 
 ## PERSONNALITÉ & SOFT SKILLS
 - Proactif : tu proposes sans attendre qu'on te demande
@@ -150,7 +185,7 @@ Agile/Scrum avec sprints de 1-2 semaines, sauf si le founder précise une autre 
         const encode = (s: string) => new TextEncoder().encode(s);
         try {
           const response = await anthropic.messages.stream({
-            model: "claude-sonnet-4-6",
+            model: isIntake ? "claude-haiku-4-5-20251001" : "claude-sonnet-4-6",
             max_tokens: 1500,
             system: systemPrompt,
             messages: messages.map((m: { role: string; content: string }) => ({
@@ -166,11 +201,9 @@ Agile/Scrum avec sprints de 1-2 semaines, sauf si le founder précise une autre 
           }
           controller.enqueue(encode("data: [DONE]\n\n"));
           // Track token usage after stream
-          if (user) {
-            const final = await response.finalMessage();
-            const total = (final.usage?.input_tokens ?? 0) + (final.usage?.output_tokens ?? 0);
-            if (total > 0) await trackUsage(supabase, user.id, total);
-          }
+          const final = await response.finalMessage();
+          const total = (final.usage?.input_tokens ?? 0) + (final.usage?.output_tokens ?? 0);
+          if (total > 0) await trackUsage(supabase, user.id, total);
         } catch (e) {
           controller.enqueue(encode(`data: ${JSON.stringify({ error: (e as Error).message })}\n\n`));
         } finally {

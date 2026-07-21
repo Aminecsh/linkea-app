@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { trackUsage } from "@/lib/ai-usage";
+import { checkUsage, trackUsage, MONTHLY_TOKEN_LIMIT } from "@/lib/ai-usage";
+import { aiRoadmapSchema, validationError } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -13,8 +14,9 @@ export async function POST(req: NextRequest) {
   }
   const token = authHeader.slice(7);
 
-  const { projectId } = await req.json();
-  if (!projectId) return NextResponse.json({ error: "projectId manquant" }, { status: 400 });
+  const parsed = aiRoadmapSchema.safeParse(await req.json());
+  if (!parsed.success) return validationError(parsed.error);
+  const { projectId } = parsed.data;
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,6 +25,14 @@ export async function POST(req: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser(token);
+  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const { ok, used } = await checkUsage(supabase, user.id);
+  if (!ok) {
+    return NextResponse.json({
+      error: `Limite mensuelle atteinte (${used.toLocaleString()} / ${MONTHLY_TOKEN_LIMIT.toLocaleString()} tokens). Reviens le mois prochain !`,
+    }, { status: 429 });
+  }
 
   const { data: project } = await supabase
     .from("projects")
@@ -63,10 +73,8 @@ Génère exactement 3 à 5 sprints. Réponds UNIQUEMENT en JSON valide avec ce f
     const content = response.content[0];
     if (content.type !== "text") return NextResponse.json({ error: "Réponse invalide" }, { status: 500 });
 
-    if (user) {
-      const total = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
-      if (total > 0) await trackUsage(supabase, user.id, total);
-    }
+    const total = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
+    if (total > 0) await trackUsage(supabase, user.id, total);
 
     try {
       return NextResponse.json(JSON.parse(content.text.trim()));

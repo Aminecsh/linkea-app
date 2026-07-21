@@ -1,4 +1,4 @@
-"use client";
+                                        "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -9,11 +9,13 @@ import { supabase } from "@/lib/supabase";
 
 type Message = { role: "user" | "assistant"; content: string };
 
-type Props = {
-  projectId: string;
-  projectTitre: string;
-  onClose: () => void;
-  onRoadmapGenerated?: (sprints: RoadmapSprint[]) => void;
+export type HealthIndicator = { label: string; value: string; status: "good" | "warn" | "bad" };
+export type HealthData = {
+  score: number;
+  label: string;
+  color: string;
+  indicators: HealthIndicator[];
+  recommendations: string[];
 };
 
 export type RoadmapSprint = {
@@ -23,22 +25,34 @@ export type RoadmapSprint = {
   taches: string[];
 };
 
-const QUICK_ACTIONS = [
-  { label: "📋 Cadrer mon MVP", prompt: "Aide-moi à cadrer le MVP de ce projet. Quelles sont les fonctionnalités essentielles à développer en priorité ?" },
-  { label: "🗓 Générer roadmap", prompt: "ROADMAP" },
-  { label: "✍️ Rédiger la fiche", prompt: "FICHE" },
-  { label: "⚙️ Choisir la stack", prompt: "Quelle stack technique recommandes-tu pour ce projet et pourquoi ?" },
-  { label: "⏱ Estimer le temps", prompt: "Combien de temps faut-il pour développer ce projet en partant de zéro ?" },
-];
+type Props = {
+  projectId: string;
+  projectTitre: string;
+  onClose: () => void;
+  onRoadmapGenerated?: (sprints: RoadmapSprint[]) => void;
+  activeSprint?: { id: string; nom: string; objectif?: string };
+  healthData?: HealthData;
+};
+
+function buildQuickActions(activeSprint?: Props["activeSprint"]) {
+  const base = [
+    { label: "🎯 Scoper le MVP",   prompt: "SCOPE"   },
+    { label: "🗓 Roadmap",          prompt: "ROADMAP" },
+    { label: "✍️ Fiche projet",     prompt: "FICHE"   },
+    { label: "⚙️ Stack technique",  prompt: "Quelle stack technique recommandes-tu pour ce projet et pourquoi ?" },
+    { label: "⏱ Estimation",        prompt: "Combien de temps faut-il pour développer ce projet en partant de zéro ?" },
+    { label: "⚠️ Risques",          prompt: "Quels sont les principaux risques de ce projet et comment les mitiger ?" },
+  ];
+  if (activeSprint) base.unshift({ label: "📋 Check-in sprint", prompt: "CHECK_IN" });
+  return base;
+}
 
 function extractQuestions(content: string): string[] {
   const lines = content.split("\n");
   const questions: string[] = [];
   for (const line of lines) {
     const clean = line.replace(/^[-*•#>\d.\s]+/, "").trim();
-    if (clean.endsWith("?") && clean.length > 10 && clean.length < 200) {
-      questions.push(clean);
-    }
+    if (clean.endsWith("?") && clean.length > 10 && clean.length < 200) questions.push(clean);
   }
   return questions.slice(0, 6);
 }
@@ -48,42 +62,43 @@ function extractSuggestions(content: string): { clean: string; suggestions: stri
   if (!match) return { clean: content, suggestions: [] };
   try {
     const parsed = JSON.parse(match[0]);
-    const suggestions: string[] = parsed.suggestions ?? [];
-    const clean = content.replace(match[0], "").trim();
-    return { clean, suggestions };
+    return { clean: content.replace(match[0], "").trim(), suggestions: parsed.suggestions ?? [] };
   } catch {
     return { clean: content, suggestions: [] };
   }
 }
 
-// Bloc de code avec bouton copier
 function CodeBlock({ children, className }: { children?: React.ReactNode; className?: string }) {
   const [copied, setCopied] = useState(false);
   const code = String(children).replace(/\n$/, "");
-  function copy() {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
   return (
     <div className="relative group my-2">
-      <button
-        onClick={copy}
-        className="absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded bg-[#1A2138] text-white/70 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+      <button onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+        style={{
+          position: "absolute", top: 8, right: 8, fontSize: 11, fontWeight: 600,
+          padding: "3px 8px", borderRadius: 7, background: "rgba(255,255,255,0.12)",
+          color: "rgba(255,255,255,0.7)", border: "none", cursor: "pointer",
+          opacity: 0, transition: "opacity 0.15s",
+        }}
+        className="group-hover:!opacity-100"
       >
-        {copied ? "Copié !" : "📋 Copier"}
+        {copied ? "Copié ✓" : "Copier"}
       </button>
-      <pre className={`${className ?? ""} rounded-xl !text-xs !p-4 overflow-x-auto`}>
-        <code>{children}</code>
-      </pre>
+      <pre className={`${className ?? ""} rounded-xl !text-xs !p-4 overflow-x-auto`}><code>{children}</code></pre>
     </div>
   );
 }
 
 function MdMessage({ content, streaming }: { content: string; streaming?: boolean }) {
-  const { clean, suggestions: _ } = extractSuggestions(content);
+  const { clean } = extractSuggestions(content);
   return (
-    <div className="prose prose-sm max-w-none prose-headings:text-[#1A2138] prose-headings:font-bold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-code:bg-[#E5E5EA] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:font-mono prose-table:text-xs prose-hr:my-3">
+    <div style={{ fontSize: 14, lineHeight: 1.65, color: "var(--text)" }}
+      className="prose prose-sm max-w-none
+        prose-headings:font-bold prose-headings:tracking-tight prose-headings:mt-3 prose-headings:mb-1.5
+        prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5
+        prose-code:bg-black/[0.06] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-xs prose-code:font-mono
+        prose-strong:font-semibold prose-strong:text-[var(--text)]
+        prose-table:text-xs prose-hr:my-3 prose-hr:border-[var(--border)]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
@@ -97,7 +112,13 @@ function MdMessage({ content, streaming }: { content: string; streaming?: boolea
       >
         {clean}
       </ReactMarkdown>
-      {streaming && <span className="inline-block w-0.5 h-4 bg-[#D4537E] ml-0.5 animate-blink align-text-bottom" />}
+      {streaming && (
+        <span style={{
+          display: "inline-block", width: 2, height: 14,
+          background: "var(--rose)", marginLeft: 2, borderRadius: 1,
+          verticalAlign: "text-bottom", animation: "lk-blink 1s step-end infinite",
+        }} />
+      )}
     </div>
   );
 }
@@ -108,39 +129,52 @@ function QuestionForm({ questions, onSubmit, disabled }: {
   disabled: boolean;
 }) {
   const [answers, setAnswers] = useState<Record<number, string>>({});
-
-  function handleSubmit() {
-    const compiled = questions
-      .map((q, i) => `**${q}**\n${answers[i]?.trim() || "—"}`)
-      .join("\n\n");
-    onSubmit(compiled);
-  }
-
   const allAnswered = questions.every((_, i) => answers[i]?.trim());
 
   return (
-    <div className="mt-2 ml-8 flex flex-col gap-2">
+    <div style={{ marginTop: 8, marginLeft: 36, display: "flex", flexDirection: "column", gap: 8 }}>
       {questions.map((q, i) => (
-        <div key={i} className="bg-white border border-[#E5E5EA] rounded-xl p-3 flex flex-col gap-1.5">
-          <p className="text-xs font-semibold text-[#1A2138]">{q}</p>
+        <div key={i} style={{
+          background: "#fff",
+          border: "1px solid var(--border-2)",
+          borderRadius: 14,
+          padding: "10px 14px",
+          boxShadow: "var(--shadow-xs)",
+        }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", margin: "0 0 6px", lineHeight: 1.4 }}>{q}</p>
           <input
             type="text"
             value={answers[i] ?? ""}
             onChange={e => setAnswers(prev => ({ ...prev, [i]: e.target.value }))}
-            onKeyDown={e => { if (e.key === "Enter" && allAnswered) handleSubmit(); }}
-            placeholder="Ta réponse..."
+            onKeyDown={e => { if (e.key === "Enter" && allAnswered) onSubmit(questions.map((q2, j) => `**${q2}**\n${answers[j]?.trim() || "—"}`).join("\n\n")); }}
+            placeholder="Ta réponse…"
             disabled={disabled}
-            className="text-sm border border-[#E5E5EA] rounded-lg px-3 py-2 focus:outline-none focus:border-[#D4537E] transition-colors disabled:opacity-50"
+            style={{
+              width: "100%", padding: "8px 12px",
+              border: "1px solid var(--border)",
+              borderRadius: 10, fontSize: 13,
+              color: "var(--text)", background: "var(--bg)",
+              outline: "none", transition: "border-color 0.15s",
+            }}
           />
         </div>
       ))}
       <button
-        onClick={handleSubmit}
+        onClick={() => onSubmit(questions.map((q, i) => `**${q}**\n${answers[i]?.trim() || "—"}`).join("\n\n"))}
         disabled={!allAnswered || disabled}
-        className="self-start mt-1 px-4 py-2 rounded-xl bg-[#1A2138] hover:bg-[#2A3252] disabled:opacity-40 text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
+        style={{
+          alignSelf: "flex-start",
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "8px 16px", borderRadius: 10,
+          background: "var(--text)", color: "#fff",
+          border: "none", fontSize: 13, fontWeight: 600,
+          cursor: allAnswered && !disabled ? "pointer" : "not-allowed",
+          opacity: allAnswered && !disabled ? 1 : 0.38,
+          transition: "opacity 0.15s",
+        }}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z" /></svg>
-        Envoyer mes réponses
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z" /></svg>
+        Envoyer
       </button>
     </div>
   );
@@ -155,44 +189,163 @@ function MessageActions({ content, onRegenerate, isLast }: {
   const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
   const { clean } = extractSuggestions(content);
 
-  function copy() {
-    navigator.clipboard.writeText(clean);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 4,
+      marginTop: 4, marginLeft: 36,
+      opacity: 0, transition: "opacity 0.15s",
+    }} className="msg-actions">
+      {[
+        { label: copied ? "✓ Copié" : "Copier", action: () => { navigator.clipboard.writeText(clean); setCopied(true); setTimeout(() => setCopied(false), 2000); } },
+        ...(isLast && onRegenerate ? [{ label: "Régénérer", action: onRegenerate }] : []),
+      ].map((btn) => (
+        <button key={btn.label} onClick={btn.action} style={{
+          fontSize: 11, fontWeight: 500, padding: "3px 9px", borderRadius: 8,
+          background: "#fff", border: "1px solid var(--border-2)",
+          color: "var(--muted)", cursor: "pointer",
+          transition: "all 0.14s", boxShadow: "var(--shadow-xs)",
+        }}>
+          {btn.label}
+        </button>
+      ))}
+      {(["up", "down"] as const).map((v) => (
+        <button key={v} onClick={() => setFeedback(v)} style={{
+          fontSize: 11, padding: "3px 7px", borderRadius: 8,
+          background: feedback === v ? "var(--rose-soft)" : "#fff",
+          border: feedback === v ? "1px solid var(--rose-border)" : "1px solid var(--border-2)",
+          cursor: "pointer", transition: "all 0.14s", boxShadow: "var(--shadow-xs)",
+        }}>
+          {v === "up" ? "👍" : "👎"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function HealthBadge({ data }: { data: HealthData }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const tagClass = data.score >= 80 ? "tag tag-green"
+    : data.score >= 50 ? "tag tag-amber"
+    : "tag tag-red";
+
+  const indicatorColor = (s: HealthIndicator["status"]) =>
+    s === "good" ? "var(--green)" : s === "warn" ? "var(--amber)" : "var(--red)";
 
   return (
-    <div className="flex items-center gap-1 mt-1.5 ml-8 opacity-0 group-hover:opacity-100 transition-opacity">
-      <button onClick={copy} title="Copier"
-        className="text-[10px] px-2 py-1 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#8A8579] transition-colors">
-        {copied ? "✓ Copié" : "📋 Copier"}
+    <div style={{ position: "relative" }}>
+      <button onClick={() => setExpanded(v => !v)} className={tagClass}
+        style={{ cursor: "pointer", letterSpacing: 0, fontWeight: 700, fontSize: 11 }}>
+        <span style={{
+          width: 6, height: 6, borderRadius: "50%",
+          background: data.score >= 80 ? "var(--green)" : data.score >= 50 ? "var(--amber)" : "var(--red)",
+          flexShrink: 0,
+        }} />
+        {data.score} · {data.label}
       </button>
-      {isLast && onRegenerate && (
-        <button onClick={onRegenerate} title="Régénérer"
-          className="text-[10px] px-2 py-1 rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#8A8579] transition-colors">
-          🔄 Régénérer
-        </button>
+
+      {expanded && (
+        <div style={{
+          position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 10,
+          width: 256, background: "#fff",
+          border: "1px solid var(--border)",
+          borderRadius: 18,
+          boxShadow: "var(--shadow-lg)",
+          padding: 16,
+          display: "flex", flexDirection: "column", gap: 10,
+        }}>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--subtle)", margin: 0 }}>
+            Santé du projet
+          </p>
+          {data.indicators.map((ind, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <span style={{ fontSize: 12, color: "var(--text-2)" }}>{ind.label}</span>
+              <span style={{
+                fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 100,
+                background: ind.status === "good" ? "var(--green-soft)" : ind.status === "warn" ? "var(--amber-soft)" : "var(--red-soft)",
+                color: indicatorColor(ind.status),
+                border: `1px solid ${ind.status === "good" ? "var(--green-border)" : ind.status === "warn" ? "var(--amber-border)" : "var(--red-border)"}`,
+              }}>
+                {ind.value}
+              </span>
+            </div>
+          ))}
+          {data.recommendations.length > 0 && (
+            <div style={{ paddingTop: 10, borderTop: "1px solid var(--border)", marginTop: 2 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--subtle)", margin: "0 0 8px" }}>
+                Recommandations
+              </p>
+              {data.recommendations.map((r, i) => (
+                <p key={i} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5, margin: "0 0 4px", display: "flex", gap: 6 }}>
+                  <span style={{ color: "var(--rose)", flexShrink: 0 }}>→</span> {r}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
       )}
-      <button onClick={() => setFeedback("up")}
-        className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${feedback === "up" ? "bg-[#E5E5EA] text-[#1A2138]" : "bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#8A8579]"}`}>
-        👍
-      </button>
-      <button onClick={() => setFeedback("down")}
-        className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${feedback === "down" ? "bg-[#E5E5EA] text-[#1A2138]" : "bg-[#F5F5F7] hover:bg-[#E5E5EA] text-[#8A8579]"}`}>
-        👎
-      </button>
+    </div>
+  );
+}
+
+function CheckinBanner({ sprintNom, onDismiss, onStart }: {
+  sprintNom: string;
+  onDismiss: () => void;
+  onStart: () => void;
+}) {
+  return (
+    <div style={{
+      margin: "0 12px 8px",
+      padding: "12px 14px",
+      borderRadius: 16,
+      background: "var(--rose-soft)",
+      border: "1px solid var(--rose-border)",
+      display: "flex", alignItems: "center", gap: 10,
+    }}>
+      <div style={{
+        width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+        background: "var(--rose)", display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 15,
+      }}>
+        📋
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: "var(--rose-hover)", margin: "0 0 2px" }}>Check-in suggéré</p>
+        <p style={{ fontSize: 11, color: "var(--rose-hover)", opacity: 0.8, margin: 0, lineHeight: 1.4 }}>
+          Sprint <strong>{sprintNom}</strong> en cours
+        </p>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+        <button onClick={onStart} style={{
+          fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 9,
+          background: "var(--rose)", color: "#fff", border: "none", cursor: "pointer",
+          boxShadow: "var(--shadow-rose)", transition: "all 0.15s",
+        }}>
+          Lancer
+        </button>
+        <button onClick={onDismiss} style={{
+          fontSize: 11, fontWeight: 600, padding: "6px 10px", borderRadius: 9,
+          background: "rgba(212,83,126,0.12)", color: "var(--rose-hover)", border: "none", cursor: "pointer",
+          transition: "all 0.15s",
+        }}>
+          Ignorer
+        </button>
+      </div>
     </div>
   );
 }
 
 const STORAGE_KEY = (id: string) => `linkeo_chat_${id}`;
+const CHECKIN_KEY = (id: string) => `lk_checkin_${id}`;
 
 const WELCOME_MSG = (titre: string): Message => ({
   role: "assistant",
-  content: `Bonjour ! Je suis **Linkeo**, ton chef de projet IA.\n\nJe prends en charge **${titre}**. Je peux structurer ton MVP, générer une roadmap, identifier les risques ou prioriser ton backlog avec MoSCoW.\n\nPar où on commence ?`,
+  content: `Bonjour ! Je suis **Linkeo**, ton chef de projet IA.\n\nJe prends en charge **${titre}**. Je peux cadrer ton MVP, générer une roadmap, identifier les risques ou faire un check-in sprint.\n\nPar où on commence ?`,
 });
 
-export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGenerated }: Props) {
+// ── Composant principal ──────────────────────────────────────────────────────
+
+export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGenerated, activeSprint, healthData }: Props) {
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window === "undefined") return [WELCOME_MSG(projectTitre)];
     try {
@@ -204,28 +357,26 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
     } catch { /* ignore */ }
     return [WELCOME_MSG(projectTitre)];
   });
-  const [answeredIdx, setAnsweredIdx] = useState<Set<number>>(new Set());
-  const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
+  const [answeredIdx, setAnsweredIdx]     = useState<Set<number>>(new Set());
+  const [input, setInput]                 = useState("");
+  const [streaming, setStreaming]         = useState(false);
   const [roadmapLoading, setRoadmapLoading] = useState(false);
-  const [ficheLoading, setFicheLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [ficheLoading, setFicheLoading]   = useState(false);
+  const [showCheckinBanner, setShowCheckinBanner] = useState(false);
+  const [error, setError]                 = useState<string | null>(null);
+  const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const checkinRef  = useRef(false);
 
-  // Persist conversation to localStorage
+  const QUICK_ACTIONS = buildQuickActions(activeSprint);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem(STORAGE_KEY(projectId), JSON.stringify(messages));
-    } catch { /* ignore */ }
+    try { localStorage.setItem(STORAGE_KEY(projectId), JSON.stringify(messages)); } catch { /* ignore */ }
   }, [messages, projectId]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streaming]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, streaming]);
 
-  // Auto-resize textarea
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -233,11 +384,21 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
     ta.style.height = Math.min(ta.scrollHeight, 96) + "px";
   }, [input]);
 
+  useEffect(() => {
+    if (checkinRef.current || !activeSprint || messages.length > 1) return;
+    const lastCheckin = localStorage.getItem(CHECKIN_KEY(projectId));
+    if (lastCheckin && (Date.now() - new Date(lastCheckin).getTime()) / 86_400_000 < 7) return;
+    checkinRef.current = true;
+    setShowCheckinBanner(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function clearHistory() {
-    const fresh = [WELCOME_MSG(projectTitre)];
-    setMessages(fresh);
+    setMessages([WELCOME_MSG(projectTitre)]);
     setAnsweredIdx(new Set());
     setError(null);
+    setShowCheckinBanner(false);
+    checkinRef.current = false;
     try { localStorage.removeItem(STORAGE_KEY(projectId)); } catch { /* ignore */ }
   }
 
@@ -249,56 +410,63 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || streaming) return;
     setError(null);
-
+    setShowCheckinBanner(false);
     if (content === "ROADMAP") { await generateRoadmap(); return; }
     if (content === "FICHE")   { await generateFiche();   return; }
+    if (content === "SCOPE")   { await generateScope();   return; }
+    if (content === "CHECK_IN") {
+      if (activeSprint) {
+        localStorage.setItem(CHECKIN_KEY(projectId), new Date().toISOString());
+        await doSend(`📋 Check-in — ${activeSprint.nom}${activeSprint.objectif ? `\nObjectif : ${activeSprint.objectif}` : ""}\n\nFais un point complet sur ce sprint : avancement des tâches, risques identifiés, et ta recommandation pour la suite.`);
+      }
+      return;
+    }
+    await doSend(content);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, streaming, projectId, activeSprint]);
 
+  async function doSend(content: string) {
     const userMsg: Message = { role: "user", content };
     const newMessages: Message[] = [...messages, userMsg];
     setMessages([...newMessages, { role: "assistant", content: "" }]);
     setInput("");
     setStreaming(true);
 
+    const healthCtx = healthData
+      ? `\n\n[SANTÉ PROJET: score=${healthData.score}/100 (${healthData.label}). ${healthData.indicators.map(i => `${i.label}=${i.value}`).join(", ")}. ${healthData.recommendations.length ? `Actions suggérées: ${healthData.recommendations.join("; ")}` : ""}]`
+      : "";
+
+    const withCtx = newMessages.map((m, i) =>
+      i === 0 && m.role === "user" && healthCtx ? { ...m, content: m.content + healthCtx } : m
+    );
+
     try {
       const token = await getToken();
       const res = await fetch("/api/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ messages: newMessages, projectId }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ messages: withCtx, projectId }),
       });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Erreur serveur");
-      }
+      if (!res.ok) throw new Error((await res.json()).error ?? "Erreur serveur");
 
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
-      let accumulated = "";
-
+      let acc = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const text = decoder.decode(value, { stream: true });
-        const lines = text.split("\n");
-        for (const line of lines) {
+        for (const line of decoder.decode(value, { stream: true }).split("\n")) {
           if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6).trim();
-          if (data === "[DONE]") break;
+          const raw = line.slice(6).trim();
+          if (raw === "[DONE]") break;
           try {
-            const parsed = JSON.parse(data);
-            if (parsed.error) throw new Error(parsed.error);
-            if (parsed.token) {
-              accumulated += parsed.token;
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { role: "assistant", content: accumulated };
-                return updated;
-              });
+            const p = JSON.parse(raw);
+            if (p.error) throw new Error(p.error);
+            if (p.token) {
+              acc += p.token;
+              setMessages(prev => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content: acc }; return u; });
             }
-          } catch (e) {
-            if ((e as Error).message !== "Unexpected token") throw e;
-          }
+          } catch (e) { if ((e as Error).message !== "Unexpected token") throw e; }
         }
       }
     } catch (e) {
@@ -307,8 +475,7 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
     } finally {
       setStreaming(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, streaming, projectId]);
+  }
 
   function handleFormSubmit(msgIdx: number, answers: string) {
     setAnsweredIdx(prev => new Set(prev).add(msgIdx));
@@ -316,11 +483,8 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
   }
 
   function handleRegenerate() {
-    const lastUser = [...messages].reverse().find(m => m.role === "user");
-    if (lastUser) {
-      setMessages(prev => prev.slice(0, -2));
-      setTimeout(() => sendMessage(lastUser.content), 50);
-    }
+    const last = [...messages].reverse().find(m => m.role === "user");
+    if (last) { setMessages(prev => prev.slice(0, -2)); setTimeout(() => sendMessage(last.content), 50); }
   }
 
   async function generateRoadmap() {
@@ -328,29 +492,15 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
     setMessages(prev => [...prev, { role: "user", content: "Génère une roadmap de sprints pour mon projet." }]);
     try {
       const token = await getToken();
-      const res = await fetch("/api/ai/roadmap", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ projectId }),
-      });
+      const res  = await fetch("/api/ai/roadmap", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ projectId }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
-
       const sprints: RoadmapSprint[] = data.sprints ?? [];
-      const preview = sprints.map((s, i) =>
-        `**Sprint ${i + 1} — ${s.nom}**\n_${s.objectif}_\n${s.taches.map(t => `• ${t}`).join("\n")}`
-      ).join("\n\n");
-
-      setMessages(prev => [...prev, {
-        role: "assistant",
-        content: `Voici ta roadmap générée ✨\n\n${preview}\n\n${onRoadmapGenerated ? "✅ J'ai ajouté ces sprints à ton projet !" : ""}`,
-      }]);
+      const preview = sprints.map((s, i) => `**Sprint ${i + 1} — ${s.nom}**\n_${s.objectif}_\n${s.taches.map(t => `• ${t}`).join("\n")}`).join("\n\n");
+      setMessages(prev => [...prev, { role: "assistant", content: `Voici ta roadmap ✨\n\n${preview}\n\n${onRoadmapGenerated ? "✅ Sprints ajoutés à ton projet !" : ""}` }]);
       onRoadmapGenerated?.(sprints);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setRoadmapLoading(false);
-    }
+    } catch (e) { setError((e as Error).message); }
+    finally { setRoadmapLoading(false); }
   }
 
   async function generateFiche() {
@@ -358,21 +508,39 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
     setMessages(prev => [...prev, { role: "user", content: "Génère une fiche projet optimisée pour attirer les bons développeurs." }]);
     try {
       const token = await getToken();
-      const res = await fetch("/api/ai/fiche", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ idee: projectTitre }),
-      });
+      const res  = await fetch("/api/ai/fiche", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ idee: projectTitre }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
+      setMessages(prev => [...prev, { role: "assistant", content: `Fiche optimisée ✨\n\n**Titre :** ${data.titre}\n\n**Description :** ${data.description}\n\n**Stack :** ${data.stack_souhaitee}\n\n**MVP :**\n${(data.fonctionnalites_mvp ?? []).map((f: string) => `• ${f}`).join("\n")}\n\n**Profil dev :** ${data.profil_dev_ideal}` }]);
+    } catch (e) { setError((e as Error).message); }
+    finally { setFicheLoading(false); }
+  }
 
-      const content = `Voici ta fiche projet optimisée ✨\n\n**Titre :** ${data.titre}\n\n**Description :** ${data.description}\n\n**Stack recommandée :** ${data.stack_souhaitee}\n\n**Fonctionnalités MVP :**\n${(data.fonctionnalites_mvp ?? []).map((f: string) => `• ${f}`).join("\n")}\n\n**Profil dev idéal :** ${data.profil_dev_ideal}`;
-      setMessages(prev => [...prev, { role: "assistant", content }]);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setFicheLoading(false);
-    }
+  async function generateScope() {
+    setMessages(prev => [...prev, { role: "user", content: "Je veux cadrer le MVP de mon projet." }]);
+    setStreaming(true);
+    setInput("");
+    const scopePrompt = `L'utilisateur veut cadrer le MVP de son projet. Pose-lui exactement 5 questions clés pour construire le cahier des charges MVP, dans cet ordre :\n1. Quel est le problème principal que tu résous et pour qui ?\n2. Quelle est la fonctionnalité numéro 1 sans laquelle le produit n'a pas de valeur ?\n3. Qui sont tes concurrents directs et quelle est ta différenciation ?\n4. Quelle est ta cible d'utilisateurs pour le lancement (volume, profil) ?\n5. Quelle est ta contrainte principale : délai, budget, ou ressources techniques ?\nFormule chaque question de façon concise sur une ligne distincte, se terminant par un point d'interrogation. Pas d'explication, juste les 5 questions numérotées.`;
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/ai/chat", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ messages: [{ role: "user", content: scopePrompt }], projectId }) });
+      if (!res.ok) throw new Error("Erreur serveur");
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        for (const line of decoder.decode(value, { stream: true }).split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (raw === "[DONE]") break;
+          try { const p = JSON.parse(raw); if (p.token) { acc += p.token; setMessages(prev => { const u = [...prev]; u[u.length - 1] = { role: "assistant", content: acc }; return u; }); } } catch { /* ignore */ }
+        }
+      }
+    } catch (e) { setError((e as Error).message); setMessages(prev => prev.slice(0, -1)); }
+    finally { setStreaming(false); }
   }
 
   const isLoading = streaming || roadmapLoading || ficheLoading;
@@ -380,76 +548,221 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
   return (
     <>
       <style>{`
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-        .animate-blink { animation: blink 1s step-end infinite; }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-        .msg-fade { animation: fadeUp 200ms ease forwards; }
+        @keyframes lk-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        @keyframes lk-bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
+        @keyframes lk-fade-up { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        .msg-fade { animation: lk-fade-up 0.2s ease forwards; }
+        .ai-msg:hover .msg-actions { opacity: 1 !important; }
       `}</style>
 
-      <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:p-4 bg-black/40">
-        <div className="w-full sm:max-w-lg bg-white sm:rounded-2xl flex flex-col shadow-2xl" style={{ height: "85vh" }}>
+      {/* Overlay */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed", inset: 0, zIndex: 50,
+          background: "rgba(17,17,24,0.45)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+        }}
+      />
 
-          {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E5EA] shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-[#1A2138] flex items-center justify-center text-white text-sm font-bold shrink-0">✦</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-[#1A2138]">Linkeo · Chef de projet IA</p>
-              <p className="text-xs text-[#8A8579] truncate">{projectTitre}</p>
+      {/* Panel */}
+      <div style={{
+        position: "fixed", zIndex: 51,
+        bottom: 0, left: 0, right: 0,
+        display: "flex", alignItems: "flex-end", justifyContent: "center",
+        padding: "0 0 env(safe-area-inset-bottom,0px)",
+        pointerEvents: "none",
+      }}>
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            width: "100%", maxWidth: 520,
+            height: "88vh",
+            background: "#ffffff",
+            borderRadius: "28px 28px 0 0",
+            boxShadow: "0 -8px 40px rgba(17,17,24,0.12), 0 -2px 12px rgba(17,17,24,0.06)",
+            display: "flex", flexDirection: "column",
+            overflow: "hidden",
+            pointerEvents: "all",
+            border: "1px solid var(--border)",
+            borderBottom: "none",
+          }}
+        >
+          {/* ── Header ── */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "16px 16px 14px",
+            borderBottom: "1px solid var(--border)",
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            flexShrink: 0,
+          }}>
+            {/* AI avatar */}
+            <div style={{
+              width: 36, height: 36, borderRadius: 12, flexShrink: 0,
+              background: "var(--rose)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontSize: 16, fontWeight: 800,
+              boxShadow: "0 2px 10px rgba(212,83,126,0.30)",
+            }}>
+              ✦
             </div>
-            <button onClick={clearHistory} title="Nouvelle conversation" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F7] text-[#8A8579] hover:text-[#1A2138] transition-colors text-sm">↺</button>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F7] text-[#8A8579] hover:text-[#1A2138] transition-colors text-lg">✕</button>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", margin: 0, letterSpacing: "-0.02em" }}>
+                Linkeo{" "}
+                <span style={{
+                  fontSize: 11, fontWeight: 600,
+                  color: "var(--rose)",
+                  letterSpacing: 0,
+                }}>
+                  · IA
+                </span>
+              </p>
+              <p style={{ fontSize: 11, color: "var(--muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
+                {projectTitre}
+              </p>
+            </div>
+
+            {/* Health badge */}
+            {healthData && <HealthBadge data={healthData} />}
+
+            {/* Reset */}
+            <button onClick={clearHistory} title="Nouvelle conversation"
+              style={{
+                width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 9, background: "transparent", border: "1px solid var(--border)",
+                color: "var(--muted)", cursor: "pointer", fontSize: 16, flexShrink: 0,
+                transition: "all 0.14s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bg)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; }}
+            >
+              ↺
+            </button>
+
+            {/* Close */}
+            <button onClick={onClose}
+              style={{
+                width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: 9, background: "transparent", border: "1px solid var(--border)",
+                color: "var(--muted)", cursor: "pointer", fontSize: 18, flexShrink: 0,
+                transition: "all 0.14s",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "var(--red-soft)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--red)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--red-border)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)"; (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; }}
+            >
+              ✕
+            </button>
           </div>
 
-          {/* Quick actions */}
-          <div className="px-4 py-2.5 border-b border-[#E5E5EA] flex gap-2 overflow-x-auto scrollbar-hide shrink-0">
+          {/* ── Quick actions ── */}
+          <div style={{
+            padding: "10px 14px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex", gap: 6,
+            overflowX: "auto", flexShrink: 0,
+            msOverflowStyle: "none", scrollbarWidth: "none",
+          }}>
             {QUICK_ACTIONS.map((a) => (
               <button key={a.label} onClick={() => sendMessage(a.prompt)} disabled={isLoading}
-                className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border border-[#E5E5EA] bg-white text-[#8A8579] hover:border-[#1A2138] hover:text-[#1A2138] transition-all disabled:opacity-40">
+                style={{
+                  flexShrink: 0, fontSize: 12, fontWeight: 600,
+                  padding: "6px 13px", borderRadius: 100,
+                  border: "1px solid var(--border-2)",
+                  background: "#fff",
+                  color: "var(--text-2)",
+                  cursor: isLoading ? "not-allowed" : "pointer",
+                  opacity: isLoading ? 0.38 : 1,
+                  transition: "all 0.14s",
+                  boxShadow: "var(--shadow-xs)",
+                  whiteSpace: "nowrap",
+                  letterSpacing: "-0.01em",
+                }}
+                onMouseEnter={e => { if (!isLoading) { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--rose-border)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--rose-hover)"; (e.currentTarget as HTMLButtonElement).style.background = "var(--rose-soft)"; } }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-2)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text-2)"; (e.currentTarget as HTMLButtonElement).style.background = "#fff"; }}
+              >
                 {a.label}
               </button>
             ))}
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-4">
+          {/* ── Check-in banner ── */}
+          {showCheckinBanner && activeSprint && (
+            <div style={{ padding: "8px 12px 0", flexShrink: 0 }}>
+              <CheckinBanner
+                sprintNom={activeSprint.nom}
+                onDismiss={() => { setShowCheckinBanner(false); localStorage.setItem(CHECKIN_KEY(projectId), new Date().toISOString()); }}
+                onStart={() => { setShowCheckinBanner(false); sendMessage("CHECK_IN"); }}
+              />
+            </div>
+          )}
+
+          {/* ── Messages ── */}
+          <div style={{
+            flex: 1, overflowY: "auto",
+            padding: "16px 14px",
+            display: "flex", flexDirection: "column", gap: 16,
+            msOverflowStyle: "none", scrollbarWidth: "none",
+          }}>
             {messages.map((msg, i) => {
-              const isAssistant = msg.role === "assistant";
-              const isStreamingThis = streaming && i === messages.length - 1 && isAssistant;
-              const questions = isAssistant ? extractQuestions(msg.content) : [];
+              const isAI = msg.role === "assistant";
+              const isStreamingThis = streaming && i === messages.length - 1 && isAI;
+              const questions = isAI ? extractQuestions(msg.content) : [];
               const { suggestions } = extractSuggestions(msg.content);
               const showForm = questions.length >= 2 && !answeredIdx.has(i) && i === messages.length - 1 && !isLoading;
-              const showSuggestions = suggestions.length > 0 && !isStreamingThis && i === messages.length - 1 && !isLoading;
-              const isLastAssistant = isAssistant && i === messages.length - 1;
+              const showSugg = suggestions.length > 0 && !isStreamingThis && i === messages.length - 1 && !isLoading;
 
               return (
-                <div key={i} className="flex flex-col msg-fade group">
-                  <div className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    {isAssistant && (
-                      <div className="w-6 h-6 rounded-lg bg-[#1A2138] flex items-center justify-center text-white text-xs font-bold shrink-0 mr-2 mt-1">✦</div>
+                <div key={i} className={`flex flex-col msg-fade${isAI ? " ai-msg" : ""}`}>
+                  <div style={{ display: "flex", justifyContent: isAI ? "flex-start" : "flex-end" }}>
+
+                    {/* AI avatar */}
+                    {isAI && (
+                      <div style={{
+                        width: 28, height: 28, borderRadius: 9, flexShrink: 0, marginRight: 8, marginTop: 2,
+                        background: "var(--rose)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        color: "#fff", fontSize: 12, fontWeight: 800,
+                        boxShadow: "0 1px 6px rgba(212,83,126,0.22)",
+                      }}>
+                        ✦
+                      </div>
                     )}
-                    <div className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                      msg.role === "user"
-                        ? "bg-[#D4537E] text-white rounded-br-md"
-                        : "bg-[#F5F5F7] text-[#1A2138] rounded-bl-md border border-[#E5E5EA]"
-                    }`}>
-                      {isAssistant ? (
-                        <MdMessage content={msg.content} streaming={isStreamingThis} />
-                      ) : (
-                        <span className="whitespace-pre-wrap">{msg.content}</span>
-                      )}
+
+                    {/* Bubble */}
+                    <div style={{
+                      maxWidth: "82%",
+                      padding: isAI ? "12px 14px" : "10px 14px",
+                      borderRadius: isAI ? "18px 18px 18px 4px" : "18px 18px 4px 18px",
+                      ...(isAI
+                        ? {
+                            background: "#ffffff",
+                            border: "1px solid var(--border)",
+                            boxShadow: "var(--shadow-sm)",
+                          }
+                        : {
+                            background: "var(--rose)",
+                            color: "#fff",
+                            boxShadow: "var(--shadow-rose)",
+                          }
+                      ),
+                    }}>
+                      {isAI
+                        ? <MdMessage content={msg.content} streaming={isStreamingThis} />
+                        : <span style={{ fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{msg.content}</span>
+                      }
                     </div>
                   </div>
 
-                  {/* Actions au hover */}
-                  {isAssistant && msg.content && !isStreamingThis && (
-                    <MessageActions
-                      content={msg.content}
-                      onRegenerate={handleRegenerate}
-                      isLast={isLastAssistant}
-                    />
+                  {/* Actions hover */}
+                  {isAI && msg.content && !isStreamingThis && (
+                    <MessageActions content={msg.content} onRegenerate={handleRegenerate} isLast={i === messages.length - 1} />
                   )}
 
-                  {/* Formulaire questions */}
+                  {/* Question form */}
                   {showForm && (
                     <QuestionForm
                       questions={questions}
@@ -458,12 +771,21 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
                     />
                   )}
 
-                  {/* Suggestions cliquables */}
-                  {showSuggestions && (
-                    <div className="ml-8 mt-2 flex flex-wrap gap-2">
+                  {/* Suggestions */}
+                  {showSugg && (
+                    <div style={{ marginTop: 8, marginLeft: 36, display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {suggestions.map((s, si) => (
                         <button key={si} onClick={() => sendMessage(s)} disabled={isLoading}
-                          className="text-xs px-3 py-1.5 rounded-full border border-[#E5E5EA] text-[#1A2138] bg-white hover:bg-[#F5F5F7] hover:border-[#1A2138] transition-all disabled:opacity-40">
+                          style={{
+                            fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: 100,
+                            border: "1px solid var(--border-2)", background: "#fff",
+                            color: "var(--text-2)", cursor: "pointer",
+                            boxShadow: "var(--shadow-xs)", transition: "all 0.14s",
+                            letterSpacing: "-0.01em",
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--rose-border)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--rose-hover)"; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-2)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--text-2)"; }}
+                        >
                           {s}
                         </button>
                       ))}
@@ -473,49 +795,109 @@ export default function AIPanel({ projectId, projectTitre, onClose, onRoadmapGen
               );
             })}
 
+            {/* Typing dots */}
             {(roadmapLoading || ficheLoading) && (
-              <div className="flex justify-start msg-fade">
-                <div className="w-6 h-6 rounded-lg bg-[#1A2138] flex items-center justify-center text-white text-xs font-bold shrink-0 mr-2 mt-1">✦</div>
-                <div className="bg-[#F5F5F7] border border-[#E5E5EA] px-4 py-3 rounded-2xl rounded-bl-md flex gap-1 items-center">
-                  <span className="w-1.5 h-1.5 bg-[#8A8579] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 bg-[#8A8579] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 bg-[#8A8579] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }} className="msg-fade">
+                <div style={{
+                  width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+                  background: "var(--rose)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff", fontSize: 12, fontWeight: 800,
+                }}>
+                  ✦
+                </div>
+                <div style={{
+                  padding: "12px 16px", borderRadius: "18px 18px 18px 4px",
+                  background: "#fff", border: "1px solid var(--border)",
+                  boxShadow: "var(--shadow-sm)",
+                  display: "flex", gap: 5, alignItems: "center",
+                }}>
+                  {[0, 150, 300].map((d) => (
+                    <span key={d} style={{
+                      width: 6, height: 6, borderRadius: "50%",
+                      background: "var(--muted)",
+                      animation: `lk-bounce 1.2s ease-in-out ${d}ms infinite`,
+                      display: "inline-block",
+                    }} />
+                  ))}
                 </div>
               </div>
             )}
 
+            {/* Error */}
             {error && (
-              <div className="text-xs text-[#D4537E] bg-white border border-[#D4537E] rounded-xl px-3 py-2 text-center">
-                ❌ {error}
+              <div style={{
+                fontSize: 12, color: "var(--red)", background: "var(--red-soft)",
+                border: "1px solid var(--red-border)", borderRadius: 12,
+                padding: "10px 14px", textAlign: "center",
+              }}>
+                ⚠️ {error}
               </div>
             )}
 
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
-          <div className="px-4 py-3 border-t border-[#E5E5EA] shrink-0">
-            <div className="flex gap-2 items-end">
+          {/* ── Input ── */}
+          <div style={{
+            padding: "12px 14px 14px",
+            borderTop: "1px solid var(--border)",
+            background: "#fff",
+            flexShrink: 0,
+          }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
               <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-                placeholder="Ou écris directement à Linkeo..."
+                placeholder="Écris à Linkeo…"
                 rows={1}
                 disabled={isLoading}
-                className="flex-1 resize-none border border-[#E5E5EA] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#D4537E] transition-colors disabled:opacity-50 overflow-hidden"
-                style={{ minHeight: 40, maxHeight: 96 }}
+                style={{
+                  flex: 1, resize: "none",
+                  padding: "11px 14px",
+                  border: "1px solid var(--border-2)",
+                  borderRadius: 14, fontSize: 14,
+                  color: "var(--text)", background: "var(--bg)",
+                  outline: "none",
+                  transition: "border-color 0.15s, box-shadow 0.15s",
+                  minHeight: 42, maxHeight: 96,
+                  overflow: "hidden",
+                  lineHeight: 1.5,
+                  fontFamily: "inherit",
+                  boxShadow: "var(--shadow-xs)",
+                  letterSpacing: "-0.01em",
+                  opacity: isLoading ? 0.5 : 1,
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = "var(--rose)"; e.currentTarget.style.boxShadow = "0 0 0 3px var(--rose-soft), var(--shadow-xs)"; }}
+                onBlur={e => { e.currentTarget.style.borderColor = "var(--border-2)"; e.currentTarget.style.boxShadow = "var(--shadow-xs)"; }}
               />
               <button
                 onClick={() => sendMessage(input)}
                 disabled={!input.trim() || isLoading}
-                className="w-10 h-10 rounded-xl bg-[#1A2138] hover:bg-[#2A3252] disabled:opacity-40 flex items-center justify-center text-white transition-colors shrink-0"
+                style={{
+                  width: 42, height: 42, borderRadius: 13, flexShrink: 0,
+                  background: !input.trim() || isLoading
+                    ? "var(--bg)"
+                    : "var(--rose)",
+                  border: !input.trim() || isLoading ? "1px solid var(--border-2)" : "none",
+                  color: !input.trim() || isLoading ? "var(--subtle)" : "#fff",
+                  cursor: !input.trim() || isLoading ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.16s cubic-bezier(0.34,1.26,0.64,1)",
+                  boxShadow: !input.trim() || isLoading ? "none" : "var(--shadow-rose)",
+                }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z" /></svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z" /></svg>
               </button>
             </div>
-            <p className="text-[10px] text-[#8A8579]/60 text-center mt-2">Linkeo · Chef de projet IA · Propulsé par Claude</p>
+            <p style={{
+              fontSize: 10, color: "var(--subtle)", textAlign: "center",
+              marginTop: 8, letterSpacing: "0.02em",
+            }}>
+              Linkeo · Chef de projet IA · Propulsé par Claude
+            </p>
           </div>
         </div>
       </div>

@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AppNav from "@/components/AppNav";
 import { generateMatchPdf } from "@/lib/generateMatchPdf";
-import { ArrowLeft, Download, PenLine, CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, Download, PenLine, CheckCircle2, Clock, AlertCircle, CreditCard, ShieldAlert } from "lucide-react";
 
 type ContractData = {
   projet: { id: string; titre: string; description?: string; stack_souhaitee?: string; deadline?: string };
@@ -20,6 +20,20 @@ type Contract = {
   founder_signed_at: string | null; founder_signed_name: string | null;
   dev_signed_at: string | null;    dev_signed_name: string | null;
   created_at: string;
+};
+
+type Payment = {
+  id: string;
+  status: string;
+  amount: number;
+  dev_amount: number;
+  dev_user_id: string | null;
+};
+
+type Dispute = {
+  id: string;
+  status: string;
+  reason: string;
 };
 
 function fmtDate(iso: string) {
@@ -38,6 +52,12 @@ export default function ContratPage() {
   const [loading, setLoading]   = useState(true);
   const [signing, setSigning]   = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [payment, setPayment]         = useState<Payment | null>(null);
+  const [dispute, setDispute]         = useState<Dispute | null>(null);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeReason, setDisputeReason]       = useState("");
+  const [openingDispute, setOpeningDispute]      = useState(false);
+  const [disputeError, setDisputeError]          = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -49,10 +69,58 @@ export default function ContratPage() {
       const { data: c } = await supabase.from("contracts").select("*").eq("id", id).maybeSingle();
       if (!c) { router.push("/profil"); return; }
       setContract(c as Contract);
+
+      // Charger le paiement associé au projet
+      const { data: pay } = await supabase
+        .from("payments")
+        .select("id, status, amount, dev_amount, dev_user_id")
+        .eq("project_id", (c as Contract).project_id)
+        .maybeSingle();
+      if (pay) {
+        setPayment(pay as Payment);
+        // Charger un éventuel litige
+        const { data: disp } = await supabase
+          .from("disputes")
+          .select("id, status, reason")
+          .eq("payment_id", pay.id)
+          .maybeSingle();
+        if (disp) setDispute(disp as Dispute);
+      }
+
       setLoading(false);
     }
     load();
   }, [id, router]);
+
+  async function openDispute() {
+    if (!payment || !contract || !disputeReason.trim() || openingDispute) return;
+    setOpeningDispute(true);
+    setDisputeError(null);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) { setOpeningDispute(false); return; }
+    const res = await fetch("/api/disputes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({
+        projectId: contract.project_id,
+        paymentId: payment.id,
+        devUserId: payment.dev_user_id,
+        reason: disputeReason.trim(),
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setDispute(data.dispute ?? { id: "", status: "open", reason: disputeReason.trim() });
+      setPayment((prev) => prev ? { ...prev, status: "disputed" } : prev);
+      setShowDisputeModal(false);
+      setDisputeReason("");
+      router.push("/messages");
+    } else {
+      const data = await res.json().catch(() => null);
+      setDisputeError(data?.details?.[0] ?? data?.error ?? "Impossible d'ouvrir le litige.");
+    }
+    setOpeningDispute(false);
+  }
 
   async function handleSign() {
     if (!contract || !userId || signing) return;
@@ -351,8 +419,118 @@ export default function ContratPage() {
               </div>
             </div>
           )}
+
+          {/* ── Bloc paiement (visible après les deux signatures) ── */}
+          {bothSigned && (
+            <>
+              {/* Pas encore payé — CTA founder */}
+              {!payment && isFounder && (
+                <div className="rounded-2xl px-5 py-4 flex flex-col gap-3"
+                  style={{ background: "#fff", border: "1px solid #ECE7DD" }}>
+                  <div className="flex items-center gap-3">
+                    <CreditCard size={18} strokeWidth={1.8} style={{ color: "#1A2138" }} />
+                    <div>
+                      <p className="text-sm font-bold" style={{ color: "#1A2138" }}>Rémunérer le développeur</p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>Le paiement est sécurisé jusqu'à la livraison.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/projets/${contract?.project_id}/paiement`)}
+                    className="btn-primary w-full py-3.5 flex items-center justify-center gap-2"
+                    style={{ fontSize: 14 }}
+                  >
+                    <CreditCard size={15} strokeWidth={2} /> Effectuer le paiement
+                  </button>
+                </div>
+              )}
+
+              {/* Paiement existant */}
+              {payment && (
+                <div className="rounded-2xl px-5 py-4 flex flex-col gap-2"
+                  style={{
+                    background: payment.status === "disputed" ? "rgba(244,63,94,0.04)" : "rgba(16,185,129,0.04)",
+                    border: `1px solid ${payment.status === "disputed" ? "rgba(244,63,94,0.2)" : "rgba(16,185,129,0.18)"}`,
+                  }}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CreditCard size={15} strokeWidth={1.8} style={{ color: payment.status === "disputed" ? "var(--rose)" : "#059669" }} />
+                      <p className="text-sm font-bold" style={{ color: payment.status === "disputed" ? "var(--rose)" : "#059669" }}>
+                        {payment.status === "held"     ? "Paiement sécurisé"
+                          : payment.status === "released" ? "Paiement versé"
+                          : payment.status === "disputed" ? "Litige en cours"
+                          : "Paiement"}
+                      </p>
+                    </div>
+                    <p className="text-sm font-black" style={{ color: "#1A2138", fontVariantNumeric: "tabular-nums" }}>
+                      {payment.dev_amount} €
+                    </p>
+                  </div>
+                  {payment.status === "held" && (
+                    <p className="text-xs" style={{ color: "var(--muted)" }}>Fonds bloqués — seront versés à la livraison.</p>
+                  )}
+                  {payment.status === "released" && (
+                    <p className="text-xs" style={{ color: "#059669" }}>Les fonds ont été versés au développeur.</p>
+                  )}
+                  {payment.status === "disputed" && dispute && (
+                    <p className="text-xs" style={{ color: "var(--rose)" }}>Motif : {dispute.reason}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Bouton ouvrir litige */}
+              {isFounder && payment?.status === "held" && !dispute && (
+                <button
+                  onClick={() => setShowDisputeModal(true)}
+                  className="btn-ghost w-full py-3 flex items-center justify-center gap-2 text-sm"
+                  style={{ color: "var(--rose)", borderColor: "rgba(244,63,94,0.25)" }}
+                >
+                  <ShieldAlert size={15} strokeWidth={2} /> Ouvrir un litige
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
+
+      {/* Modal litige */}
+      {showDisputeModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)" }}>
+          <div className="card w-full max-w-sm p-6 flex flex-col gap-4">
+            <div>
+              <h2 className="text-lg font-black mb-1.5" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>
+                Ouvrir un litige
+              </h2>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--muted)" }}>
+                Décris le motif du litige. Notre équipe examinera la situation.
+              </p>
+            </div>
+            <textarea
+              value={disputeReason}
+              onChange={(e) => setDisputeReason(e.target.value)}
+              placeholder="Ex : Le dev n'a pas livré ce qui était convenu..."
+              rows={4}
+              maxLength={1000}
+              style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid #ECE7DD", background: "#FAF8F4", fontSize: 13, fontWeight: 500, outline: "none", resize: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+            />
+            {disputeError && (
+              <p style={{ fontSize: 12, color: "#D4537E", margin: 0 }}>{disputeError}</p>
+            )}
+            <button
+              onClick={openDispute}
+              disabled={openingDispute || !disputeReason.trim()}
+              className="btn-primary w-full py-3.5 flex items-center justify-center gap-2"
+              style={{ fontSize: 15 }}
+            >
+              <ShieldAlert size={15} strokeWidth={2} />
+              {openingDispute ? "Envoi en cours..." : "Soumettre le litige"}
+            </button>
+            <button onClick={() => { setShowDisputeModal(false); setDisputeReason(""); }} className="btn-ghost w-full py-3">
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal confirmation */}
       {showConfirm && (

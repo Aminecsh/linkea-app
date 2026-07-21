@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getAuthUser } from "@/lib/auth";
+import { validateProjectFile } from "@/lib/fileUpload";
 import AppNav from "@/components/AppNav";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import {
@@ -197,19 +199,19 @@ export default function ChatPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) { router.push("/connexion"); return; }
       setUserId(user.id);
 
-      const { data: roleData } = await supabase
-        .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+      // Parallel: role + conversation
+      const [{ data: roleData }, { data: conv }] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
+        supabase.from("conversations")
+          .select("id, project_id, is_group, group_name, projects(titre, statut), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
+          .eq("id", id).maybeSingle(),
+      ]);
       const r = roleData?.role ?? null;
       setRole(r);
-
-      const { data: conv } = await supabase
-        .from("conversations")
-        .select("id, project_id, is_group, group_name, projects(titre, statut), profiles_founder(nom, user_id), profiles_developer(nom, user_id)")
-        .eq("id", id).maybeSingle();
 
       if (!conv) { router.push("/messages"); return; }
       const convTyped = conv as unknown as Conversation;
@@ -353,10 +355,11 @@ export default function ChatPage() {
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !userId) return;
+    const check = validateProjectFile(file);
+    if (!check.ok) { e.target.value = ""; alert(check.error); return; }
     setUploading(true);
 
-    const ext  = file.name.split(".").pop();
-    const path = `${id}/${crypto.randomUUID()}.${ext}`;
+    const path = `${id}/${crypto.randomUUID()}.${check.ext}`;
 
     const { error } = await supabase.storage.from("chat-files").upload(path, file);
     if (error) { setUploading(false); return; }
@@ -872,7 +875,7 @@ export default function ChatPage() {
               )}
 
               <input
-                type="text" value={content} onChange={handleInput} placeholder="Message…"
+                type="text" value={content} onChange={handleInput} placeholder="Message…" maxLength={5000}
                 className="flex-1 text-sm" autoComplete="off"
                 style={{ background: "#ffffff", border: "1px solid rgba(0,0,0,0.10)", borderRadius: 20, padding: "10px 16px", outline: "none", color: "var(--text)", boxShadow: "0 1px 2px rgba(0,0,0,0.03)", fontFamily: "var(--font-sans)" }}
                 onFocus={(e) => { e.target.style.borderColor = "var(--rose)"; e.target.style.boxShadow = "0 0 0 3px rgba(244,63,94,0.10)"; }}

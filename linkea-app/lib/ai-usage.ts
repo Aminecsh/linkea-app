@@ -1,5 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 
+// Sonnet 4.6 ≈ $3/$15 par million de tokens (in/out) : 100k tokens ≈ max $1.5/mois/utilisateur.
+// Volontairement bas tant que le budget de test est de quelques dollars.
 export const MONTHLY_TOKEN_LIMIT = 100_000;
 
 export function currentMonth() {

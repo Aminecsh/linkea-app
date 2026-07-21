@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AppNav from "@/components/AppNav";
-import AIPanel, { type RoadmapSprint } from "@/components/AIPanel";
+import { validateProjectFile } from "@/lib/fileUpload";
+import AIPanel, { type RoadmapSprint, type HealthData } from "@/components/AIPanel";
 import { sendNotif } from "@/lib/notifications";
 import {
   Plus, Upload, LayoutGrid, List, CalendarRange, Folder,
@@ -187,8 +188,11 @@ export default function GestionPage() {
   const [editSprint, setEditSprint]   = useState("");
   const [editAssigne, setEditAssigne] = useState("");
 
-  // Modal sprint
+  // IA
   const [showAIPanel, setShowAIPanel] = useState(false);
+  const [healthData, setHealthData] = useState<HealthData | null>(null);
+
+  // Modal sprint
   const [showSprintModal, setShowSprintModal] = useState(false);
   const [sprintNom, setSprintNom]     = useState("");
   const [sprintObj, setSprintObj]     = useState("");
@@ -218,20 +222,26 @@ export default function GestionPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/connexion"); return; }
-      setUserId(user.id);
+      // getSession() is local — no network round-trip for auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) { router.push("/connexion"); return; }
+      const userId = session.user.id;
+      setUserId(userId);
 
-      const { data: roleData } = await supabase
-        .from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+      // Parallel: role + project + conversation (3 queries → 1 round-trip)
+      const [{ data: roleData }, { data: proj }, { data: conv }] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+        supabase.from("projects")
+          .select("titre, statut, profiles_founder(nom, user_id)")
+          .eq("id", projectId).maybeSingle(),
+        supabase.from("conversations")
+          .select("id, profiles_developer(nom, user_id)")
+          .eq("project_id", projectId).maybeSingle(),
+      ]);
+
       setRole(roleData?.role ?? null);
 
-      const { data: proj } = await supabase
-        .from("projects")
-        .select("titre, statut, profiles_founder(nom, user_id)")
-        .eq("id", projectId).maybeSingle();
-
-      if (!proj || !["matched","en_cours"].includes(proj.statut)) {
+      if (!proj || !["matched", "en_cours"].includes(proj.statut)) {
         router.push(`/projets/${projectId}`); return;
       }
       setProjectTitre(proj.titre);
@@ -239,16 +249,12 @@ export default function GestionPage() {
       const membersArr: Member[] = [];
       const fp = proj.profiles_founder as unknown as { nom: string; user_id: string } | null;
       if (fp) membersArr.push({ user_id: fp.user_id, nom: fp.nom, role: "founder" });
-
-      const { data: conv } = await supabase
-        .from("conversations")
-        .select("id, profiles_developer(nom, user_id)")
-        .eq("project_id", projectId).maybeSingle();
       const dp = conv?.profiles_developer as unknown as { nom: string; user_id: string } | null;
       if (dp) membersArr.push({ user_id: dp.user_id, nom: dp.nom, role: "developer" });
       if (conv?.id) setConvId(conv.id);
       setMembers(membersArr);
 
+      // Parallel: sprints + tasks + deliverables
       const [{ data: sprintsData }, { data: tasksData }, { data: deliData }] = await Promise.all([
         supabase.from("sprints").select("*").eq("project_id", projectId).order("date_debut"),
         supabase.from("tasks").select("*").eq("project_id", projectId).order("created_at"),
@@ -264,6 +270,15 @@ export default function GestionPage() {
       if (enCours) setSelectedSprintId(enCours.id);
 
       setLoading(false);
+
+      // Health score — non-blocking, uses already-available session token
+      if (session.access_token) {
+        fetch("/api/ai/health", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+          body: JSON.stringify({ projectId }),
+        }).then(r => r.ok ? r.json() : null).then(d => { if (d) setHealthData(d as HealthData); }).catch(() => {});
+      }
     }
     load();
   }, [projectId, router]);
@@ -454,6 +469,8 @@ export default function GestionPage() {
 
   function onFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
+    const check = validateProjectFile(file);
+    if (!check.ok) { e.target.value = ""; alert(check.error); return; }
     setPendingFile(file); setFileDesc("");
     setFileSprint(selectedSprintId === "all" ? (sprints[0]?.id ?? "") : selectedSprintId);
     setShowFileModal(true); e.target.value = "";
@@ -461,10 +478,11 @@ export default function GestionPage() {
 
   async function uploadFile() {
     if (!pendingFile || !userId) return;
+    const check = validateProjectFile(pendingFile);
+    if (!check.ok) { setUploadError(check.error); return; }
     setUploading(true);
     setUploadError(null);
-    const ext = pendingFile.name.split(".").pop();
-    const path = `${projectId}/${crypto.randomUUID()}.${ext}`;
+    const path = `${projectId}/${crypto.randomUUID()}.${check.ext}`;
     const { error: storageErr } = await supabase.storage.from("project-files").upload(path, pendingFile);
     if (storageErr) {
       setUploadError(storageErr.message);
@@ -588,10 +606,21 @@ export default function GestionPage() {
             )}
             <button
               onClick={() => setShowAIPanel(true)}
-              style={{ flexShrink: 0, width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 11, background: C.rose, color: "#fff", fontSize: 15, border: "none", cursor: "pointer" }}
+              style={{
+                flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6,
+                padding: healthData ? "0 10px 0 0" : "0",
+                width: healthData ? "auto" : 36, height: 36,
+                borderRadius: 11, background: C.rose, color: "#fff", fontSize: 15, border: "none", cursor: "pointer",
+              }}
               title="Assistant IA"
             >
-              ✦
+              <span style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>✦</span>
+              {healthData && (
+                <span style={{ fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: healthData.color, flexShrink: 0 }} />
+                  {healthData.score}
+                </span>
+              )}
             </button>
           </div>
 
@@ -1277,6 +1306,8 @@ export default function GestionPage() {
           projectTitre={projectTitre}
           onClose={() => setShowAIPanel(false)}
           onRoadmapGenerated={handleRoadmapGenerated}
+          activeSprint={sprints.find(s => s.statut === "en_cours")}
+          healthData={healthData ?? undefined}
         />
       )}
 

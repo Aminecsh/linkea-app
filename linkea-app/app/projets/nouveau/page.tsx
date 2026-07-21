@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AppNav from "@/components/AppNav";
 import React from "react";
-import { ArrowLeft, ArrowRight, AlertCircle, Plus, X, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, AlertCircle, Plus, X, Check, Sparkles, PenLine, Send } from "lucide-react";
+
+type ChatMessage = { role: "user" | "assistant"; content: string };
+
+const READY_MARKER = /\{"ready_for_fiche"\s*:\s*true\}/;
+
+function stripMarkdown(text: string): string {
+  return text.replace(/\*\*/g, "").replace(/^#+\s*/gm, "").replace(/^[-*]\s+/gm, "");
+}
 
 const STACKS = ["React", "Node.js", "Flutter", "Python", "Vue.js", "Laravel", "Swift", "Kotlin", "Next.js", "TypeScript"];
 
@@ -30,7 +38,17 @@ export default function NouveauProjet() {
   const [loading, setLoading]           = useState(true);
   const [saving, setSaving]             = useState(false);
   const [error, setError]               = useState("");
-  const [step, setStep]                 = useState<1 | 2>(1);
+  const [step, setStep]                 = useState<0 | 1 | 2>(0);
+
+  // Step 0 · Linkeo intake (chat guidé)
+  const [linkeoActive, setLinkeoActive] = useState(false);
+  const [messages, setMessages]         = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput]       = useState("");
+  const [streaming, setStreaming]       = useState(false);
+  const [readyForFiche, setReadyForFiche] = useState(false);
+  const [ficheLoading, setFicheLoading] = useState(false);
+  const [linkeoError, setLinkeoError]   = useState("");
+  const messagesEndRef                  = useRef<HTMLDivElement>(null);
 
   // Step 1
   const [titre, setTitre]               = useState("");
@@ -42,6 +60,7 @@ export default function NouveauProjet() {
   const [showCustom, setShowCustom]     = useState(false);
   const [dateDebut, setDateDebut]       = useState("");
   const [dateFin, setDateFin]           = useState("");
+  const [budget, setBudget]             = useState("");
 
   useEffect(() => {
     async function checkAccess() {
@@ -86,6 +105,140 @@ export default function NouveauProjet() {
     setStep(2);
   }
 
+  async function sendToLinkeo(text: string) {
+    if (!text.trim() || streaming) return;
+    const nextMessages = [...messages, { role: "user" as const, content: text.trim() }];
+    setMessages(nextMessages);
+    setChatInput("");
+    setStreaming(true);
+    setLinkeoError("");
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+        body: JSON.stringify({ messages: nextMessages }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Erreur serveur");
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+      if (reader) {
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const chunks = buffer.split("\n\n");
+          buffer = chunks.pop() ?? "";
+          for (const chunk of chunks) {
+            if (!chunk.startsWith("data: ")) continue;
+            const payload = chunk.slice(6);
+            if (payload === "[DONE]") continue;
+            const parsed = JSON.parse(payload);
+            if (parsed.error) throw new Error(parsed.error);
+            if (parsed.token) {
+              acc += parsed.token;
+              const snapshot = acc;
+              setMessages((prev) => {
+                const copy = [...prev];
+                copy[copy.length - 1] = { role: "assistant", content: snapshot };
+                return copy;
+              });
+            }
+          }
+        }
+      }
+
+      if (READY_MARKER.test(acc)) {
+        const cleaned = acc.replace(READY_MARKER, "").trim();
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = { role: "assistant", content: cleaned };
+          return copy;
+        });
+        setReadyForFiche(true);
+      }
+    } catch (e) {
+      setLinkeoError((e as Error).message);
+    } finally {
+      setStreaming(false);
+    }
+  }
+
+  function startLinkeoChat() {
+    setLinkeoActive(true);
+    sendToLinkeo("Bonjour, je veux déposer un projet mais je ne sais pas trop comment m'y prendre, aide-moi.");
+  }
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  async function handleGenerateFiche() {
+    setFicheLoading(true);
+    setLinkeoError("");
+
+    const transcript = messages
+      .filter((m) => m.content.trim())
+      .map((m) => `${m.role === "user" ? "Porteur de projet" : "Linkeo"} : ${m.content.trim()}`)
+      .join("\n\n")
+      .slice(0, 4000);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/ai/fiche", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+        body: JSON.stringify({ idee: transcript }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Erreur serveur");
+
+      setTitre(stripMarkdown(data.titre ?? "").slice(0, 80));
+
+      const mvpLines = Array.isArray(data.fonctionnalites_mvp) && data.fonctionnalites_mvp.length
+        ? `\n\nFonctionnalités clés :\n${data.fonctionnalites_mvp.map((f: string) => `- ${stripMarkdown(f)}`).join("\n")}`
+        : "";
+      const profil = data.profil_dev_ideal ? `\n\nProfil dev recherché : ${stripMarkdown(data.profil_dev_ideal)}` : "";
+      setDescription(`${stripMarkdown(data.description ?? "")}${mvpLines}${profil}`.slice(0, DESC_MAX));
+
+      const stackRaw = String(data.stack_souhaitee ?? "").trim();
+      if (stackRaw && !/au choix|pas de préférence|non précisé/i.test(stackRaw)) {
+        const stacks = stackRaw.split(",").map((s: string) => s.trim()).filter(Boolean);
+        setSelectedStacks(stacks);
+      }
+
+      setDateDebut(todayISO());
+
+      const semaines = Number(data.delai_semaines);
+      if (Number.isFinite(semaines) && semaines > 0) {
+        const fin = new Date();
+        fin.setDate(fin.getDate() + semaines * 7);
+        setDateFin(fin.toISOString().split("T")[0]);
+      }
+
+      const budgetEstime = Number(data.budget_estime_eur);
+      if (Number.isFinite(budgetEstime) && budgetEstime > 0) {
+        setBudget(String(Math.round(budgetEstime)));
+      }
+
+      setLinkeoActive(false);
+      setStep(1);
+    } catch (e) {
+      setLinkeoError((e as Error).message);
+    } finally {
+      setFicheLoading(false);
+    }
+  }
+
   async function handleSubmit() {
     if (!founderId || !dateFin) return;
     setSaving(true);
@@ -102,6 +255,7 @@ export default function NouveauProjet() {
       stack_souhaitee: selectedStacks.join(", "),
       deadline: deadlineStr,
       statut: "pending",
+      budget: budget ? Number(budget) : null,
     });
 
     if (dbError) {
@@ -143,24 +297,141 @@ export default function NouveauProjet() {
         {/* Top nav */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
           <button
-            onClick={() => step === 1 ? router.push("/profil") : setStep(1)}
+            onClick={() => {
+              if (step === 0 && linkeoActive) { setLinkeoActive(false); setMessages([]); setReadyForFiche(false); return; }
+              if (step === 0) { router.push("/profil"); return; }
+              if (step === 1) { setStep(0); return; }
+              setStep(1);
+            }}
             style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#8A8579", padding: 0 }}
           >
             <ArrowLeft size={14} strokeWidth={2} />
-            {step === 1 ? "Retour" : "Étape précédente"}
+            {step === 0 ? "Retour" : "Étape précédente"}
           </button>
 
           {/* Progress dots */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {[1, 2].map((n) => (
-              <div key={n} style={{ height: 4, borderRadius: 99, width: step >= n ? 24 : 10, background: step >= n ? "#D4537E" : "#E5E5EA", transition: "width 0.2s, background 0.2s" }} />
-            ))}
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#8A8579", marginLeft: 4 }}>{step}/2</span>
-          </div>
+          {step > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {[1, 2].map((n) => (
+                <div key={n} style={{ height: 4, borderRadius: 99, width: step >= n ? 24 : 10, background: step >= n ? "#D4537E" : "#E5E5EA", transition: "width 0.2s, background 0.2s" }} />
+              ))}
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#8A8579", marginLeft: 4 }}>{step}/2</span>
+            </div>
+          )}
         </div>
 
         {/* Card */}
         <div style={{ background: "#fff", border: "1px solid #E5E5EA", borderRadius: 20, padding: "32px 28px" }}>
+
+          {/* ── STEP 0 · CHOIX ── */}
+          {step === 0 && !linkeoActive && (
+            <>
+              <div style={{ marginBottom: 28 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#8A8579", display: "block", marginBottom: 12 }}>Nouveau projet</span>
+                <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 26, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", letterSpacing: "-0.03em", lineHeight: 1.15 }}>
+                  Comment veux-tu procéder ?
+                </h1>
+                <p style={{ fontSize: 13, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Tu peux te faire aider pour bien cibler ton besoin, ou remplir directement le formulaire.</p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <button
+                  onClick={startLinkeoChat}
+                  className="lk-n-chip"
+                  style={{ display: "flex", alignItems: "flex-start", gap: 12, textAlign: "left", padding: "18px 16px", borderRadius: 14, border: "1.5px solid #1A2138", background: "#1A2138", cursor: "pointer" }}
+                >
+                  <Sparkles size={18} strokeWidth={2} style={{ color: "#D4537E", flexShrink: 0, marginTop: 1 }} />
+                  <span>
+                    <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 3 }}>Déposer mon projet avec Linkeo</span>
+                    <span style={{ display: "block", fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.5 }}>Réponds à quelques questions, Linkeo rédige ta fiche projet pour toi.</span>
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setStep(1)}
+                  className="lk-n-chip"
+                  style={{ display: "flex", alignItems: "flex-start", gap: 12, textAlign: "left", padding: "18px 16px", borderRadius: 14, border: "1px solid #ECE7DD", background: "#fff", cursor: "pointer" }}
+                >
+                  <PenLine size={18} strokeWidth={2} style={{ color: "#8A8579", flexShrink: 0, marginTop: 1 }} />
+                  <span>
+                    <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: "#1A2138", marginBottom: 3 }}>Remplir moi-même</span>
+                    <span style={{ display: "block", fontSize: 12, color: "#8A8579", lineHeight: 1.5 }}>Tu connais déjà précisément ton besoin.</span>
+                  </span>
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ── STEP 0 · CHAT LINKEO ── */}
+          {step === 0 && linkeoActive && (
+            <>
+              <div style={{ marginBottom: 18 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#D4537E", marginBottom: 12 }}>
+                  <Sparkles size={12} strokeWidth={2.5} /> Avec Linkeo
+                </span>
+                <h1 style={{ fontFamily: "var(--font-display), Georgia, serif", fontSize: 24, fontWeight: 600, color: "#1A2138", margin: "0 0 6px", letterSpacing: "-0.03em", lineHeight: 1.15 }}>
+                  Parle-moi de ton projet
+                </h1>
+                <p style={{ fontSize: 13, color: "#8A8579", margin: 0, lineHeight: 1.6 }}>Réponds simplement, avec tes mots — aucune connaissance technique requise.</p>
+              </div>
+
+              {/* Fil de discussion */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: 340, overflowY: "auto", padding: "4px 2px", marginBottom: 14 }}>
+                {messages.map((m, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+                    <div style={{
+                      maxWidth: "85%", padding: "10px 14px", borderRadius: 14,
+                      borderBottomRightRadius: m.role === "user" ? 4 : 14,
+                      borderBottomLeftRadius: m.role === "assistant" ? 4 : 14,
+                      background: m.role === "user" ? "#1A2138" : "#FAF8F4",
+                      color: m.role === "user" ? "#fff" : "#1A2138",
+                      fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap",
+                    }}>
+                      {stripMarkdown(m.content) || (streaming && i === messages.length - 1 ? "…" : "")}
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {linkeoError && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(212,83,126,0.3)", background: "rgba(212,83,126,0.05)", color: "#D4537E", fontSize: 13, marginBottom: 14 }}>
+                  <AlertCircle size={14} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+                  {linkeoError}
+                </div>
+              )}
+
+              {/* Zone de saisie */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendToLinkeo(chatInput); } }}
+                  placeholder="Écris ta réponse ici..."
+                  disabled={streaming}
+                  className="lk-n-input"
+                  style={{ ...sInput, flex: 1 }}
+                />
+                <button
+                  onClick={() => sendToLinkeo(chatInput)}
+                  disabled={streaming || !chatInput.trim()}
+                  className="lk-n-navy"
+                  style={{ ...sNavy, width: "auto", padding: "0 16px", borderRadius: 10, flexShrink: 0 }}
+                >
+                  <Send size={15} strokeWidth={2} />
+                </button>
+              </div>
+
+              {(readyForFiche || messages.filter((m) => m.role === "user").length >= 3) && (
+                <button onClick={handleGenerateFiche} disabled={ficheLoading || streaming} className="lk-n-navy" style={sNavy}>
+                  {ficheLoading
+                    ? <div style={{ width: 17, height: 17, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} />
+                    : <>Générer ma fiche projet <Sparkles size={15} strokeWidth={2} /></>
+                  }
+                </button>
+              )}
+            </>
+          )}
 
           {/* ── STEP 1 ── */}
           {step === 1 && (
@@ -318,6 +589,24 @@ export default function NouveauProjet() {
                       </span>
                     </div>
                   )}
+                </div>
+
+                {/* Budget */}
+                <div>
+                  <label style={sLabel}>Budget (€)</label>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      type="number"
+                      min={0}
+                      value={budget}
+                      onChange={(e) => setBudget(e.target.value)}
+                      placeholder="Ex : 500"
+                      className="lk-n-input"
+                      style={{ ...sInput, paddingRight: 32 }}
+                    />
+                    <span style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", fontSize: 13, fontWeight: 600, color: "#8A8579" }}>€</span>
+                  </div>
+                  <p style={{ fontSize: 11, color: "#8A8579", margin: "5px 0 0" }}>Optionnel — le dev reçoit 90 % du montant</p>
                 </div>
 
                 {error && (

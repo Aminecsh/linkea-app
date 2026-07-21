@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getAuthUser } from "@/lib/auth";
 import AppNav from "@/components/AppNav";
 import NotificationBell from "@/components/NotificationBell";
 import {
@@ -88,7 +89,7 @@ export default function DevsPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getAuthUser();
       if (!user) { router.push("/connexion"); return; }
 
       const { data: roleData } = await supabase

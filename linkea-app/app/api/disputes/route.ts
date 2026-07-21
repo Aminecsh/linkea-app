@@ -1,0 +1,123 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { disputeCreateSchema, validationError } from "@/lib/validation";
+
+export async function POST(req: NextRequest) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  const token = authHeader.slice(7);
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  const { data: { user } } = await supabase.auth.getUser(token);
+  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const parsed = disputeCreateSchema.safeParse(await req.json());
+  if (!parsed.success) return validationError(parsed.error);
+  const { projectId, paymentId, devUserId, reason } = parsed.data;
+
+  // Vérifier que c'est bien le founder
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, titre, profiles_founder(user_id)")
+    .eq("id", projectId).maybeSingle();
+
+  const fp = Array.isArray(project?.profiles_founder) ? project.profiles_founder[0] : project?.profiles_founder;
+  if ((fp as { user_id: string } | null)?.user_id !== user.id) {
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  }
+
+  const titre = (project as { titre: string }).titre;
+
+  // Passer le paiement en "disputed"
+  await supabase.from("payments").update({ status: "disputed" }).eq("id", paymentId);
+
+  // Créer le litige
+  const { data: dispute } = await supabase.from("disputes").insert({
+    project_id: projectId,
+    payment_id: paymentId,
+    founder_user_id: user.id,
+    dev_user_id: devUserId,
+    reason,
+  }).select().maybeSingle();
+
+  // Récupérer les admins
+  const { data: admins } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+  const adminIds = (admins ?? []).map((a: { user_id: string }) => a.user_id);
+
+  // Créer deux conversations privées : admin ↔ founder et admin ↔ dev
+  const convMessage = `⚠️ Litige ouvert sur le projet "${titre}".\n\nMotif : ${reason}\n\nNous traitons la situation. N'hésitez pas à nous donner plus de détails ici.`;
+
+  let convFounderId: string | undefined;
+  let convDevId: string | undefined;
+
+  for (const adminId of adminIds) {
+    // Conv admin ↔ founder
+    const { data: convFounder } = await supabase.from("conversations").insert({
+      project_id: projectId,
+      is_group: true,
+      group_name: `⚠️ Litige — ${titre} (Founder)`,
+    }).select().maybeSingle();
+
+    if (convFounder) {
+      convFounderId = convFounder.id;
+      await supabase.from("conversation_participants").insert([
+        { conversation_id: convFounder.id, user_id: adminId },
+        { conversation_id: convFounder.id, user_id: user.id },
+      ]);
+      await supabase.from("messages").insert({
+        conversation_id: convFounder.id,
+        sender_id: adminId,
+        content: convMessage,
+      });
+    }
+
+    // Conv admin ↔ dev
+    const { data: convDev } = await supabase.from("conversations").insert({
+      project_id: projectId,
+      is_group: true,
+      group_name: `⚠️ Litige — ${titre} (Dev)`,
+    }).select().maybeSingle();
+
+    if (convDev) {
+      convDevId = convDev.id;
+      await supabase.from("conversation_participants").insert([
+        { conversation_id: convDev.id, user_id: adminId },
+        { conversation_id: convDev.id, user_id: devUserId },
+      ]);
+      await supabase.from("messages").insert({
+        conversation_id: convDev.id,
+        sender_id: adminId,
+        content: convMessage,
+      });
+    }
+  }
+
+  // Notifier le dev
+  await supabase.from("notifications").insert({
+    user_id: devUserId,
+    type: "litige",
+    title: "⚠️ Litige ouvert",
+    body: `Un litige a été ouvert sur "${titre}". L'équipe Linkea te contacte via la messagerie.`,
+    link: convDevId ? `/messages/${convDevId}` : "/wallet",
+  });
+
+  // Notifier les admins
+  if (adminIds.length > 0) {
+    await supabase.from("notifications").insert(
+      adminIds.map((aid: string) => ({
+        user_id: aid,
+        type: "litige",
+        title: "⚠️ Nouveau litige",
+        body: `Litige sur "${titre}" — conversations créées avec les deux parties`,
+        link: "/admin",
+      }))
+    );
+  }
+
+  return NextResponse.json({ ok: true, dispute });
+}

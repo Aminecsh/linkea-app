@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AppNav from "@/components/AppNav";
-import { ArrowLeft, Calendar, Check, Send } from "lucide-react";
+import { ArrowLeft, Calendar, Check, Send, Banknote } from "lucide-react";
 
 const C = {
   ink:      "#1A2138",
@@ -22,6 +22,7 @@ type Project = {
   stack_souhaitee: string;
   deadline: string;
   statut: string;
+  budget: number | null;
   profiles_founder: {
     nom: string;
     ecole?: string;
@@ -54,7 +55,7 @@ export default function ProjectDetailPage() {
 
       const { data: proj } = await supabase
         .from("projects")
-        .select("id, titre, description, stack_souhaitee, deadline, statut, profiles_founder(nom, ecole, user_id, avatar_url)")
+        .select("id, titre, description, stack_souhaitee, deadline, statut, budget, profiles_founder(nom, ecole, user_id, avatar_url)")
         .eq("id", id)
         .maybeSingle();
 
@@ -185,6 +186,20 @@ export default function ProjectDetailPage() {
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 8, border: `1px solid ${C.hairline}`, background: C.canvas, marginBottom: 20 }}>
               <Calendar size={12} strokeWidth={2} style={{ color: C.muted }} />
               <span style={{ fontSize: 12, fontWeight: 600, color: C.muted }}>{project.deadline}</span>
+            </div>
+          )}
+
+          {/* Rémunération dev */}
+          {project.budget != null && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderRadius: 12, border: "1px solid rgba(16,185,129,0.2)", background: "rgba(16,185,129,0.05)", marginBottom: 20 }}>
+              <Banknote size={16} strokeWidth={1.8} style={{ color: "#059669", flexShrink: 0 }} />
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#059669", margin: "0 0 2px" }}>Rémunération</p>
+                <p style={{ fontSize: 18, fontWeight: 800, color: "#059669", margin: 0, fontVariantNumeric: "tabular-nums" }}>
+                  {Math.round(project.budget * 0.9)} €
+                  <span style={{ fontSize: 12, fontWeight: 500, color: "#8A8579", marginLeft: 6 }}>net (90 % de {project.budget} €)</span>
+                </p>
+              </div>
             </div>
           )}
 
