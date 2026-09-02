@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { FileText } from "lucide-react";
 import HeroMockups from "@/components/HeroMockups";
-import StatCounter from "@/components/StatCounter";
 
 const C = { ink: "#1A2138", rose: "#D4537E", muted: "#8A8579", hairline: "#E5E5EA", canvas: "#F5F5F7", surface: "#FFFFFF" };
 
@@ -16,16 +15,9 @@ export default function Home() {
         .lk-cta-primary:hover {
           background-color: #2A3252;
         }
-        .lk-cta-primary:hover .lk-arrow {
-          transform: translateX(3px);
-        }
         .lk-cta-primary:focus-visible {
           outline: 2px solid #D4537E;
           outline-offset: 3px;
-        }
-        .lk-arrow {
-          display: inline-block;
-          transition: transform 150ms ease;
         }
         .lk-cta-secondary {
           transition: border-color 150ms ease;
@@ -63,23 +55,17 @@ export default function Home() {
               Linkea connecte vos projets digitaux avec des développeurs étudiants motivés et vérifiés.
             </p>
             <p style={{ fontSize: 14, color: C.muted, margin: "0 0 40px", maxWidth: 400, opacity: 0.75 }}>
-              Startup, PME, équipe interne ou projet solo.
+              Site vitrine, application, audit, maintenance — quel que soit ton besoin.
             </p>
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 52 }}>
               <Link href="/inscription?role=founder" className="lk-cta-primary" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", fontSize: 15, fontWeight: 600, borderRadius: 12, color: "#fff", textDecoration: "none", background: C.rose }}>
-                Déposer un projet <span className="lk-arrow">→</span>
+                Déposer un projet
               </Link>
               <Link href="/inscription?role=developer" className="lk-cta-secondary" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", fontSize: 15, fontWeight: 600, borderRadius: 12, color: C.ink, textDecoration: "none", background: C.surface, border: `1px solid ${C.rose}` }}>
                 Je suis développeur
               </Link>
             </div>
-
-            <StatCounter items={[
-              { n: 156, label: "projets lancés" },
-              { n: 214, label: "devs actifs" },
-              { n: 24,  suffix: "h", label: "délai de match" },
-            ]} />
           </div>
 
           {/* Right — mockups iPhone */}
@@ -94,17 +80,16 @@ export default function Home() {
 
             {/* Grande card */}
             <div style={{ background: C.surface, border: `1.5px solid ${C.hairline}`, borderRadius: 18, padding: "44px 48px" }}>
-              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "1.5px", color: C.rose, textTransform: "uppercase", marginBottom: 16 }}>
-                Comment ça marche
-              </p>
               <h2 style={{ fontFamily: "var(--font-sans)", fontSize: 30, fontWeight: 600, color: C.ink, letterSpacing: "-0.03em", lineHeight: 1.1, margin: "0 0 36px" }}>
                 De l&apos;idée au MVP,<br />en quelques semaines
               </h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
                 {[
-                  { n: "01", title: "Déposez votre projet", desc: "Décrivez le contexte, la stack souhaitée et la deadline. 5 minutes." },
-                  { n: "02", title: "Recevez des profils dès le lendemain", desc: "Des développeurs étudiants candidatent dans les 24h. Vous choisissez." },
-                  { n: "03", title: "Construisez ensemble", desc: "Contrat signé, gestion de projet et livrables inclus." },
+                  { n: "01", title: "Décrivez votre projet", desc: "Contexte, stack souhaitée, deadline. 5 minutes." },
+                  { n: "02", title: "Linkeo analyse votre besoin", desc: "L'IA de Linkea évalue la complexité et la stack la plus adaptée." },
+                  { n: "03", title: "Recevez une équipe", desc: "Des développeurs étudiants vérifiés, sélectionnés pour votre projet." },
+                  { n: "04", title: "Le travail commence", desc: "Contrat signé, gestion de projet et suivi inclus." },
+                  { n: "05", title: "Livré", desc: "Vous recevez votre projet, prêt à l'emploi." },
                 ].map(({ n, title, desc }) => (
                   <div key={n} style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
                     <span style={{ fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 600, color: C.rose, flexShrink: 0, marginTop: 2, letterSpacing: "0.02em" }}>{n}</span>

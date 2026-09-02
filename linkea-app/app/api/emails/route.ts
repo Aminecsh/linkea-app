@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resend: Resend | null = null;
+function getResend(): Resend {
+  if (!resend) resend = new Resend(process.env.RESEND_API_KEY);
+  return resend;
+}
 
 const DEV_MODE = process.env.NODE_ENV !== "production";
 const DEV_EMAIL = "amine.chamssan@gmail.com";
@@ -56,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (type === "nouvelle_candidature") {
-      await resend.emails.send({
+      await getResend().emails.send({
         from: "Linkea <onboarding@resend.dev>",
         to: recipient,
         subject: `Nouveau candidat sur ton projet "${data.projetTitre}"`,
@@ -81,7 +85,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === "candidature_acceptee") {
-      await resend.emails.send({
+      await getResend().emails.send({
         from: "Linkea <onboarding@resend.dev>",
         to: recipient,
         subject: `Ta candidature a été acceptée ! 🎉`,
@@ -107,7 +111,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === "candidature_refusee") {
-      await resend.emails.send({
+      await getResend().emails.send({
         from: "Linkea <onboarding@resend.dev>",
         to: recipient,
         subject: `Mise à jour sur ta candidature`,

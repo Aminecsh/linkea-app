@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { aiHealthSchema, validationError } from "@/lib/validation";
+import { rateLimit } from "@/lib/rate-limit";
 
 export type HealthIndicator = {
   label: string;
@@ -35,6 +36,9 @@ export async function POST(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser(token);
   if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const limited = rateLimit(req, "read", user.id);
+  if (!limited.ok) return limited.response;
 
   const [{ data: project }, { data: sprints }, { data: tasks }] = await Promise.all([
     supabase.from("projects").select("titre, deadline, statut, created_at").eq("id", projectId).maybeSingle(),

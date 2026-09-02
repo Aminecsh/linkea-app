@@ -260,7 +260,8 @@ export default function AppNav() {
         </div>
 
         <nav className="flex-1 px-3 pt-2 flex flex-col gap-1">
-          {tabs.map((tab) => {
+          {/* "Profil" masqué en desktop : déjà accessible via l'avatar en bas de sidebar */}
+          {tabs.filter((tab) => tab.href !== "/profil").map((tab) => {
             const active = tab.href.includes("/gestion")
               ? pathname.includes("/gestion")
               : pathname.startsWith(tab.href);

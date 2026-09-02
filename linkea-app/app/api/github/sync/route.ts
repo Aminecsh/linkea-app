@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { checkUsage, trackUsage } from "@/lib/ai-usage";
 import { githubSyncSchema, validationError } from "@/lib/validation";
+import { rateLimit } from "@/lib/rate-limit";
 
 type GithubCommit = {
   sha: string;
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser(token);
   if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const limited = rateLimit(req, "create", user.id);
+  if (!limited.ok) return limited.response;
 
   const { data: project } = await supabase
     .from("projects")

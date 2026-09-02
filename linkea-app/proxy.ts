@@ -27,8 +27,21 @@ function getIP(req: NextRequest): string {
   );
 }
 
+// La vitrine publique vit sur linkea.tech. Le sous-domaine app.linkea.tech
+// ne doit servir que le produit (connexion, inscription, dashboard, etc.) —
+// un visiteur qui atterrit sur la racine du sous-domaine app est redirigé
+// vers la vitrine plutôt que de voir une ancienne landing dupliquée.
+const MARKETING_SITE_URL = "https://linkea.tech";
+const APP_HOSTS = new Set(["app.linkea.tech"]);
+
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const host = req.headers.get("host")?.split(":")[0] ?? "";
+
+  if (pathname === "/" && APP_HOSTS.has(host)) {
+    return NextResponse.redirect(MARKETING_SITE_URL, 308);
+  }
+
   const ruleKey = getRule(pathname);
   if (!ruleKey) return NextResponse.next();
 
@@ -68,6 +81,7 @@ export function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
+    "/",
     "/connexion",
     "/inscription",
     "/mot-de-passe-oublie",

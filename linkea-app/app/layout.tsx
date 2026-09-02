@@ -12,7 +12,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Linkea",
-  description: "De l'idée au MVP en 4-8 semaines.",
+  description: "Des développeurs étudiants pour ton projet — du site vitrine à l'app complète.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -125,7 +125,7 @@ function ScreenBuild() {
 
         <div style={{ marginTop: 28, background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 18, padding: "18px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <span style={{ fontSize: 13, color: C.muted }}>MVP en cours</span>
+            <span style={{ fontSize: 13, color: C.muted }}>Projet en cours</span>
             <span style={{ fontFamily: "var(--font-sans)", fontSize: 15, fontWeight: 600, color: C.ink }}>Sem. 3 / 6</span>
           </div>
           <div style={{ marginTop: 12, height: 8, borderRadius: 5, background: C.hairline, overflow: "hidden" }}>

@@ -69,6 +69,11 @@ export const githubSyncSchema = z.object({
   projectId: uuid,
 });
 
+export const startConversationSchema = z.object({
+  projectId: uuid,
+  developerId: uuid.optional(), // fourni par le founder ; omis quand c'est le dev qui initie
+});
+
 export const githubRepoRegex = /^[\w.-]+\/[\w.-]+$/;
 
 export function validationError(error: z.ZodError) {
