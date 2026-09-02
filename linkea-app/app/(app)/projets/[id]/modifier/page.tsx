@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { STACKS } from "@/lib/constants/catalog";
 import PageTransition from "@/components/PageTransition";
+import CoverImagePicker from "@/components/CoverImagePicker";
 import React from "react";
 import { ArrowLeft, ArrowRight, AlertCircle, Plus, X, Check } from "lucide-react";
 
@@ -57,6 +58,7 @@ export default function ModifierProjet() {
   const [showCustom, setShowCustom]   = useState(false);
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin]     = useState("");
+  const [coverUrl, setCoverUrl]   = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -69,7 +71,7 @@ export default function ModifierProjet() {
 
       const { data: proj } = await supabase
         .from("projects")
-        .select("id, titre, description, stack_souhaitee, deadline, statut, profiles_founder(user_id)")
+        .select("id, titre, description, stack_souhaitee, deadline, statut, image_url, profiles_founder(user_id)")
         .eq("id", id)
         .maybeSingle();
 
@@ -81,6 +83,7 @@ export default function ModifierProjet() {
 
       setTitre(proj.titre ?? "");
       setDescription(proj.description ?? "");
+      setCoverUrl((proj as { image_url?: string | null }).image_url ?? null);
       setSelectedStacks(
         proj.stack_souhaitee ? proj.stack_souhaitee.split(",").map((s: string) => s.trim()).filter(Boolean) : []
       );
@@ -122,6 +125,7 @@ export default function ModifierProjet() {
       description: description.trim(),
       stack_souhaitee: selectedStacks.join(", "),
       deadline: deadlineStr,
+      image_url: coverUrl,
     }).eq("id", id);
 
     if (dbError) { setError(dbError.message); setSaving(false); return; }
@@ -191,6 +195,11 @@ export default function ModifierProjet() {
                   <input value={titre} onChange={(e) => setTitre(e.target.value)}
                     placeholder="Ex : App de mise en relation étudiants"
                     maxLength={80} autoFocus className="lk-n-input" style={sInput} />
+                </div>
+
+                <div>
+                  <label style={sLabel}>Photo de couverture</label>
+                  <CoverImagePicker value={coverUrl} onChange={setCoverUrl} folder={id} />
                 </div>
 
                 <div>

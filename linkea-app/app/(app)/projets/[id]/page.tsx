@@ -23,6 +23,7 @@ type Project = {
   deadline: string;
   statut: string;
   budget: number | null;
+  image_url?: string | null;
   profiles_founder: {
     nom: string;
     ecole?: string;
@@ -55,7 +56,7 @@ export default function ProjectDetailPage() {
 
       const { data: proj } = await supabase
         .from("projects")
-        .select("id, titre, description, stack_souhaitee, deadline, statut, budget, profiles_founder(nom, ecole, user_id, avatar_url)")
+        .select("id, titre, description, stack_souhaitee, deadline, statut, budget, image_url, profiles_founder(nom, ecole, user_id, avatar_url)")
         .eq("id", id)
         .maybeSingle();
 
@@ -148,6 +149,13 @@ export default function ProjectDetailPage() {
       </div>
 
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "28px 20px 0" }}>
+
+        {/* Photo de couverture */}
+        {project.image_url && (
+          <div style={{ borderRadius: 20, overflow: "hidden", border: `1px solid ${C.hairline}`, marginBottom: 16, aspectRatio: "16 / 9", background: C.canvas }}>
+            <img src={project.image_url} alt={project.titre} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          </div>
+        )}
 
         {/* Card principale */}
         <div style={{ background: C.surface, border: `1px solid ${C.hairline}`, borderRadius: 20, padding: "28px 24px", marginBottom: 16 }}>

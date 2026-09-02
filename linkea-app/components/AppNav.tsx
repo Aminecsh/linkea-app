@@ -459,13 +459,22 @@ function SidebarLink({
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-colors relative"
-      style={{
-        background: active ? "var(--lk-accent-soft)" : "transparent",
-        color: active ? "var(--lk-accent)" : "rgba(255,255,255,0.65)",
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[13.5px] transition-colors relative"
+      style={active ? {
+        // Touche enfoncée dans le navy : on lit l'état au relief, pas seulement à la couleur
+        background: "linear-gradient(180deg, #141A2E 0%, #1C2440 100%)",
+        color: "#FF9FBE",
+        fontWeight: 600,
+        border: "1px solid rgba(255,255,255,0.06)",
+        boxShadow: "inset 0 2px 4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)",
+      } : {
+        background: "transparent",
+        color: "rgba(255,255,255,0.65)",
+        fontWeight: 500,
+        border: "1px solid transparent",
       }}
     >
-      <Icon size={18} strokeWidth={2} style={{ color: active ? "var(--lk-accent)" : "rgba(255,255,255,0.65)" }} />
+      <Icon size={18} strokeWidth={2} style={{ color: active ? "#FF9FBE" : "rgba(255,255,255,0.65)" }} />
       {label}
       {!!badge && (
         <span

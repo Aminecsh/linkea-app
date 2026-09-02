@@ -8,9 +8,10 @@ import { getAuthUser } from "@/lib/auth";
 import { sendEmail } from "@/lib/sendEmail";
 import NotificationBell from "@/components/NotificationBell";
 import PageTransition from "@/components/PageTransition";
+import { LinkeoEmpty, LinkeoLoader, useDelayed } from "@/components/Linkeo";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { listContainerVariants, listItemVariants, listItemVariantsNoStagger, STAGGER_LIMIT } from "@/lib/motionVariants";
-import { Search, ArrowRight, Check, X, Users, Clock, Sparkles, ChevronDown, MessageCircle, Banknote } from "lucide-react";
+import { Search, ArrowRight, Check, X, Users, Clock, Sparkles, MessageCircle, Banknote } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Project = {
@@ -22,6 +23,7 @@ type Project = {
   statut: string;
   created_at: string;
   budget: number | null;
+  image_url?: string | null;
   founder_id?: string;
   profiles_founder: {
     nom: string;
@@ -55,13 +57,14 @@ function parseStack(stack: string | null | undefined): string[] {
   return out;
 }
 
-// Teinte de la tuile selon la famille dominante de la stack — palette plate Linkea, faible chroma.
-type Tile = { bg: string; blob: string };
+// Matière de la tuile selon la famille dominante de la stack (classes dans globals.css,
+// section « Matière Linkea ») : même liquide que le logo, angle et dominante par famille.
+type Tile = { cls: string; shadow: string };
 const TILES: Record<"web" | "mobile" | "data" | "autre", Tile> = {
-  web:    { bg: "#E3EAFB", blob: "rgba(74,123,247,0.16)" },
-  mobile: { bg: "#F9E3EB", blob: "rgba(212,83,126,0.14)" },
-  data:   { bg: "#E1F4E7", blob: "rgba(52,199,89,0.14)" },
-  autre:  { bg: "#FBEEDD", blob: "rgba(255,149,0,0.12)" },
+  web:    { cls: "lk-mat-blue", shadow: "var(--lk-mat-shadow-blue)" },
+  mobile: { cls: "lk-mat-rose", shadow: "var(--lk-mat-shadow-rose)" },
+  data:   { cls: "lk-mat-mix",  shadow: "var(--lk-mat-shadow-mix)" },
+  autre:  { cls: "lk-mat-warm", shadow: "var(--lk-mat-shadow-warm)" },
 };
 function tileFor(stackTokens: string[]): Tile {
   const s = stackTokens.join(" ").toLowerCase();
@@ -141,47 +144,51 @@ function ProjectTile({ p, tokens, score, applied, fresh, size }: {
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[18px] shrink-0 transition-shadow duration-150 group-hover:shadow-[0_8px_24px_rgba(26,33,56,0.10)]",
-        size === "feature" ? "h-[200px] w-full" : "w-24 h-24 sm:w-full sm:h-[150px]"
+        "lk-mat rounded-[20px] shrink-0 transition-shadow duration-150",
+        !p.image_url && tile.cls,
+        size === "feature" ? "h-[200px] w-full" : "w-24 h-24 sm:w-full sm:h-[150px] lk-mat-matte",
+        p.image_url && "bg-[#ECECEF]"
       )}
-      style={{ background: tile.bg }}
+      style={{ boxShadow: size === "feature" ? tile.shadow : undefined }}
     >
-      <div className="absolute rounded-full" style={{ right: -40, bottom: -70, width: 220, height: 220, background: tile.blob }} />
-      <div className="absolute rounded-full" style={{ left: -30, top: -60, width: 160, height: 160, background: "rgba(255,255,255,0.45)" }} />
+      {p.image_url ? (
+        <img src={p.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      ) : (
+        <>
+          <div className="lk-mat-hi" style={{ width: 260, height: 260, left: -80, top: -120 }} />
+          {size === "feature" && <div className="lk-mat-hi" style={{ width: 140, height: 140, right: -30, bottom: -60, opacity: 0.5 }} />}
+          <div className="lk-mat-grain" />
+        </>
+      )}
 
       {/* Badge principal (haut gauche) */}
       {applied ? (
-        <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5" style={{ background: C.ink }}>
-          <Check size={12} strokeWidth={2.5} color="#fff" />
-          <span className="hidden sm:inline text-[12px] font-bold text-white">Candidature envoyée</span>
+        <div className="lk-stamp absolute left-3 top-3">
+          <Check size={11} strokeWidth={2.5} color="#fff" />
+          <span className="hidden sm:inline">Candidature envoyée</span>
         </div>
       ) : score > 0 ? (
-        <div className="absolute left-3 top-3 hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5" style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+        <div className="lk-plaque absolute left-3 top-3 max-sm:hidden!" style={{ color: C.roseDark, padding: "5px 9px", fontSize: 12 }}>
           <Sparkles size={12} strokeWidth={2.2} color={C.rose} />
-          <span className="text-[12px] font-bold" style={{ color: C.roseDark }}>{score} % compatible</span>
+          {score} % compatible
         </div>
       ) : fresh ? (
-        <div className="absolute left-3 top-3 hidden sm:inline-flex items-center rounded-full px-2.5 py-1.5" style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-          <span className="text-[12px] font-bold" style={{ color: C.ink }}>Nouveau</span>
-        </div>
+        <div className="lk-plaque absolute left-3 top-3 max-sm:hidden!" style={{ padding: "5px 9px", fontSize: 12 }}>Nouveau</div>
       ) : null}
 
       {/* Technos (haut droite) — masquées sur la tuile compacte mobile */}
       {shown.length > 0 && (
         <div className="absolute right-3 top-3 hidden sm:flex gap-1.5">
-          {shown.map((t) => (
-            <span key={t} className="rounded-full px-2 py-1 text-[11px] font-semibold" style={{ background: "rgba(255,255,255,0.92)", color: C.ink }}>{t}</span>
-          ))}
-          {extra > 0 && <span className="rounded-full px-2 py-1 text-[11px] font-semibold" style={{ background: "rgba(255,255,255,0.92)", color: C.muted }}>+{extra}</span>}
+          {shown.map((t) => <span key={t} className="lk-plaque">{t}</span>)}
+          {extra > 0 && <span className="lk-plaque" style={{ color: C.muted }}>+{extra}</span>}
         </div>
       )}
 
-      <div
-        className={cn("absolute font-bold leading-none", size === "feature" ? "left-5 bottom-3.5 text-[64px]" : "left-3 bottom-2 text-[34px] sm:left-5 sm:bottom-3 sm:text-[52px]")}
-        style={{ letterSpacing: "-0.05em", color: "rgba(26,33,56,0.85)" }}
-      >
-        {letter}
-      </div>
+      {!p.image_url && (
+        <div className={cn("lk-mat-letter", size === "feature" ? "left-5 bottom-3 text-[68px]" : "left-3 bottom-2 text-[34px] sm:left-5 sm:bottom-2.5 sm:text-[54px]")}>
+          {letter}
+        </div>
+      )}
     </div>
   );
 }
@@ -219,10 +226,8 @@ function ProjectCard({ p, size, score, applied, candCount, onOpen }: {
         {/* Sur mobile compact, les technos passent sous le texte */}
         {size === "grid" && tokens.length > 0 && (
           <div className="flex sm:hidden gap-1.5 mt-1">
-            {tokens.slice(0, 2).map((t) => (
-              <span key={t} className="rounded-full px-2 py-[3px] text-[11px] font-semibold" style={{ background: C.surface, border: `1px solid ${C.hairline}`, color: C.ink }}>{t}</span>
-            ))}
-            {tokens.length > 2 && <span className="rounded-full px-2 py-[3px] text-[11px] font-semibold" style={{ background: C.surface, border: `1px solid ${C.hairline}`, color: C.muted }}>+{tokens.length - 2}</span>}
+            {tokens.slice(0, 2).map((t) => <span key={t} className="lk-plaque">{t}</span>)}
+            {tokens.length > 2 && <span className="lk-plaque" style={{ color: C.muted }}>+{tokens.length - 2}</span>}
           </div>
         )}
         {score > 0 && size === "grid" && !applied && (
@@ -242,6 +247,7 @@ function ProjetsPageInner() {
   const searchParams = useSearchParams();
   const projectParam = searchParams.get("project");
   const reduceMotion = useReducedMotion();
+  const slow         = useDelayed(1500);
 
   const [projects,       setProjects]       = useState<Project[]>([]);
   const [search,         setSearch]         = useState("");
@@ -249,7 +255,6 @@ function ProjetsPageInner() {
   const [onlyMyStack,    setOnlyMyStack]    = useState(false);
   const [budgetOnly,     setBudgetOnly]     = useState(false);
   const [sort,           setSort]           = useState<SortMode>("pertinence");
-  const [sortOpen,       setSortOpen]       = useState(false);
   const [candidatures,   setCandidatures]   = useState<Set<string>>(new Set());
   const [loading,        setLoading]        = useState(true);
   const [role,           setRole]           = useState<string | null>(null);
@@ -386,9 +391,10 @@ function ProjetsPageInner() {
 
   const SORT_LABEL: Record<SortMode, string> = { pertinence: "Pertinence", recents: "Plus récents", budget: "Budget" };
 
-  // ── Loading : silhouettes de tuiles ──
+  // ── Loading : silhouettes de tuiles, puis Linkeo si ça traîne (> 1,5 s) ──
   if (loading) return (
     <div className="min-h-screen pb-nav pl-sidebar" style={{ background: "var(--bg)" }}>
+      {slow && <LinkeoLoader />}
       <div className="max-w-[1200px] mx-auto px-5 sm:px-10 pt-9 flex flex-col gap-7">
         <div className="flex flex-col gap-2"><div className="skeleton h-8 w-52" /><div className="skeleton h-4 w-80" /></div>
         <div className="flex gap-2">{[...Array(6)].map((_, i) => <div key={i} className="skeleton h-9 w-24 !rounded-full" />)}</div>
@@ -427,10 +433,9 @@ function ProjetsPageInner() {
                 </p>
               </div>
               <div className="flex items-center gap-2.5">
-                <div className="hidden md:flex items-center gap-2.5 h-11 w-[320px] px-3.5 rounded-[13px] bg-white" style={{ border: "1px solid rgba(0,0,0,0.10)", boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
-                  <Search size={15} strokeWidth={2} style={{ color: C.subtle, flexShrink: 0 }} />
-                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Chercher un projet, une techno, une école…"
-                    className="flex-1 min-w-0 bg-transparent outline-none text-sm" style={{ color: C.ink }} />
+                <div className="lk-well hidden md:flex items-center gap-2.5 w-[320px]">
+                  <Search size={15} strokeWidth={2} style={{ color: C.muted, flexShrink: 0 }} />
+                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Chercher un projet, une techno, une école…" />
                   {search && <button onClick={() => setSearch("")} aria-label="Effacer"><X size={13} style={{ color: C.subtle }} /></button>}
                 </div>
                 <NotificationBell />
@@ -438,10 +443,9 @@ function ProjetsPageInner() {
             </div>
 
             {/* Recherche mobile */}
-            <div className="md:hidden flex items-center gap-2.5 h-11 px-3.5 rounded-[13px] bg-white" style={{ border: "1px solid rgba(0,0,0,0.10)" }}>
-              <Search size={15} strokeWidth={2} style={{ color: C.subtle, flexShrink: 0 }} />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Chercher un projet, une techno…"
-                className="flex-1 min-w-0 bg-transparent outline-none text-sm" style={{ color: C.ink }} />
+            <div className="lk-well flex md:hidden items-center gap-2.5">
+              <Search size={15} strokeWidth={2} style={{ color: C.muted, flexShrink: 0 }} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Chercher un projet, une techno…" />
               {search && <button onClick={() => setSearch("")} aria-label="Effacer"><X size={13} style={{ color: C.subtle }} /></button>}
             </div>
 
@@ -452,7 +456,7 @@ function ProjetsPageInner() {
                   <button onClick={() => setOnlyMyStack((v) => !v)} className={cn("chip", onlyMyStack && "chip-active-rose")} style={{ padding: "8px 14px", fontSize: 12.5 }}>
                     <Sparkles size={13} strokeWidth={2.2} />
                     Ma stack
-                    <span className="rounded-full px-1.5 text-[10.5px] font-bold" style={{ background: onlyMyStack ? C.rose : C.hairline, color: onlyMyStack ? "#fff" : C.muted }}>{matchCount}</span>
+                    <span className="lk-count">{matchCount}</span>
                   </button>
                 )}
                 {STACKS.map((s) => (
@@ -471,25 +475,13 @@ function ProjetsPageInner() {
                 )}
               </div>
 
-              <div className="relative shrink-0 hidden sm:block">
-                <button onClick={() => setSortOpen((v) => !v)} className="chip" style={{ padding: "8px 14px", fontSize: 12.5, color: C.ink, gap: 8 }}>
-                  <span style={{ color: C.muted, fontWeight: 500 }}>Trier</span>{SORT_LABEL[sort]}
-                  <ChevronDown size={13} strokeWidth={2} style={{ color: C.muted }} />
-                </button>
-                {sortOpen && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setSortOpen(false)} />
-                    <div className="absolute right-0 top-[calc(100%+6px)] z-20 w-44 rounded-[14px] bg-white p-1.5" style={{ border: `1px solid ${C.hairline}`, boxShadow: "0 4px 24px rgba(0,0,0,0.07), 0 2px 8px rgba(0,0,0,0.04)" }}>
-                      {(Object.keys(SORT_LABEL) as SortMode[]).map((k) => (
-                        <button key={k} onClick={() => { setSort(k); setSortOpen(false); }}
-                          className="w-full flex items-center justify-between rounded-[10px] px-3 py-2 text-[13px] font-medium text-left"
-                          style={{ background: sort === k ? C.canvas : "transparent", color: C.ink }}>
-                          {SORT_LABEL[k]}{sort === k && <Check size={13} strokeWidth={2.5} style={{ color: C.rose }} />}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
+              {/* Tri : un rail à glissière, le choix courant est une touche posée dessus */}
+              <div className="lk-seg shrink-0 hidden sm:inline-flex" role="radiogroup" aria-label="Trier les projets">
+                {(Object.keys(SORT_LABEL) as SortMode[]).map((k) => (
+                  <button key={k} role="radio" aria-checked={sort === k} onClick={() => setSort(k)} className={cn("lk-seg-item", sort === k && "lk-seg-cur")}>
+                    {SORT_LABEL[k]}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -499,16 +491,12 @@ function ProjetsPageInner() {
         <div className="max-w-[1200px] mx-auto px-5 sm:px-10 pt-7 pb-16 flex flex-col gap-9">
 
           {filtered.length === 0 ? (
-            <motion.div initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2, ease: "easeOut" }}
-              className="flex flex-col items-center justify-center text-center gap-4 py-24">
-              <div className="w-16 h-16 rounded-[20px] flex items-center justify-center" style={{ background: TILES.web.bg }}>
-                <Search size={26} strokeWidth={1.6} style={{ color: C.ink }} />
-              </div>
-              <div>
-                <p className="font-bold text-[16px]" style={{ color: C.ink }}>Aucun projet ne correspond</p>
-                <p className="text-sm mt-1" style={{ color: C.muted }}>{hasFilter ? "Élargis tes filtres pour voir plus de projets." : "Les prochains projets déposés apparaîtront ici."}</p>
-              </div>
-              {hasFilter && <button onClick={resetFilters} className="btn-ghost">Tout afficher</button>}
+            <motion.div initial={reduceMotion ? false : { opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+              <LinkeoEmpty
+                title={hasFilter ? "Aucun projet ne correspond" : "Aucun projet pour l'instant"}
+                text={hasFilter ? "Élargis tes filtres pour voir plus de projets." : "Les prochains projets déposés apparaîtront ici. Linkeo te préviendra dès qu'un projet colle à ta stack."}
+                action={hasFilter ? <button onClick={resetFilters} className="btn-ghost">Tout afficher</button> : undefined}
+              />
             </motion.div>
           ) : (
             <>
@@ -520,7 +508,7 @@ function ProjetsPageInner() {
                       <h2 className="font-bold shrink-0" style={{ fontSize: 20, letterSpacing: "-0.025em", color: C.ink }}>Pour toi</h2>
                       <span className="hidden sm:inline text-[13px] truncate" style={{ color: C.muted }}>Les projets où ta stack fait la différence</span>
                     </div>
-                    <button onClick={() => router.push("/profil")} className="text-[13px] font-semibold shrink-0" style={{ color: C.rose }}>Modifier ma stack</button>
+                    <button onClick={() => router.push("/profil")} className="lk-key shrink-0">Modifier ma stack</button>
                   </div>
                   <motion.div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
                     variants={reduceMotion ? undefined : listContainerVariants} initial={reduceMotion ? undefined : "hidden"} animate={reduceMotion ? undefined : "show"}>
@@ -571,28 +559,36 @@ function ProjetsPageInner() {
               role="dialog" aria-modal="true" aria-label={selected.titre}
             >
               {/* Couverture */}
-              <div className="relative shrink-0 overflow-hidden h-[180px] lg:h-[200px]" style={{ background: selTile.bg }}>
-                <div className="absolute rounded-full" style={{ right: -40, bottom: -70, width: 240, height: 240, background: selTile.blob }} />
-                <div className="absolute rounded-full" style={{ left: -30, top: -60, width: 170, height: 170, background: "rgba(255,255,255,0.45)" }} />
+              <div className={cn("lk-mat shrink-0 h-[180px] lg:h-[200px]", !selected.image_url && selTile.cls, selected.image_url && "bg-[#ECECEF]")}>
+                {selected.image_url ? (
+                  <img src={selected.image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                ) : (
+                  <>
+                    <div className="lk-mat-hi" style={{ width: 280, height: 280, left: -90, top: -130 }} />
+                    <div className="lk-mat-grain" />
+                  </>
+                )}
                 <div className="absolute lg:hidden left-1/2 -translate-x-1/2 top-2.5 w-9 h-1 rounded-full" style={{ background: "rgba(26,33,56,0.25)" }} />
                 <button onClick={() => setSelected(null)} aria-label="Fermer" className="absolute right-3.5 top-3.5 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.92)" }}>
                   <X size={14} strokeWidth={2.2} style={{ color: C.ink }} />
                 </button>
                 {devCompetences.length > 0 && selScore > 0 && !selApplied && (
-                  <div className="absolute left-4 bottom-4 inline-flex items-center gap-1.5 rounded-full px-3 py-[7px]" style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+                  <div className="lk-plaque absolute left-4 bottom-4" style={{ color: C.roseDark, padding: "6px 10px", fontSize: 12.5 }}>
                     <Sparkles size={12} strokeWidth={2.2} color={C.rose} />
-                    <span className="text-[12.5px] font-bold" style={{ color: C.roseDark }}>{selScore} % compatible avec ta stack</span>
+                    {selScore} % compatible avec ta stack
                   </div>
                 )}
                 {selApplied && (
-                  <div className="absolute left-4 bottom-4 inline-flex items-center gap-1.5 rounded-full px-3 py-[7px]" style={{ background: C.ink }}>
+                  <div className="lk-stamp absolute left-4 bottom-4" style={{ padding: "6px 10px", fontSize: 12.5 }}>
                     <Check size={12} strokeWidth={2.5} color="#fff" />
-                    <span className="text-[12.5px] font-bold text-white">Candidature envoyée</span>
+                    Candidature envoyée
                   </div>
                 )}
-                <div className="absolute right-4 bottom-1.5 font-bold leading-none text-[72px]" style={{ letterSpacing: "-0.05em", color: "rgba(26,33,56,0.85)" }}>
-                  {selected.titre?.trim()?.[0]?.toUpperCase() ?? "?"}
-                </div>
+                {!selected.image_url && (
+                  <div className="lk-mat-letter right-4 bottom-1.5 text-[72px]">
+                    {selected.titre?.trim()?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
               </div>
 
               {/* Contenu */}
@@ -630,8 +626,8 @@ function ProjetsPageInner() {
                     <span className="text-[13px] font-semibold" style={{ color: C.ink }}>Stack demandée</span>
                     <div className="flex flex-wrap gap-1.5">
                       {selTokens.map((t) => selMatched.has(t)
-                        ? <span key={t} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold" style={{ background: "rgba(212,83,126,0.12)", border: "1px solid rgba(212,83,126,0.24)", color: C.roseDark }}><Check size={11} strokeWidth={3} />{t}</span>
-                        : <span key={t} className="inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-semibold bg-white" style={{ border: `1px solid ${C.hairline}`, color: C.ink }}>{t}</span>
+                        ? <span key={t} className="lk-key lk-key-on" style={{ padding: "6px 11px", fontSize: 12, cursor: "default" }}><Check size={11} strokeWidth={3} />{t}</span>
+                        : <span key={t} className="lk-key" style={{ padding: "6px 11px", fontSize: 12, cursor: "default" }}>{t}</span>
                       )}
                     </div>
                     {devCompetences.length === 0 && (
@@ -652,16 +648,14 @@ function ProjetsPageInner() {
               {role === "developer" && (
                 <div className="shrink-0 flex items-center gap-2.5 px-5 pt-3.5 pb-[calc(16px+env(safe-area-inset-bottom,0px))] bg-white" style={{ borderTop: `1px solid ${C.hairline}` }}>
                   <button onClick={() => router.push(`/projets/${selected.id}`)} aria-label="Voir la page complète du projet"
-                    className="w-12 h-12 shrink-0 flex items-center justify-center rounded-[10px] bg-white" style={{ border: `1px solid ${C.hairline}` }}>
+                    className="btn-icon w-12 h-12 shrink-0">
                     <MessageCircle size={18} strokeWidth={2} style={{ color: C.ink }} />
                   </button>
                   <button
                     onClick={() => { if (!selApplied) handleCandidater(selected.id); }}
                     disabled={selApplied || applying === selected.id}
-                    className="flex-1 h-12 rounded-[10px] flex items-center justify-center gap-2 text-[15px] font-semibold transition-transform active:scale-[0.98]"
-                    style={selApplied
-                      ? { background: C.surface, color: C.muted, border: `1px solid ${C.hairline}`, cursor: "default" }
-                      : { background: C.rose, color: "#fff", border: "none", cursor: "pointer" }}
+                    className={cn("flex-1 h-12 text-[15px]", selApplied ? "lk-key" : "btn-primary")}
+                    style={selApplied ? { color: C.muted, cursor: "default", fontSize: 15 } : undefined}
                   >
                     {selApplied
                       ? <><Check size={15} strokeWidth={2.5} /> Candidature envoyée</>

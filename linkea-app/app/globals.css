@@ -463,3 +463,123 @@ input, textarea, select {
   position: relative;
   display: inline-flex;
 }
+
+/* ─── Matière Linkea ─────────────────────────────────────────────────────
+   Le liquide rose/bleu du logo (et la peau de Linkeo, le fruit du dragon)
+   devient la matière de la marque. Version mate : dégradés courts et peu
+   saturés, un reflet, un grain léger. Règle : uniquement sur les tuiles de
+   projets, Linkeo, le bouton principal et les moments de célébration. */
+:root {
+  --lk-lime: #A7D129;          /* les piquants de Linkeo — accent rare (idée, nouveauté) */
+  --lk-mat-shadow-rose: 0 14px 34px rgba(212, 83, 126, 0.18);
+  --lk-mat-shadow-blue: 0 14px 34px rgba(74, 123, 247, 0.18);
+  --lk-mat-shadow-mix:  0 14px 34px rgba(139, 92, 246, 0.18);
+  --lk-mat-shadow-warm: 0 14px 34px rgba(255, 149, 0, 0.14);
+}
+.lk-mat { position: relative; overflow: hidden; }
+.lk-mat-rose { background: linear-gradient(140deg, #F7CBDA 0%, #E88BAD 52%, #CDA9EC 100%); }
+.lk-mat-blue { background: linear-gradient(140deg, #CBD8FA 0%, #8FAAF3 52%, #C4A2E6 100%); }
+.lk-mat-mix  { background: linear-gradient(140deg, #B9C6F4 0%, #C79EE0 50%, #F0B7CA 100%); }
+.lk-mat-warm { background: linear-gradient(140deg, #F8D2C0 0%, #EE9FB8 55%, #D2A9E8 100%); }
+.lk-mat-hi {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.28) 38%, rgba(255,255,255,0) 70%);
+}
+.lk-mat-grain {
+  position: absolute; inset: 0; opacity: 0.14; mix-blend-mode: soft-light; pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.lk-mat-letter {
+  position: absolute; font-weight: 800; line-height: 1; letter-spacing: -0.05em;
+  color: rgba(255,255,255,0.94); text-shadow: 0 2px 16px rgba(80, 40, 120, 0.22);
+}
+.lk-mat-matte { filter: saturate(0.9); }
+
+/* Bouton principal : léger relief au lieu d'un aplat (deux tons très proches) */
+.btn-primary {
+  background: linear-gradient(180deg, #DB6690 0%, #CF4E7C 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.30), 0 6px 16px rgba(212, 83, 126, 0.22);
+}
+.btn-primary:hover { background: linear-gradient(180deg, #CF5A83 0%, #BF4471 100%); }
+
+/* Linkeo qui respire (chargement) */
+@keyframes lk-breathe { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.03); } }
+.lk-breathe { animation: lk-breathe 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .lk-breathe { animation: none; } }
+
+/* ─── Relief fin : de l'étiquette au contrôle ─────────────────────────────
+   Tout ce qui se clique ressemble à une touche qu'on peut enfoncer : un filet
+   de lumière en haut, une ombre d'un pixel en bas, l'état actif en creux.
+   Coins 6 (plaque) · 7 (tampon) · 10 (touche) · 11 (bouton) · 20 (tuile).
+   Plus de pilule à 100 px. Trois ombres, toujours les mêmes : */
+:root {
+  --lk-key-shadow:     inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 0 rgba(26,33,56,0.08), 0 2px 6px rgba(26,33,56,0.05);
+  --lk-pressed-shadow: inset 0 2px 4px rgba(26,33,56,0.10), inset 0 1px 0 rgba(255,255,255,0.4);
+  --lk-well-shadow:    inset 0 1.5px 3px rgba(26,33,56,0.10), inset 0 0 0 1px rgba(26,33,56,0.04);
+}
+
+/* Touche neutre (bouton secondaire, filtre off, actions) */
+.lk-key, .chip, .btn-ghost, .btn-icon {
+  border-radius: 10px;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F7F7F9 100%);
+  border: 1px solid #DCDCE2;
+  color: var(--text);
+  box-shadow: var(--lk-key-shadow);
+  transition: box-shadow 0.12s ease, transform 0.08s ease, background 0.12s ease, color 0.12s ease;
+}
+.lk-key { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 14px; font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.chip { color: var(--text); }
+.chip:hover, .lk-key:hover, .btn-ghost:hover, .btn-icon:hover { color: var(--text); border-color: #CFCFD7; box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 0 rgba(26,33,56,0.08), 0 4px 10px rgba(26,33,56,0.07); }
+.chip:active, .lk-key:active, .btn-ghost:active, .btn-icon:active { transform: translateY(1px); box-shadow: var(--lk-pressed-shadow); }
+.btn-ghost { border-radius: 11px; }
+.btn-icon { border-radius: 12px; color: var(--text); }
+
+/* Touche enfoncée (filtre actif) */
+.lk-key-on, .chip-active-rose {
+  background: linear-gradient(180deg, #F2E4EA 0%, #F8ECF1 100%);
+  border-color: rgba(212,83,126,0.35);
+  color: #B8436A;
+  box-shadow: var(--lk-pressed-shadow);
+}
+.chip-active-blue {
+  background: linear-gradient(180deg, #E4EBFB 0%, #ECF1FD 100%);
+  border-color: rgba(74,123,247,0.35);
+  color: #3A66D6;
+  box-shadow: var(--lk-pressed-shadow);
+}
+.chip-active-rose:hover, .chip-active-blue:hover, .lk-key-on:hover { box-shadow: var(--lk-pressed-shadow); transform: none; }
+
+/* Bouton principal : touche rose */
+.btn-primary {
+  border-radius: 11px;
+  border: 1px solid #B8436A;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 1px 0 rgba(26,33,56,0.12), 0 6px 14px rgba(212,83,126,0.24);
+}
+.btn-primary:active { transform: translateY(1px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 rgba(26,33,56,0.12), 0 3px 8px rgba(212,83,126,0.2); }
+.btn-primary:disabled { box-shadow: none; }
+
+/* Touche encre (action secondaire forte) */
+.lk-key-ink { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border-radius: 11px; font-family: var(--font-sans); font-size: 14px; font-weight: 700; color: #fff; cursor: pointer; background: linear-gradient(180deg, #2B3452 0%, #1A2138 100%); border: 1px solid #12172A; box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 1px 0 rgba(26,33,56,0.2), 0 6px 14px rgba(26,33,56,0.18); }
+.lk-key-ink:active { transform: translateY(1px); }
+
+/* Rail à glissière (tri, onglets courts) */
+.lk-seg { gap: 2px; padding: 3px; border-radius: 11px; background: #E9E9EE; box-shadow: inset 0 1px 2px rgba(26,33,56,0.10); }
+.lk-seg-item { padding: 7px 12px; border-radius: 8px; border: none; background: transparent; font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; transition: color 0.12s ease; }
+.lk-seg-item:hover { color: var(--text-2); }
+.lk-seg-cur { background: linear-gradient(180deg, #FFFFFF 0%, #F9F9FB 100%); color: var(--text); box-shadow: 0 1px 0 rgba(26,33,56,0.08), 0 2px 5px rgba(26,33,56,0.08); }
+
+/* Plaque (techno sur une tuile, petite info) */
+.lk-plaque { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.94); font-size: 11px; font-weight: 700; color: var(--text); box-shadow: inset 0 1px 0 rgba(255,255,255,1), 0 1px 0 rgba(26,33,56,0.10), 0 1px 3px rgba(26,33,56,0.08); white-space: nowrap; }
+
+/* Tampon (statut : un fait, il a le droit d'être un peu lourd) */
+.lk-stamp { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 7px; background: linear-gradient(180deg, #2B3452 0%, #1A2138 100%); color: #fff; font-size: 11.5px; font-weight: 700; box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 1px 2px rgba(26,33,56,0.25); white-space: nowrap; }
+
+/* Puits (champ de saisie : l'inverse d'une touche) */
+.lk-well, .input-field { border-radius: 12px; background: #EFEFF3; border: 1px solid transparent; box-shadow: var(--lk-well-shadow); }
+.lk-well { height: 44px; padding: 0 14px; color: var(--muted); font-size: 14px; } /* display/align/gap portés par le markup (utilitaires responsive) */
+.lk-well:focus-within, .input-field:focus { background: #FFFFFF; border-color: var(--rose); box-shadow: var(--lk-well-shadow), 0 0 0 3px rgba(212,83,126,0.10); }
+.lk-well input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; font-family: var(--font-sans); font-size: 14px; color: var(--text); }
+
+/* Compteur (badge numérique) */
+.lk-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 6px; font-size: 11px; font-weight: 800; color: #fff; background: linear-gradient(180deg, #DE6A93 0%, #CE4A7A 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 1px 0 rgba(26,33,56,0.12); }

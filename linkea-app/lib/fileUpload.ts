@@ -45,6 +45,12 @@ export function validateAvatar(file: File): FileValidation {
   return validate(file, IMAGE_TYPES, AVATAR_MAX_BYTES);
 }
 
+export const COVER_MAX_BYTES = 8 * 1024 * 1024; // 8 Mo — photo de couverture d'un projet
+
+export function validateCoverImage(file: File): FileValidation {
+  return validate(file, IMAGE_TYPES, COVER_MAX_BYTES);
+}
+
 export function validateProjectFile(file: File): FileValidation {
   return validate(file, DOCUMENT_TYPES, FILE_MAX_BYTES);
 }

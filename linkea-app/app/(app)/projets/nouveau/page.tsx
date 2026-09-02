@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { STACKS } from "@/lib/constants/catalog";
 import PageTransition from "@/components/PageTransition";
+import CoverImagePicker from "@/components/CoverImagePicker";
 import React from "react";
 import { ArrowLeft, ArrowRight, AlertCircle, Plus, X, Check, Sparkles, PenLine, Send } from "lucide-react";
 
@@ -61,6 +62,7 @@ export default function NouveauProjet() {
   const [dateDebut, setDateDebut]       = useState("");
   const [dateFin, setDateFin]           = useState("");
   const [budget, setBudget]             = useState("");
+  const [coverUrl, setCoverUrl]         = useState<string | null>(null);
 
   useEffect(() => {
     async function checkAccess() {
@@ -256,6 +258,7 @@ export default function NouveauProjet() {
       deadline: deadlineStr,
       statut: "pending",
       budget: budget ? Number(budget) : null,
+      image_url: coverUrl,
     });
 
     if (dbError) {
@@ -456,6 +459,11 @@ export default function NouveauProjet() {
                     className="lk-n-input"
                     style={sInput}
                   />
+                </div>
+
+                <div>
+                  <label style={sLabel}>Photo de couverture</label>
+                  <CoverImagePicker value={coverUrl} onChange={setCoverUrl} folder={founderId ?? "anonyme"} />
                 </div>
 
                 <div>
