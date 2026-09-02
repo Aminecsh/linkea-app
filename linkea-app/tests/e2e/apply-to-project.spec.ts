@@ -57,10 +57,11 @@ test("un développeur peut candidater à un projet du feed, puis le retrouver da
   await loginViaUi(page, devEmail, TEST_PASSWORD);
 
   await page.goto("/projets");
-  await page.locator(".card", { hasText: projectTitle }).first().click();
+  await page.getByTestId("project-card").filter({ hasText: projectTitle }).first().click();
   await page.getByRole("button", { name: /candidater à ce projet/i }).click();
 
-  await expect(page.getByText(/candidature envoyée/i)).toBeVisible({ timeout: 10_000 });
+  // Le bouton de la fiche passe en état "envoyée" (le même libellé apparaît aussi en badge sur la card)
+  await expect(page.getByRole("dialog").getByRole("button", { name: /candidature envoyée/i })).toBeVisible({ timeout: 10_000 });
 
   // Suivi des candidatures = page profil du dev
   await page.goto("/profil");
